@@ -1,0 +1,5 @@
+pandas
+fastapi
+redis
+types-redis
+uvicorn
