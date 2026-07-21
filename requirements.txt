@@ -3,3 +3,5 @@ fastapi
 redis
 types-redis
 uvicorn
+python-dotenv
+psycopg2-binary
