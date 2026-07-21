@@ -1,6 +1,3 @@
-# pip install -r requirements.txt
-# python.exe -m pip install --upgrade pip
-
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv

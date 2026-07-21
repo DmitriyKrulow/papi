@@ -51,3 +51,6 @@ my_project/
 
 
 Совет: если порт по умолчанию уже используется, остановите отладчик и откройте палитру команд (Shift+cmd+P), найдите Debug: Add Configuration, выберите Python Debugger, а затем FastAPI. Это создаст пользовательский файл конфигурации в .vscode/launch.json, который вы сможете редактировать. Добавьте в "args":[] следующее, чтобы задать собственный порт: "--port=5000". Сохраните файл и перезапустите отладчик с помощью (F5).
+
+# pip install -r requirements.txt
+# python.exe -m pip install --upgrade pip
