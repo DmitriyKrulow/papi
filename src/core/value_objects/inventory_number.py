@@ -1,0 +1,396 @@
+# src/core/value_objects/inventory_number.py
+from dataclasses import dataclass
+from typing import Optional, ClassVar, Union, List
+import re
+
+
+@dataclass(frozen=True)
+class InventoryNumber:
+    """
+    Value Object для инвентарного номера.
+    Поддерживает три формата:
+    1. Цифровой: 28+ цифр (например, 0232026200020180000000045)
+    2. С префиксом "С": С + 10-14 цифр (например, С2101072050)
+    3. С префиксом "Э": Э + 8 цифр (например, Э99936792)
+    """
+    
+    value: str
+    
+    # Константы
+    _DIGIT_MIN_LENGTH: ClassVar[int] = 28  # Минимальная длина для цифровых номеров
+    _PREFIX_C_MIN_LENGTH: ClassVar[int] = 10  # Минимальная длина для номеров с "С"
+    _PREFIX_C_MAX_LENGTH: ClassVar[int] = 14  # Максимальная длина для номеров с "С"
+    _PREFIX_E_LENGTH: ClassVar[int] = 9  # Длина для номеров с "Э" (Э + 8 цифр)
+    
+    # Регулярные выражения
+    _PATTERN_DIGIT: ClassVar[re.Pattern] = re.compile(r'^\d+$')
+    _PATTERN_PREFIX_C: ClassVar[re.Pattern] = re.compile(r'^[СC]\d+$')  # Поддерживаем и латиницу C
+    _PATTERN_PREFIX_E: ClassVar[re.Pattern] = re.compile(r'^[ЭE]\d+$')  # Поддерживаем и латиницу E
+    
+    def __post_init__(self) -> None:
+        """Нормализация и валидация инвентарного номера"""
+        # Удаляем пробелы и дефисы
+        cleaned = re.sub(r'[\s\-]', '', self.value)
+        object.__setattr__(self, 'value', cleaned)
+        
+        if not self._is_valid():
+            raise ValueError(
+                f"Invalid inventory number: '{self.value}'. "
+                f"Supported formats: "
+                f"1) {self._DIGIT_MIN_LENGTH}+ digits, "
+                f"2) С + {self._PREFIX_C_MIN_LENGTH}-{self._PREFIX_C_MAX_LENGTH} digits, "
+                f"3) Э + 8 digits"
+            )
+    
+    def _is_valid(self) -> bool:
+        """Проверяет валидность инвентарного номера"""
+        value = self.value
+        
+        # Формат 1: Только цифры (минимум 28)
+        if self._PATTERN_DIGIT.match(value):
+            return len(value) >= self._DIGIT_MIN_LENGTH
+        
+        # Формат 2: Префикс "С" + цифры (10-14 символов)
+        if self._PATTERN_PREFIX_C.match(value):
+            digits = value[1:]  # Убираем префикс
+            return self._PREFIX_C_MIN_LENGTH <= len(digits) <= self._PREFIX_C_MAX_LENGTH
+        
+        # Формат 3: Префикс "Э" + 8 цифр
+        if self._PATTERN_PREFIX_E.match(value):
+            digits = value[1:]  # Убираем префикс
+            return len(digits) == 8
+        
+        return False
+    
+    # ========== Свойства ==========
+    
+    @property
+    def prefix(self) -> Optional[str]:
+        """
+        Возвращает префикс номера (если есть).
+        Возвращает: 'С', 'Э' или None для цифровых номеров.
+        """
+        first_char = self.value[0]
+        if first_char in ('С', 'C', 'Э', 'E'):
+            return first_char
+        return None
+    
+    @property
+    def digits_only(self) -> str:
+        """Возвращает только цифровую часть номера (без префикса)"""
+        if self.prefix:
+            return self.value[1:]
+        return self.value
+    
+    @property
+    def length(self) -> int:
+        """Общая длина номера"""
+        return len(self.value)
+    
+    @property
+    def digits_length(self) -> int:
+        """Длина цифровой части номера"""
+        return len(self.digits_only)
+    
+    @property
+    def type(self) -> str:
+        """
+        Возвращает тип номера:
+        - 'digit': только цифры
+        - 'prefix_c': с префиксом С
+        - 'prefix_e': с префиксом Э
+        """
+        if self.prefix in ('С', 'C'):
+            return 'prefix_c'
+        elif self.prefix in ('Э', 'E'):
+            return 'prefix_e'
+        return 'digit'
+    
+    @property
+    def checksum(self) -> int:
+        """
+        Вычисляет контрольную сумму (Luhn алгоритм) для цифровой части.
+        """
+        digits = [int(d) for d in self.digits_only]
+        total = 0
+        
+        # Идем справа налево
+        for i, digit in enumerate(reversed(digits)):
+            if i % 2 == 1:  # Каждая вторая цифра (начиная с последней)
+                doubled = digit * 2
+                if doubled > 9:
+                    doubled -= 9
+                total += doubled
+            else:
+                total += digit
+        
+        return (10 - (total % 10)) % 10
+    
+    @property
+    def is_valid_checksum(self) -> bool:
+        """Проверяет корректность контрольной суммы"""
+        digits = [int(d) for d in self.digits_only]
+        total = 0
+        
+        for i, digit in enumerate(reversed(digits)):
+            if i % 2 == 1:
+                doubled = digit * 2
+                if doubled > 9:
+                    doubled -= 9
+                total += doubled
+            else:
+                total += digit
+        
+        return total % 10 == 0
+    
+    @property
+    def is_digit_sequence(self) -> bool:
+        """Проверяет, является ли номер последовательностью (возрастающей)"""
+        digits = self.digits_only
+        if len(digits) < 2:
+            return False
+        
+        # Проверяем, что все цифры идут по порядку
+        for i in range(len(digits) - 1):
+            if int(digits[i + 1]) != (int(digits[i]) + 1) % 10:
+                return False
+        return True
+    
+    @property
+    def is_repeating_sequence(self) -> bool:
+        """Проверяет, состоит ли номер из повторяющихся блоков"""
+        digits = self.digits_only
+        if len(digits) < 4:
+            return False
+        
+        # Проверяем повторяющиеся блоки (например, 1212, 123123)
+        for block_size in range(2, len(digits) // 2 + 1):
+            if len(digits) % block_size == 0:
+                block = digits[:block_size]
+                if digits == block * (len(digits) // block_size):
+                    return True
+        return False
+    
+    # ========== Методы ==========
+    
+    def format_grouped(self, group_size: int = 4) -> str:
+        """
+        Форматирует номер группами.
+        Примеры:
+        - 0232 0262 0002 0180 0000 00045
+        - С2101 0572 050
+        - Э9993 6792
+        """
+        digits = self.digits_only
+        groups = [digits[i:i + group_size] 
+                  for i in range(0, len(digits), group_size)]
+        
+        if self.prefix:
+            return f"{self.prefix}{' '.join(groups)}"
+        return ' '.join(groups)
+    
+    def obfuscate(self, visible_start: int = 4, visible_end: int = 4) -> str:
+        """
+        Скрывает часть номера для безопасности.
+        """
+        digits = self.digits_only
+        
+        if len(digits) <= visible_start + visible_end:
+            return self.value
+        
+        start = digits[:visible_start]
+        end = digits[-visible_end:]
+        middle = '*' * (len(digits) - visible_start - visible_end)
+        
+        if self.prefix:
+            return f"{self.prefix}{start}{middle}{end}"
+        return f"{start}{middle}{end}"
+    
+    def extract_date(self) -> Optional[dict]:
+        """
+        Пытается извлечь дату из номера (если есть).
+        Для формата С21010573318 -> {'year': 2021, 'month': 1, 'day': 5}
+        """
+        digits = self.digits_only
+        
+        if len(digits) >= 10:
+            # Пытаемся интерпретировать первые 8 цифр как дату
+            try:
+                year_part = digits[:4]
+                month_part = digits[4:6]
+                day_part = digits[6:8]
+                
+                year = int(year_part)
+                month = int(month_part)
+                day = int(day_part)
+                
+                # Проверяем валидность даты
+                if 2000 <= year <= 2099 and 1 <= month <= 12 and 1 <= day <= 31:
+                    return {
+                        'year': year,
+                        'month': month,
+                        'day': day,
+                        'formatted': f"{day:02d}.{month:02d}.{year}"
+                    }
+            except ValueError:
+                pass
+        
+        return None
+    
+    def get_serial_number(self) -> Optional[int]:
+        """
+        Извлекает серийный номер (последние цифры).
+        Для 0232026200020180000000045 -> 45
+        """
+        digits = self.digits_only
+        if len(digits) >= 4:
+            try:
+                return int(digits[-4:])
+            except ValueError:
+                pass
+        return None
+    
+    def get_batch_id(self) -> Optional[str]:
+        """
+        Извлекает идентификатор партии (первые 16-20 цифр).
+        Для 0232026200020180000000045 -> 0232026200020180
+        """
+        digits = self.digits_only
+        if len(digits) >= 20:
+            return digits[:16]
+        return None
+    
+    def is_sequential_with(self, other: 'InventoryNumber') -> bool:
+        """
+        Проверяет, являются ли номера последовательными.
+        """
+        if self.prefix != other.prefix:
+            return False
+        
+        if self.type != other.type:
+            return False
+        
+        try:
+            # Пытаемся сравнить как числа
+            self_num = int(self.digits_only)
+            other_num = int(other.digits_only)
+            return abs(self_num - other_num) == 1
+        except ValueError:
+            return False
+    
+    def increment(self, steps: int = 1) -> Optional['InventoryNumber']:
+        """
+        Генерирует следующий номер в последовательности.
+        """
+        try:
+            digits_int = int(self.digits_only)
+            new_digits_int = digits_int + steps
+            
+            # Сохраняем длину
+            new_digits = str(new_digits_int).zfill(len(self.digits_only))
+            
+            if self.prefix:
+                return InventoryNumber(f"{self.prefix}{new_digits}")
+            return InventoryNumber(new_digits)
+        except (ValueError, OverflowError):
+            return None
+    
+    # ========== Фабричные методы ==========
+    
+    @classmethod
+    def create_allow_null(cls, value: Optional[str]) -> Optional['InventoryNumber']:
+        """Безопасное создание: возвращает None для пустых значений"""
+        if not value or not value.strip():
+            return None
+        return cls(value)
+    
+    @classmethod
+    def create_quiet(cls, value: str) -> Optional['InventoryNumber']:
+        """Создает номер без выбрасывания исключений"""
+        try:
+            return cls(value)
+        except ValueError:
+            return None
+    
+    @classmethod
+    def generate_digit(cls, length: int = 28) -> 'InventoryNumber':
+        """Генерирует цифровой номер заданной длины"""
+        import secrets
+        
+        if length < cls._DIGIT_MIN_LENGTH:
+            length = cls._DIGIT_MIN_LENGTH
+        
+        digits = ''.join(str(secrets.randbelow(10)) for _ in range(length))
+        return cls(digits)
+    
+    @classmethod
+    def generate_prefix_c(cls, digits_length: int = 11) -> 'InventoryNumber':
+        """Генерирует номер с префиксом С"""
+        import secrets
+        
+        if digits_length < cls._PREFIX_C_MIN_LENGTH:
+            digits_length = cls._PREFIX_C_MIN_LENGTH
+        if digits_length > cls._PREFIX_C_MAX_LENGTH:
+            digits_length = cls._PREFIX_C_MAX_LENGTH
+        
+        digits = ''.join(str(secrets.randbelow(10)) for _ in range(digits_length))
+        return cls(f"С{digits}")
+    
+    @classmethod
+    def generate_prefix_e(cls) -> 'InventoryNumber':
+        """Генерирует номер с префиксом Э"""
+        import secrets
+        
+        digits = ''.join(str(secrets.randbelow(10)) for _ in range(8))
+        return cls(f"Э{digits}")
+    
+    # ========== Статистические методы ==========
+    
+    @classmethod
+    def analyze_sequence(cls, numbers: List['InventoryNumber']) -> dict:
+        """
+        Анализирует последовательность номеров.
+        Возвращает статистику по типам, длинам и диапазонам.
+        """
+        if not numbers:
+            return {'count': 0, 'types': {}, 'lengths': {}, 'ranges': {}}
+        
+        types = {}
+        lengths = {}
+        digit_values = []
+        
+        for num in numbers:
+            t = num.type
+            types[t] = types.get(t, 0) + 1
+            
+            l = num.length
+            lengths[l] = lengths.get(l, 0) + 1
+            
+            try:
+                digit_values.append(int(num.digits_only))
+            except ValueError:
+                pass
+        
+        result = {
+            'count': len(numbers),
+            'types': types,
+            'lengths': lengths,
+        }
+        
+        if digit_values:
+            result['ranges'] = {
+                'min': min(digit_values),
+                'max': max(digit_values),
+                'unique': len(set(digit_values)),
+                'sequential': max(digit_values) - min(digit_values) + 1 == len(set(digit_values))
+            }
+        
+        return result
+    
+    # ========== Специальные методы ==========
+    
+    def __str__(self) -> str:
+        return self.value
+    
+    def __repr__(self) -> str:
+        return f"InventoryNumber('{self.value}')"
