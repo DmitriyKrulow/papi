@@ -11,7 +11,7 @@
             "request": "launch",
             "module": "uvicorn",
             "args": [
-                "src.infrastructure.main:app",
+                "backend.src.infrastructure.main:app",
                 "--reload",
                 "--port=8888",
                 "--app-dir",

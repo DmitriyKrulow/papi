@@ -18,7 +18,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import declarative_base, relationship
 
-from core.value_objects import AssetStatus
+from backend.src.core.value_objects import AssetStatus
 
 Base = declarative_base()
 
@@ -88,6 +88,7 @@ class Asset(Base):
         CheckConstraint("current_value >= 0", name="chk_assets_current_value_non_negative"),
     )
 
+    # Relationships
     repair_requests = relationship(
         "RepairRequest", back_populates="asset", cascade="all, delete-orphan"
     )

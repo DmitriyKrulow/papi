@@ -1,0 +1,29 @@
+{
+  "users": {
+    "1": {
+      "id": 1,
+      "email": "admin@papi.local",
+      "username": "admin",
+      "full_name": "\u0421\u0438\u0441\u0442\u0435\u043c\u043d\u044b\u0439 \u0430\u0434\u043c\u0438\u043d\u0438\u0441\u0442\u0440\u0430\u0442\u043e\u0440",
+      "phone": null,
+      "password_hash": "D1hkUJMD1I7tEPqworrqSm2l7unpMEwJ7/hCuzYe8iw=$100000$9cF3TFfyFJTWw3Wzk9zHHMF71GkYor8+UUjuesDtdaU=",
+      "role": "admin",
+      "is_active": true,
+      "created_at": "2026-07-24T00:52:27.018190",
+      "updated_at": "2026-07-24T00:52:27.018190"
+    },
+    "2": {
+      "id": 2,
+      "email": "dkrugg@mail.ru",
+      "username": "kdw",
+      "full_name": "\u041a\u0440\u0443\u0433\u043b\u043e\u0432 \u0414\u043c\u0438\u0442\u0440\u0438\u0439 \u0412\u043b\u0430\u0434\u0438\u043c\u0438\u0440\u043e\u0432\u0438\u0447",
+      "phone": "+79118842134",
+      "password_hash": "yeaUssSqciY04uNFdQonxbCliap2C1KhvlIYp9vXKHU=$100000$iSvmbKR+mGTktHTFzHwMrpmQ0quXQ6ViF69zK+j/9fk=",
+      "role": "user",
+      "is_active": true,
+      "created_at": "2026-07-24T00:53:15.410371",
+      "updated_at": "2026-07-24T00:53:15.410371"
+    }
+  },
+  "counter": 2
+}
