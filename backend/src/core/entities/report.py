@@ -6,7 +6,7 @@ from enum import Enum
 
 
 class ReportType(Enum):
-    """Типы отчетов"""
+    """???? ???????"""
     ASSET_LIST = "asset_list"
     ASSET_CARD = "asset_card"
     DEPRECIATION = "depreciation"
@@ -21,7 +21,7 @@ class ReportType(Enum):
 
 
 class ReportFormat(Enum):
-    """Форматы отчетов"""
+    """??????? ???????"""
     PDF = "pdf"
     EXCEL = "excel"
     CSV = "csv"
@@ -30,7 +30,7 @@ class ReportFormat(Enum):
 
 
 class ReportStatus(Enum):
-    """Статус отчета"""
+    """?????? ??????"""
     GENERATING = "generating"
     READY = "ready"
     ERROR = "error"
@@ -40,7 +40,7 @@ class ReportStatus(Enum):
 @dataclass
 class Report:
     """
-    Сущность "Отчет".
+    ???????? "?????".
     """
     id: int
     name: str
@@ -48,7 +48,7 @@ class Report:
     format: ReportFormat
     created_by: int
     
-    # Поля со значениями по умолчанию
+    # ???? ?? ?????????? ?? ?????????
     parameters: Dict[str, Any] = field(default_factory=dict)
     filters: Dict[str, Any] = field(default_factory=dict)
     
@@ -68,45 +68,45 @@ class Report:
     tags: List[str] = field(default_factory=list)
     
     def mark_ready(self, document_id: int) -> None:
-        """Отметить отчет как готовый"""
+        """???????? ????? ??? ???????"""
         self.status = ReportStatus.READY
         self.document_id = document_id
         self.generated_at = datetime.now()
     
     def mark_error(self, error_message: str) -> None:
-        """Отметить отчет как ошибочный"""
+        """???????? ????? ??? ?????????"""
         self.status = ReportStatus.ERROR
         self.error_message = error_message
     
     def is_ready(self) -> bool:
-        """Готов ли отчет к скачиванию"""
+        """????? ?? ????? ? ??????????"""
         return self.status == ReportStatus.READY
     
     def is_expired(self) -> bool:
-        """Просрочен ли отчет"""
+        """????????? ?? ?????"""
         if not self.expires_at:
             return False
         return datetime.now() > self.expires_at
     
     def get_type_display(self) -> str:
-        """Читаемое название типа отчета"""
+        """???????? ???????? ???? ??????"""
         types = {
-            ReportType.ASSET_LIST: "Список активов",
-            ReportType.ASSET_CARD: "Карточка актива",
-            ReportType.DEPRECIATION: "Амортизация",
-            ReportType.MOVEMENT: "Перемещения",
-            ReportType.MAINTENANCE: "Техническое обслуживание",
-            ReportType.REPAIR: "Ремонты",
-            ReportType.INVENTORY: "Инвентаризация",
-            ReportType.WRITE_OFF: "Списание",
-            ReportType.SUMMARY: "Сводка",
-            ReportType.TAX: "Налоговый учет",
-            ReportType.CUSTOM: "Пользовательский",
+            ReportType.ASSET_LIST: "?????? ???????",
+            ReportType.ASSET_CARD: "???????? ??????",
+            ReportType.DEPRECIATION: "???????????",
+            ReportType.MOVEMENT: "???????????",
+            ReportType.MAINTENANCE: "??????????? ????????????",
+            ReportType.REPAIR: "???????",
+            ReportType.INVENTORY: "??????????????",
+            ReportType.WRITE_OFF: "????????",
+            ReportType.SUMMARY: "??????",
+            ReportType.TAX: "????????? ????",
+            ReportType.CUSTOM: "????????????????",
         }
         return types.get(self.report_type, str(self.report_type))
     
     def get_format_display(self) -> str:
-        """Читаемое название формата"""
+        """???????? ???????? ???????"""
         formats = {
             ReportFormat.PDF: "PDF",
             ReportFormat.EXCEL: "Excel",
@@ -118,3 +118,4 @@ class Report:
     
     def __str__(self) -> str:
         return f"Report(id={self.id}, name='{self.name}', type={self.report_type})"
+

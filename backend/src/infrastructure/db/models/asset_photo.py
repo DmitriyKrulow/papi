@@ -17,7 +17,7 @@ Base = declarative_base()
 
 
 class AssetPhoto(Base):
-    """Модель фотографии актива"""
+    """?????? ?????????? ??????"""
     __tablename__ = "asset_photos"
 
     id = Column(Integer, primary_key=True)
@@ -55,3 +55,5 @@ class AssetPhoto(Base):
 
     def __repr__(self) -> str:
         return f"<AssetPhoto(id={self.id}, asset_id={self.asset_id}, stage='{self.stage}')>"
+
+

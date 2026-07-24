@@ -2,41 +2,61 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel
 
 
 class DocumentBase(BaseModel):
-    filename: str = Field(..., min_length=1, max_length=255, description="Имя файла")
-    file_size: int = Field(..., ge=0, description="Размер файла в байтах")
-    mime_type: str = Field(..., max_length=100, description="MIME тип файла")
-    title: Optional[str] = Field(None, max_length=255, description="Заголовок документа")
-    description: Optional[str] = Field(None, max_length=1000, description="Описание")
+    filename: str
+    file_path: str
+    file_size: int
+    mime_type: str
+    document_type: str = "other"
+    category: str = "asset"
+    entity_id: Optional[int] = None
+    entity_type: Optional[str] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
+    is_primary: bool = False
+    sort_order: int = 0
+    file_hash: Optional[str] = None
 
 
 class DocumentCreate(DocumentBase):
-    document_type: Optional[str] = Field("other", description="Тип документа")
-    category: Optional[str] = Field("asset", description="Категория документа")
-    entity_id: Optional[int] = Field(None, description="ID сущности")
-    entity_type: Optional[str] = Field(None, description="Тип сущности")
-    is_primary: Optional[bool] = Field(False, description="Основной документ")
+    uploaded_by: int
 
 
 class DocumentResponse(DocumentBase):
-    id: int = Field(..., description="ID документа")
-    document_type: str
-    category: str
-    entity_id: Optional[int]
-    entity_type: Optional[str]
-    file_path: str
+    id: int
     uploaded_by: int
     uploaded_at: datetime
-    is_primary: bool
-    sort_order: int
-    file_hash: Optional[str]
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 
-class DocumentListResponse(BaseModel):
-    total: int
-    items: list[DocumentResponse]
+# Типы документов
+class DocumentType:
+    PHOTO = "photo"
+    SCAN = "scan"
+    CONTRACT = "contract"
+    INVOICE = "invoice"
+    ACT = "act"
+    WARRANTY = "warranty"
+    PASSPORT = "passport"
+    MANUAL = "manual"
+    CERTIFICATE = "certificate"
+    REPORT = "report"
+    OTHER = "other"
+
+
+# Категории документов
+class DocumentCategory:
+    ASSET = "asset"
+    REPAIR = "repair"
+    INVENTORY = "inventory"
+    MOVEMENT = "movement"
+    WRITE_OFF = "write_off"
+    CONTRACT = "contract"
+    SUPPLIER = "supplier"
+    EMPLOYEE = "employee"
+    REPORT = "report"

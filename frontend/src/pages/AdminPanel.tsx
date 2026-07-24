@@ -1,6 +1,7 @@
+// frontend/src/pages/AdminPanel.tsx
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../hooks/useAuth';
-import Navbar from '../components/common/Navbar';
+import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 
 interface User {
   id: number;
@@ -14,25 +15,38 @@ interface User {
 }
 
 const AdminPanel: React.FC = () => {
-  const { user, isAuthenticated, isAdmin } = useAuth();
+  const navigate = useNavigate();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingUser, setDeletingUser] = useState<number | null>(null);
+  const [updatingRole, setUpdatingRole] = useState<number | null>(null);
 
+  // Проверяем авторизацию и права администратора
   useEffect(() => {
-    if (!isAuthenticated) {
-      window.location.href = '/login';
+    const token = localStorage.getItem('token');
+    const userStr = localStorage.getItem('user');
+    
+    if (!token) {
+      navigate('/login');
       return;
     }
 
-    if (!isAdmin) {
-      window.location.href = '/';
+    // Проверяем роль
+    try {
+      const user = userStr ? JSON.parse(userStr) : null;
+      if (user?.role !== 'admin') {
+        toast.error('Доступ запрещен. Требуются права администратора.');
+        navigate('/dashboard');
+        return;
+      }
+    } catch {
+      navigate('/dashboard');
       return;
     }
 
     fetchUsers();
-  }, [isAuthenticated, isAdmin]);
+  }, [navigate]);
 
   const fetchUsers = async () => {
     try {
@@ -40,19 +54,28 @@ const AdminPanel: React.FC = () => {
       const token = localStorage.getItem('token');
       const response = await fetch('/api/admin/users', {
         headers: {
-          Authorization: `Bearer ${token}`,
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
       });
 
       if (!response.ok) {
-        throw new Error('Failed to fetch users');
+        if (response.status === 401) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          navigate('/login');
+          return;
+        }
+        throw new Error(`Failed to fetch users: ${response.status}`);
       }
 
       const data = await response.json();
-      setUsers(data);
+      setUsers(Array.isArray(data) ? data : data.items || []);
+      setError(null);
     } catch (err) {
       setError('Ошибка при загрузке пользователей');
       console.error(err);
+      toast.error('Ошибка загрузки пользователей');
     } finally {
       setLoading(false);
     }
@@ -69,7 +92,8 @@ const AdminPanel: React.FC = () => {
       const response = await fetch(`/api/admin/users/${userId}`, {
         method: 'DELETE',
         headers: {
-          Authorization: `Bearer ${token}`,
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
       });
 
@@ -78,9 +102,11 @@ const AdminPanel: React.FC = () => {
       }
 
       setUsers(users.filter(u => u.id !== userId));
+      toast.success('Пользователь удален');
     } catch (err) {
       setError('Ошибка при удалении пользователя');
       console.error(err);
+      toast.error('Ошибка удаления пользователя');
     } finally {
       setDeletingUser(null);
     }
@@ -88,12 +114,15 @@ const AdminPanel: React.FC = () => {
 
   const handleRoleChange = async (userId: number, newRole: string) => {
     try {
+      setUpdatingRole(userId);
       const token = localStorage.getItem('token');
-      const response = await fetch(`/api/admin/users/${userId}/role?role=${newRole}`, {
+      const response = await fetch(`/api/admin/users/${userId}/role`, {
         method: 'PUT',
         headers: {
-          Authorization: `Bearer ${token}`,
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify({ role: newRole }),
       });
 
       if (!response.ok) {
@@ -103,9 +132,13 @@ const AdminPanel: React.FC = () => {
       setUsers(users.map(u => 
         u.id === userId ? { ...u, role: newRole } : u
       ));
+      toast.success('Роль обновлена');
     } catch (err) {
       setError('Ошибка при изменении роли');
       console.error(err);
+      toast.error('Ошибка изменения роли');
+    } finally {
+      setUpdatingRole(null);
     }
   };
 
@@ -113,7 +146,7 @@ const AdminPanel: React.FC = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900">Загрузка...</h2>
+          <div className="text-2xl font-bold text-gray-900">Загрузка...</div>
         </div>
       </div>
     );
@@ -121,16 +154,23 @@ const AdminPanel: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
-      <Navbar />
       <main className="flex-grow container mx-auto px-4 py-8">
         <div className="max-w-6xl mx-auto">
           <div className="bg-white shadow rounded-lg p-6 mb-6">
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">Админ-панель</h1>
+            <div className="flex justify-between items-center mb-4">
+              <h1 className="text-2xl font-bold text-gray-900">👑 Админ-панель</h1>
+              <button
+                onClick={() => navigate('/dashboard')}
+                className="text-blue-600 hover:text-blue-800 transition"
+              >
+                ← Назад в дашборд
+              </button>
+            </div>
             <p className="text-sm text-gray-500 mb-4">Управление пользователями системы</p>
             
             {error && (
               <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-                {error}
+                ❌ {error}
               </div>
             )}
 
@@ -156,7 +196,7 @@ const AdminPanel: React.FC = () => {
                     </tr>
                   ) : (
                     users.map((user) => (
-                      <tr key={user.id}>
+                      <tr key={user.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.id}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{user.username}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.email}</td>
@@ -167,11 +207,12 @@ const AdminPanel: React.FC = () => {
                           <select
                             value={user.role}
                             onChange={(e) => handleRoleChange(user.id, e.target.value)}
-                            className="px-2 py-1 border rounded-md text-sm"
-                            disabled={user.id === user.id}
+                            disabled={updatingRole === user.id}
+                            className="px-2 py-1 border rounded-md text-sm disabled:opacity-50"
                           >
-                            <option value="user">user</option>
-                            <option value="admin">admin</option>
+                            <option value="user">Пользователь</option>
+                            <option value="admin">Администратор</option>
+                            <option value="viewer">Наблюдатель</option>
                           </select>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -185,7 +226,7 @@ const AdminPanel: React.FC = () => {
                             disabled={deletingUser === user.id}
                             className="text-red-600 hover:text-red-900 disabled:opacity-50"
                           >
-                            {deletingUser === user.id ? 'Удаление...' : 'Удалить'}
+                            {deletingUser === user.id ? 'Удаление...' : '🗑️ Удалить'}
                           </button>
                         </td>
                       </tr>
@@ -194,15 +235,21 @@ const AdminPanel: React.FC = () => {
                 </tbody>
               </table>
             </div>
+
+            {users.length > 0 && (
+              <div className="mt-4 text-sm text-gray-500">
+                Всего пользователей: {users.length}
+              </div>
+            )}
           </div>
 
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h3 className="text-lg font-medium text-blue-900 mb-2">Информация</h3>
+            <h3 className="text-lg font-medium text-blue-900 mb-2">ℹ️ Информация</h3>
             <ul className="list-disc list-inside text-sm text-blue-700 space-y-1">
               <li>Здесь вы можете управлять всеми пользователями системы</li>
               <li>Администраторы имеют полный доступ ко всем функциям</li>
               <li>Обычные пользователи могут управлять только своими данными</li>
-              <li>Начальный администратор: admin (пароль: admin123)</li>
+              <li>Начальный администратор: <strong>admin</strong> (пароль: <strong>admin123</strong>)</li>
             </ul>
           </div>
         </div>

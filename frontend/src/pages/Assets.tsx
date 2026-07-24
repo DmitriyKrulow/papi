@@ -1,6 +1,8 @@
 // frontend/src/pages/Assets.tsx
 import { useState, useEffect, useMemo } from 'react';
-import { apiClient } from '../api/client';
+import { useNavigate } from 'react-router-dom';
+// Удаляем неиспользуемый импорт
+// import { apiClient } from '../api/client';
 import type { Asset } from '../types';
 import { AssetStatusMap } from '../types';
 import { formatMoney } from '../utils/helpers';
@@ -11,6 +13,7 @@ import EditAssetForm from '../components/assets/EditAssetForm';
 import AssetDetailsModal from '../components/assets/AssetDetailsModal';
 
 const Assets: React.FC = () => {
+  const navigate = useNavigate();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -29,9 +32,21 @@ const Assets: React.FC = () => {
     const fetchAssets = async () => {
       try {
         setLoading(true);
-        const response = await apiClient.assets.list();
-        setAssets(response.data);
-        setError(null);
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/assets', {
+          headers: {
+            'Authorization': token ? `Bearer ${token}` : '',
+          },
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setAssets(data.items || data || []);
+          setError(null);
+        } else {
+          setError('Ошибка загрузки активов');
+          toast.error('Ошибка загрузки активов');
+        }
       } catch (err: any) {
         setError('Ошибка загрузки активов: ' + (err.message || 'Неизвестная ошибка'));
         toast.error('Ошибка загрузки активов');
@@ -46,8 +61,8 @@ const Assets: React.FC = () => {
   const filteredAssets = useMemo(() => {
     return assets.filter((asset) => {
       const matchesSearch =
-        asset.inventory_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        asset.name.toLowerCase().includes(searchQuery.toLowerCase());
+        asset.inventory_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        asset.name?.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesStatus = statusFilter === 'all' || asset.status === statusFilter;
       return matchesSearch && matchesStatus;
     });
@@ -57,6 +72,14 @@ const Assets: React.FC = () => {
     return [...filteredAssets].sort((a, b) => {
       const aValue = a[sortField];
       const bValue = b[sortField];
+
+      if (aValue === undefined && bValue === undefined) return 0;
+      if (aValue === undefined) return 1;
+      if (bValue === undefined) return -1;
+
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        return sortOrder === 'asc' ? aValue - bValue : bValue - aValue;
+      }
 
       if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
       if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
@@ -97,10 +120,24 @@ const Assets: React.FC = () => {
 
   const handleAddAsset = async (asset: Omit<Asset, 'id' | 'created_at' | 'updated_at'>) => {
     try {
-      const response = await apiClient.assets.create(asset);
-      setAssets((prev) => [...prev, response.data]);
-      toast.success('Актив добавлен');
-      setIsAddModalOpen(false);
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/assets', {
+        method: 'POST',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(asset),
+      });
+      
+      if (response.ok) {
+        const newAsset = await response.json();
+        setAssets((prev) => [...prev, newAsset]);
+        toast.success('Актив добавлен');
+        setIsAddModalOpen(false);
+      } else {
+        toast.error('Ошибка добавления актива');
+      }
     } catch (err: any) {
       toast.error('Ошибка добавления актива');
     }
@@ -108,34 +145,49 @@ const Assets: React.FC = () => {
 
   const handleEditAsset = async (asset: Asset) => {
     try {
-      const response = await apiClient.assets.update(asset.id, asset);
-      setAssets((prev) =>
-        prev.map((a) => (a.id === asset.id ? response.data : a))
-      );
-      toast.success('Актив обновлен');
-      setIsEditModalOpen(false);
-      setCurrentAsset(null);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/assets/${asset.id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(asset),
+      });
+      
+      if (response.ok) {
+        const updatedAsset = await response.json();
+        setAssets((prev) =>
+          prev.map((a) => (a.id === asset.id ? updatedAsset : a))
+        );
+        toast.success('Актив обновлен');
+        setIsEditModalOpen(false);
+        setCurrentAsset(null);
+      } else {
+        toast.error('Ошибка обновления актива');
+      }
     } catch (err: any) {
       toast.error('Ошибка обновления актива');
-    }
-  };
-
-  const handleHideAsset = async (id: number) => {
-    if (!window.confirm('Вы уверены, что хотите скрыть этот актив?')) return;
-    try {
-      await apiClient.assets.hide(id);
-      setAssets((prev) => prev.filter((a) => a.id !== id));
-      toast.success('Актив скрыт');
-    } catch (err: any) {
-      toast.error('Ошибка скрытия актива');
     }
   };
 
   const handleDeleteAsset = async (id: number) => {
     if (!window.confirm('Вы уверены, что хотите удалить этот актив?')) return;
     try {
-      await apiClient.assets.delete(id);
-      toast.success('Актив удален навсегда');
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/assets/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
+      });
+      
+      if (response.ok) {
+        setAssets((prev) => prev.filter((a) => a.id !== id));
+        toast.success('Актив удален');
+      } else {
+        toast.error('Ошибка удаления актива');
+      }
     } catch (err: any) {
       toast.error('Ошибка удаления актива');
     }
@@ -187,12 +239,20 @@ const Assets: React.FC = () => {
     <div>
       <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
         <h1 className="text-2xl font-bold text-gray-800">📦 Активы</h1>
-        <button
-          onClick={() => setIsAddModalOpen(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition flex items-center gap-2"
-        >
-          <span>➕</span> Добавить актив
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => navigate('/assets/create')}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition flex items-center gap-2"
+          >
+            <span>➕</span> Добавить актив
+          </button>
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition flex items-center gap-2"
+          >
+            <span>📤</span> Быстрое добавление
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow p-4 mb-6 space-y-4">
@@ -307,16 +367,9 @@ const Assets: React.FC = () => {
                         ✏️
                       </button>
                       <button
-                        onClick={() => handleHideAsset(asset.id)}
-                        className="text-yellow-600 hover:text-yellow-800 mr-3 transition"
-                        title="Скрыть"
-                      >
-                        🟡
-                      </button>
-                      <button
                         onClick={() => handleDeleteAsset(asset.id)}
                         className="text-red-600 hover:text-red-800 transition"
-                        title="Удалить навсегда"
+                        title="Удалить"
                       >
                         🗑️
                       </button>

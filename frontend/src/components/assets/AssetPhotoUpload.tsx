@@ -1,5 +1,6 @@
+// frontend/src/components/assets/AssetPhotoUpload.tsx
 import { useState } from 'react';
-import { useAssetPhotos } from '../hooks/useAssetPhotos';
+import { useAssetPhotos } from '../../hooks/useAssetPhotos';
 
 interface AssetPhotoUploadProps {
   assetId: number;
@@ -94,12 +95,6 @@ export const AssetPhotoUpload = ({
     } finally {
       setIsUploading(false);
     }
-  };
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
   return (

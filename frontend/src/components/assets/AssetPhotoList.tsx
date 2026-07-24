@@ -1,5 +1,6 @@
+// frontend/src/components/assets/AssetPhotoList.tsx
 import { useState } from 'react';
-import { useAssetPhotos } from '../hooks/useAssetPhotos';
+import { useAssetPhotos } from '../../hooks/useAssetPhotos';
 
 interface AssetPhotoListProps {
   assetId: number;

@@ -7,7 +7,7 @@ from typing import Optional
 @dataclass(frozen=True)
 class YearPeriod:
     """
-    Годовой период (для учета и амортизации).
+    ??????? ?????? (??? ????? ? ???????????).
     """
     year: int
     
@@ -17,15 +17,15 @@ class YearPeriod:
     
     @classmethod
     def current(cls) -> 'YearPeriod':
-        """Текущий год"""
+        """??????? ???"""
         return cls(date.today().year)
     
     @classmethod
     def from_inventory_number(cls, value: str) -> Optional['YearPeriod']:
         """
-        Извлекает год из инвентарного номера.
+        ????????? ??? ?? ???????????? ??????.
         """
-        # Ищем 4 цифры подряд, которые похожи на год (20xx)
+        # ???? 4 ????? ??????, ??????? ?????? ?? ??? (20xx)
         import re
         matches = re.findall(r'(20\d{2})', value)
         if matches:
@@ -38,20 +38,20 @@ class YearPeriod:
     
     @property
     def decade(self) -> int:
-        """Десятилетие (2020-е, 2030-е)"""
+        """??????????? (2020-?, 2030-?)"""
         return (self.year // 10) * 10
     
     @property
     def is_leap(self) -> bool:
-        """Високосный год?"""
+        """?????????? ????"""
         return (self.year % 4 == 0 and self.year % 100 != 0) or (self.year % 400 == 0)
     
     def next(self) -> 'YearPeriod':
-        """Следующий год"""
+        """????????? ???"""
         return YearPeriod(self.year + 1)
     
     def previous(self) -> 'YearPeriod':
-        """Предыдущий год"""
+        """?????????? ???"""
         return YearPeriod(self.year - 1)
     
     def __str__(self) -> str:
@@ -59,3 +59,4 @@ class YearPeriod:
     
     def __repr__(self) -> str:
         return f"YearPeriod({self.year})"
+

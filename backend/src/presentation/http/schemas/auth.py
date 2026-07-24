@@ -6,43 +6,43 @@ from pydantic import BaseModel, Field, EmailStr
 
 
 class UserBase(BaseModel):
-    username: str = Field(..., min_length=3, max_length=50, description="Имя пользователя")
-    email: EmailStr = Field(..., description="Email адрес")
-    full_name: Optional[str] = Field(None, max_length=100, description="ФИО")
-    phone: Optional[str] = Field(None, description="Телефон")
-    department: Optional[str] = Field(None, max_length=255, description="Подразделение")
-    role: str = Field("user", max_length=50, description="Роль пользователя")
-    is_active: bool = Field(True, description="Активен ли пользователь")
+    username: str = Field(..., min_length=3, max_length=50, description="??? ????????????")
+    email: EmailStr = Field(..., description="Email ?????")
+    full_name: Optional[str] = Field(None, max_length=100, description="???")
+    phone: Optional[str] = Field(None, description="???????")
+    department: Optional[str] = Field(None, max_length=255, description="?????????????")
+    role: str = Field("user", max_length=50, description="???? ????????????")
+    is_active: bool = Field(True, description="??????? ?? ????????????")
 
 
 class UserCreate(UserBase):
-    password: str = Field(..., min_length=6, max_length=255, description="Пароль (обязательное поле)")
+    password: str = Field(..., min_length=6, max_length=255, description="?????? (???????????? ????)")
 
 
 class UserUpdate(BaseModel):
-    username: Optional[str] = Field(None, min_length=3, max_length=50, description="Имя пользователя")
-    email: Optional[EmailStr] = Field(None, description="Email адрес")
-    full_name: Optional[str] = Field(None, max_length=100, description="ФИО")
-    phone: Optional[str] = Field(None, description="Телефон")
-    department: Optional[str] = Field(None, max_length=255, description="Подразделение")
-    role: Optional[str] = Field(None, max_length=50, description="Роль пользователя")
-    is_active: Optional[bool] = Field(None, description="Активен ли пользователь")
+    username: Optional[str] = Field(None, min_length=3, max_length=50, description="??? ????????????")
+    email: Optional[EmailStr] = Field(None, description="Email ?????")
+    full_name: Optional[str] = Field(None, max_length=100, description="???")
+    phone: Optional[str] = Field(None, description="???????")
+    department: Optional[str] = Field(None, max_length=255, description="?????????????")
+    role: Optional[str] = Field(None, max_length=50, description="???? ????????????")
+    is_active: Optional[bool] = Field(None, description="??????? ?? ????????????")
 
 
 class UserResponse(UserBase):
-    id: int = Field(..., description="ID пользователя")
-    created_at: datetime = Field(..., description="Дата создания")
-    updated_at: datetime = Field(..., description="Дата последнего обновления")
+    id: int = Field(..., description="ID ????????????")
+    created_at: datetime = Field(..., description="???? ????????")
+    updated_at: datetime = Field(..., description="???? ?????????? ??????????")
 
 
 class UserLogin(BaseModel):
-    username: str = Field(..., description="Имя пользователя")
-    password: str = Field(..., description="Пароль")
+    username: str = Field(..., description="??? ????????????")
+    password: str = Field(..., description="??????")
 
 
 class UserToken(BaseModel):
-    access_token: str = Field(..., description="JWT токен доступа")
-    token_type: str = Field("bearer", description="Тип токена")
+    access_token: str = Field(..., description="JWT ????? ???????")
+    token_type: str = Field("bearer", description="??? ??????")
 
 
 class TokenData(BaseModel):
@@ -51,12 +51,14 @@ class TokenData(BaseModel):
 
 
 class ProfileUpdate(BaseModel):
-    username: Optional[str] = Field(None, min_length=3, max_length=50, description="Имя пользователя")
-    email: Optional[EmailStr] = Field(None, description="Email адрес")
-    full_name: Optional[str] = Field(None, max_length=100, description="ФИО")
-    phone: Optional[str] = Field(None, description="Телефон")
+    username: Optional[str] = Field(None, min_length=3, max_length=50, description="??? ????????????")
+    email: Optional[EmailStr] = Field(None, description="Email ?????")
+    full_name: Optional[str] = Field(None, max_length=100, description="???")
+    phone: Optional[str] = Field(None, description="???????")
 
 
 class ChangePasswordRequest(BaseModel):
-    old_password: str = Field(..., description="Старый пароль")
-    new_password: str = Field(..., min_length=6, max_length=255, description="Новый пароль")
+    old_password: str = Field(..., description="?????? ??????")
+    new_password: str = Field(..., min_length=6, max_length=255, description="????? ??????")
+
+

@@ -1,149 +1,272 @@
-from datetime import datetime
-from pathlib import Path
-from typing import List, Optional
-import uuid
+# src/presentation/http/routers/documents.py
 import os
+import hashlib
+from datetime import datetime
+from typing import Optional, List
 
-from fastapi import APIRouter, HTTPException, status, UploadFile, Form, Request
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks
+from fastapi.responses import FileResponse
+from sqlalchemy.orm import Session
 
-from backend.src.core.entities.document import DocumentType, DocumentCategory
+from src.infrastructure.db.init_db import get_db
+from src.infrastructure.db.models.document import Document
+from src.infrastructure.db.models.user import User
+from src.presentation.http.dependencies.auth import get_current_user
 
-router = APIRouter()
+router = APIRouter(prefix="/documents", tags=["documents"])
 
-BASE_DIR = Path(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
-UPLOAD_DIR = BASE_DIR / "uploads" / "documents"
+# Настройки загрузки
+UPLOAD_DIR = "uploads/documents"
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+ALLOWED_EXTENSIONS = {
+    'image': ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'],
+    'document': ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt'],
+    'archive': ['zip', 'rar', '7z'],
+}
 
-
-class DocumentCreateRequest(BaseModel):
-    document_type: Optional[str] = "other"
-    category: Optional[str] = "asset"
-    entity_id: Optional[int] = None
-    entity_type: Optional[str] = None
-    title: Optional[str] = None
-    description: Optional[str] = None
-    is_primary: Optional[bool] = False
-    sort_order: Optional[int] = 0
-
-
-class DocumentResponse(BaseModel):
-    id: int
-    filename: str
-    file_path: str
-    file_size: int
-    mime_type: str
-    uploaded_by: int
-    document_type: str
-    category: str
-    entity_id: Optional[int]
-    entity_type: Optional[str]
-    title: Optional[str]
-    description: Optional[str]
-    uploaded_at: datetime
-    is_primary: bool
-    sort_order: int
-    file_hash: Optional[str]
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
-documents_db: dict = {}
-document_id_counter = 1
-
-
-@router.get("/", response_model=List[DocumentResponse], status_code=status.HTTP_200_OK)
-async def get_documents():
-    return list(documents_db.values())
-
-
-@router.get("/{document_id}", response_model=DocumentResponse, status_code=status.HTTP_200_OK)
-async def get_document(document_id: int):
-    if document_id not in documents_db:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
-    return documents_db[document_id]
-
-
-@router.post("/upload", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/upload")
 async def upload_document(
-    file: UploadFile,
-    request: Request,
-    document_type: Optional[str] = Form("other"),
-    category: Optional[str] = Form("asset"),
-    entity_id: Optional[int] = Form(None),
-    entity_type: Optional[str] = Form(None),
-    title: Optional[str] = Form(None),
-    description: Optional[str] = Form(None),
-    is_primary: Optional[bool] = Form(False),
-    sort_order: Optional[int] = Form(0),
+    file: UploadFile = File(...),
+    entity_type: Optional[str] = None,
+    entity_id: Optional[int] = None,
+    document_type: str = "other",
+    category: str = "asset",
+    title: Optional[str] = None,
+    description: Optional[str] = None,
+    is_primary: bool = False,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    global document_id_counter
-    
-    allowed_types = [
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "application/vnd.ms-excel",
-        "application/pdf",
-        "image/jpeg",
-        "image/png",
-        "image/gif",
-        "application/msword",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    ]
-    
-    if file.content_type not in allowed_types:
+    """
+    Загружает документ.
+    """
+    # Проверяем размер
+    content = await file.read()
+    if len(content) > MAX_FILE_SIZE:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid file type. Allowed types: Excel, PDF, Images, Word documents. Got: {file.content_type or 'None'}",
+            status_code=413,
+            detail=f"File too large. Max size: {MAX_FILE_SIZE // (1024 * 1024)} MB"
         )
+
+    # Проверяем расширение
+    filename = file.filename or "unknown"
+    extension = filename.split('.')[-1].lower() if '.' in filename else ''
     
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    
-    file_id = uuid.uuid4().hex
-    file_extension = Path(file.filename).suffix
-    filename = f"{file_id}{file_extension}"
-    
-    file_path = UPLOAD_DIR / filename
-    
-    contents = await file.read()
+    if extension not in [ext for exts in ALLOWED_EXTENSIONS.values() for ext in exts]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File type not allowed. Allowed: {', '.join([ext for exts in ALLOWED_EXTENSIONS.values() for ext in exts])}"
+        )
+
+    # Определяем mime_type
+    mime_type = file.content_type or _guess_mime_type(extension)
+
+    # Генерируем уникальное имя файла
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    safe_filename = f"{timestamp}_{filename}"
+    file_path = os.path.join(UPLOAD_DIR, safe_filename)
+
+    # Сохраняем файл
     with open(file_path, "wb") as f:
-        f.write(contents)
-    
-    try:
-        dt = DocumentType(document_type)
-    except ValueError:
-        dt = DocumentType.OTHER
-    
-    try:
-        dc = DocumentCategory(category)
-    except ValueError:
-        dc = DocumentCategory.ASSET
-    
-    document = DocumentResponse(
-        id=document_id_counter,
-        filename=file.filename,
-        file_path=str(file_path),
-        file_size=len(contents),
-        mime_type=file.content_type,
-        uploaded_by=1,
-        document_type=dt.value,
-        category=dc.value,
+        f.write(content)
+
+    # Вычисляем хеш файла
+    file_hash = hashlib.md5(content).hexdigest()
+
+    # Создаем запись в БД
+    document = Document(
+        filename=filename,
+        file_path=file_path,
+        file_size=len(content),
+        mime_type=mime_type,
+        document_type=document_type,
+        category=category,
         entity_id=entity_id,
         entity_type=entity_type,
-        title=title,
+        title=title or filename,
         description=description,
+        uploaded_by=current_user.id,
         uploaded_at=datetime.now(),
         is_primary=is_primary,
-        sort_order=sort_order,
-        file_hash=None,
+        file_hash=file_hash,
     )
-    
-    documents_db[document_id_counter] = document
-    document_id_counter += 1
-    
-    return document
+
+    db.add(document)
+    db.commit()
+    db.refresh(document)
+
+    return {
+        "id": document.id,
+        "filename": document.filename,
+        "file_path": document.file_path,
+        "file_size": document.file_size,
+        "mime_type": document.mime_type,
+        "document_type": document.document_type,
+        "category": document.category,
+        "entity_id": document.entity_id,
+        "entity_type": document.entity_type,
+        "title": document.title,
+        "description": document.description,
+        "is_primary": document.is_primary,
+        "uploaded_at": document.uploaded_at,
+    }
 
 
-@router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_document(document_id: int):
-    if document_id not in documents_db:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+@router.get("/")
+def list_documents(
+    entity_type: Optional[str] = None,
+    entity_id: Optional[int] = None,
+    category: Optional[str] = None,
+    document_type: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Список документов с фильтрацией.
+    """
+    query = db.query(Document)
+
+    if entity_type and entity_id is not None:
+        query = query.filter(
+            Document.entity_type == entity_type,
+            Document.entity_id == entity_id
+        )
+
+    if category:
+        query = query.filter(Document.category == category)
+
+    if document_type:
+        query = query.filter(Document.document_type == document_type)
+
+    documents = query.offset(skip).limit(limit).all()
+    total = query.count()
+
+    return {
+        "items": [
+            {
+                "id": d.id,
+                "filename": d.filename,
+                "file_path": d.file_path,
+                "file_size": d.file_size,
+                "mime_type": d.mime_type,
+                "document_type": d.document_type,
+                "category": d.category,
+                "entity_id": d.entity_id,
+                "entity_type": d.entity_type,
+                "title": d.title,
+                "description": d.description,
+                "is_primary": d.is_primary,
+                "uploaded_at": d.uploaded_at,
+            }
+            for d in documents
+        ],
+        "total": total,
+    }
+
+
+@router.get("/{document_id}")
+def get_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Получает документ по ID.
+    """
+    document = db.query(Document).filter(Document.id == document_id).first()
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
     
-    del documents_db[document_id]
-    return None
+    return {
+        "id": document.id,
+        "filename": document.filename,
+        "file_path": document.file_path,
+        "file_size": document.file_size,
+        "mime_type": document.mime_type,
+        "document_type": document.document_type,
+        "category": document.category,
+        "entity_id": document.entity_id,
+        "entity_type": document.entity_type,
+        "title": document.title,
+        "description": document.description,
+        "is_primary": document.is_primary,
+        "uploaded_at": document.uploaded_at,
+    }
+
+
+@router.get("/{document_id}/download")
+async def download_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Скачивает файл документа.
+    """
+    document = db.query(Document).filter(Document.id == document_id).first()
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # Получаем значения атрибутов
+    file_path = document.file_path
+    filename = document.filename
+    mime_type = document.mime_type
+
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found on server")
+
+    return FileResponse(
+        path=file_path,
+        filename=filename,
+        media_type=mime_type,
+    )
+
+
+@router.delete("/{document_id}")
+def delete_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Удаляет документ.
+    """
+    document = db.query(Document).filter(Document.id == document_id).first()
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    file_path = document.file_path
+    
+    # Удаляем файл с диска
+    if os.path.exists(file_path):
+        os.remove(file_path)
+
+    db.delete(document)
+    db.commit()
+
+    return {"message": "Document deleted"}
+
+
+def _guess_mime_type(extension: str) -> str:
+    """Определяет mime-type по расширению"""
+    mime_types = {
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'png': 'image/png',
+        'gif': 'image/gif',
+        'webp': 'image/webp',
+        'pdf': 'application/pdf',
+        'doc': 'application/msword',
+        'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'xls': 'application/vnd.ms-excel',
+        'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'txt': 'text/plain',
+        'zip': 'application/zip',
+        'rar': 'application/x-rar-compressed',
+    }
+    return mime_types.get(extension, 'application/octet-stream')

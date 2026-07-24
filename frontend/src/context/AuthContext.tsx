@@ -1,3 +1,4 @@
+// frontend/src/context/AuthContext.tsx
 import React, { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import axios, { AxiosError } from 'axios';
 
@@ -95,11 +96,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       });
       
       setUser(meResponse.data);
+      localStorage.setItem('user', JSON.stringify(meResponse.data));
       
       return response.data;
     } catch (err) {
       const axiosError = err as AxiosError;
-      setError(axiosError.message || 'Login failed');
+      const errorDetail = axiosError.response?.data || axiosError.message || 'Login failed';
+      console.error('Login error details:', errorDetail);
+      setError(typeof errorDetail === 'string' ? errorDetail : JSON.stringify(errorDetail));
       throw err;
     } finally {
       setLoading(false);
@@ -110,6 +114,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setUser(null);
     setToken(null);
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
   }, []);
 
   const getToken = useCallback(async (): Promise<string | null> => {
@@ -135,11 +140,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         },
       });
       setUser(response.data);
+      localStorage.setItem('user', JSON.stringify(response.data));
       return response.data;
     } catch (err) {
       const axiosError = err as AxiosError;
       if (axiosError.response?.status === 401) {
         localStorage.removeItem('token');
+        localStorage.removeItem('user');
         setUser(null);
         return null;
       }
@@ -161,6 +168,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         },
       });
       setUser(response.data);
+      localStorage.setItem('user', JSON.stringify(response.data));
       return response.data;
     } catch (err) {
       const axiosError = err as AxiosError;

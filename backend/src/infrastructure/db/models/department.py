@@ -17,7 +17,7 @@ Base = declarative_base()
 
 
 class Department(Base):
-    """Модель подразделения/отдела"""
+    """?????? ?????????????/??????"""
     __tablename__ = "departments"
 
     id = Column(Integer, primary_key=True)
@@ -54,3 +54,5 @@ class Department(Base):
 
     def __repr__(self) -> str:
         return f"<Department(id={self.id}, name='{self.name}', code='{self.code}')>"
+
+

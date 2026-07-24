@@ -1,4 +1,5 @@
-from datetime import date, datetime
+# src/infrastructure/db/models/depreciation_record.py
+from datetime import datetime, date
 from decimal import Decimal
 from typing import Optional
 
@@ -11,14 +12,15 @@ from sqlalchemy import (
     Integer,
     Numeric,
     String,
+    Text,
 )
-from sqlalchemy.orm import declarative_base, relationship
+from sqlalchemy.orm import declarative_base
 
-Base = declarative_base()
+# Импортируем Base из __init__.py
+from . import Base
 
 
 class DepreciationRecord(Base):
-    """Модель записи об амортизации"""
     __tablename__ = "depreciation_records"
 
     id = Column(Integer, primary_key=True)
@@ -45,8 +47,5 @@ class DepreciationRecord(Base):
         Index("idx_depreciation_records_method", "method"),
     )
 
-    # Relationships
-    asset = relationship("Asset", back_populates="depreciation_records")
-
     def __repr__(self) -> str:
-        return f"<DepreciationRecord(id={self.id}, asset_id={self.asset_id}, period={self.period_start}→{self.period_end}, amount={self.depreciation_amount})>"
+        return f"<DepreciationRecord(id={self.id}, asset_id={self.asset_id}, amount={self.depreciation_amount})>"

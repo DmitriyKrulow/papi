@@ -18,7 +18,7 @@ Base = declarative_base()
 
 
 class Employee(Base):
-    """Модель сотрудника"""
+    """?????? ??????????"""
     __tablename__ = "employees"
 
     id = Column(Integer, primary_key=True)
@@ -58,3 +58,5 @@ class Employee(Base):
 
     def __repr__(self) -> str:
         return f"<Employee(id={self.id}, name='{self.last_name} {self.first_name}', position='{self.position}')>"
+
+

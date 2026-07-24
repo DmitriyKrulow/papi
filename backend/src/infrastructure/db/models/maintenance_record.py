@@ -19,7 +19,7 @@ Base = declarative_base()
 
 
 class MaintenanceRecord(Base):
-    """Модель записи о техническом обслуживании"""
+    """?????? ?????? ? ??????????? ????????????"""
     __tablename__ = "maintenance_records"
 
     id = Column(Integer, primary_key=True)
@@ -53,3 +53,5 @@ class MaintenanceRecord(Base):
 
     def __repr__(self) -> str:
         return f"<MaintenanceRecord(id={self.id}, asset_id={self.asset_id}, date={self.maintenance_date}, type='{self.maintenance_type}')>"
+
+

@@ -6,7 +6,7 @@ from enum import Enum
 
 
 class DocumentType(Enum):
-    """Типы документов"""
+    """???? ??????????"""
     PHOTO = "photo"
     SCAN = "scan"
     CONTRACT = "contract"
@@ -21,7 +21,7 @@ class DocumentType(Enum):
 
 
 class DocumentCategory(Enum):
-    """Категории документов"""
+    """????????? ??????????"""
     ASSET = "asset"
     REPAIR = "repair"
     INVENTORY = "inventory"
@@ -35,7 +35,7 @@ class DocumentCategory(Enum):
 @dataclass
 class Document:
     """
-    Сущность "Документ/Файл".
+    ???????? "????????/????".
     """
     id: int
     filename: str
@@ -44,7 +44,7 @@ class Document:
     mime_type: str
     uploaded_by: int
     
-    # Поля со значениями по умолчанию
+    # ???? ?? ?????????? ?? ?????????
     document_type: DocumentType = DocumentType.OTHER
     category: DocumentCategory = DocumentCategory.ASSET
     
@@ -61,13 +61,13 @@ class Document:
     file_hash: Optional[str] = None
     
     def get_file_extension(self) -> str:
-        """Возвращает расширение файла"""
+        """?????????? ?????????? ?????"""
         if '.' in self.filename:
             return self.filename.split('.')[-1].lower()
         return ''
     
     def get_file_size_display(self) -> str:
-        """Размер файла в читаемом формате"""
+        """?????? ????? ? ???????? ???????"""
         if self.file_size < 1024:
             return f"{self.file_size} B"
         elif self.file_size < 1024 * 1024:
@@ -78,15 +78,15 @@ class Document:
             return f"{self.file_size / (1024 * 1024 * 1024):.1f} GB"
     
     def is_image(self) -> bool:
-        """Проверяет, является ли файл изображением"""
+        """?????????, ???????? ?? ???? ????????????"""
         return self.mime_type.startswith('image/')
     
     def is_pdf(self) -> bool:
-        """Проверяет, является ли файл PDF"""
+        """?????????, ???????? ?? ???? PDF"""
         return self.mime_type == 'application/pdf'
     
     def is_document(self) -> bool:
-        """Проверяет, является ли файл документом"""
+        """?????????, ???????? ?? ???? ??????????"""
         return self.mime_type in (
             'application/msword',
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -95,35 +95,36 @@ class Document:
         )
     
     def get_type_display(self) -> str:
-        """Читаемое название типа документа"""
+        """???????? ???????? ???? ?????????"""
         types = {
-            DocumentType.PHOTO: "Фотография",
-            DocumentType.SCAN: "Скан",
-            DocumentType.CONTRACT: "Договор",
-            DocumentType.INVOICE: "Счет-фактура",
-            DocumentType.ACT: "Акт",
-            DocumentType.WARRANTY: "Гарантийный талон",
-            DocumentType.PASSPORT: "Паспорт",
-            DocumentType.MANUAL: "Руководство",
-            DocumentType.CERTIFICATE: "Сертификат",
-            DocumentType.REPORT: "Отчет",
-            DocumentType.OTHER: "Другое",
+            DocumentType.PHOTO: "??????????",
+            DocumentType.SCAN: "????",
+            DocumentType.CONTRACT: "???????",
+            DocumentType.INVOICE: "????-???????",
+            DocumentType.ACT: "???",
+            DocumentType.WARRANTY: "??????????? ?????",
+            DocumentType.PASSPORT: "???????",
+            DocumentType.MANUAL: "???????????",
+            DocumentType.CERTIFICATE: "??????????",
+            DocumentType.REPORT: "?????",
+            DocumentType.OTHER: "??????",
         }
         return types.get(self.document_type, str(self.document_type))
     
     def get_category_display(self) -> str:
-        """Читаемое название категории"""
+        """???????? ???????? ?????????"""
         categories = {
-            DocumentCategory.ASSET: "Актив",
-            DocumentCategory.REPAIR: "Ремонт",
-            DocumentCategory.INVENTORY: "Инвентаризация",
-            DocumentCategory.MOVEMENT: "Перемещение",
-            DocumentCategory.WRITE_OFF: "Списание",
-            DocumentCategory.CONTRACT: "Договор",
-            DocumentCategory.SUPPLIER: "Поставщик",
-            DocumentCategory.EMPLOYEE: "Сотрудник",
+            DocumentCategory.ASSET: "?????",
+            DocumentCategory.REPAIR: "??????",
+            DocumentCategory.INVENTORY: "??????????????",
+            DocumentCategory.MOVEMENT: "???????????",
+            DocumentCategory.WRITE_OFF: "????????",
+            DocumentCategory.CONTRACT: "???????",
+            DocumentCategory.SUPPLIER: "?????????",
+            DocumentCategory.EMPLOYEE: "?????????",
         }
         return categories.get(self.category, str(self.category))
     
     def __str__(self) -> str:
         return f"Document(id={self.id}, filename='{self.filename}')"
+

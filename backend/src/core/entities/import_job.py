@@ -6,7 +6,7 @@ from enum import Enum
 
 
 class ImportStatus(Enum):
-    """Статус импорта"""
+    """?????? ???????"""
     PENDING = "pending"
     PROCESSING = "processing"
     COMPLETED = "completed"
@@ -15,7 +15,7 @@ class ImportStatus(Enum):
 
 
 class ImportType(Enum):
-    """Тип импорта"""
+    """??? ???????"""
     ASSETS = "assets"
     EMPLOYEES = "employees"
     DEPARTMENTS = "departments"
@@ -27,14 +27,14 @@ class ImportType(Enum):
 @dataclass
 class ImportJob:
     """
-    Сущность "Задача импорта".
+    ???????? "?????? ???????".
     """
     id: int
     filename: str
     import_type: ImportType
     created_by: int
     
-    # Поля со значениями по умолчанию
+    # ???? ?? ?????????? ?? ?????????
     status: ImportStatus = ImportStatus.PENDING
     total_rows: int = 0
     processed_rows: int = 0
@@ -53,14 +53,14 @@ class ImportJob:
     parameters: Dict[str, Any] = field(default_factory=dict)
     
     def start(self) -> None:
-        """Начать импорт"""
+        """?????? ??????"""
         if self.status != ImportStatus.PENDING:
             raise ValueError(f"Cannot start import with status {self.status}")
         self.status = ImportStatus.PROCESSING
         self.started_at = datetime.now()
     
     def complete(self, successful: int, failed: int, errors: List[Dict[str, Any]]) -> None:
-        """Завершить импорт"""
+        """????????? ??????"""
         if self.status != ImportStatus.PROCESSING:
             raise ValueError(f"Cannot complete import with status {self.status}")
         
@@ -78,39 +78,40 @@ class ImportJob:
             self.status = ImportStatus.COMPLETED
     
     def fail(self, error_message: str) -> None:
-        """Отметить импорт как неудачный"""
+        """???????? ?????? ??? ?????????"""
         self.status = ImportStatus.FAILED
         self.errors = [{'message': error_message, 'timestamp': datetime.now().isoformat()}]
         self.completed_at = datetime.now()
     
     def get_progress(self) -> float:
-        """Процент выполнения"""
+        """??????? ??????????"""
         if self.total_rows == 0:
             return 0.0
         return (self.processed_rows / self.total_rows) * 100
     
     def get_status_display(self) -> str:
-        """Читаемое название статуса"""
+        """???????? ???????? ???????"""
         statuses = {
-            ImportStatus.PENDING: "Ожидает",
-            ImportStatus.PROCESSING: "В процессе",
-            ImportStatus.COMPLETED: "Завершен",
-            ImportStatus.PARTIAL: "Частично завершен",
-            ImportStatus.FAILED: "Не удался",
+            ImportStatus.PENDING: "???????",
+            ImportStatus.PROCESSING: "? ????????",
+            ImportStatus.COMPLETED: "????????",
+            ImportStatus.PARTIAL: "???????? ????????",
+            ImportStatus.FAILED: "?? ??????",
         }
         return statuses.get(self.status, str(self.status))
     
     def get_type_display(self) -> str:
-        """Читаемое название типа"""
+        """???????? ???????? ????"""
         types = {
-            ImportType.ASSETS: "Активы",
-            ImportType.EMPLOYEES: "Сотрудники",
-            ImportType.DEPARTMENTS: "Подразделения",
-            ImportType.SUPPLIERS: "Поставщики",
-            ImportType.CONTRACTS: "Договоры",
-            ImportType.INVENTORY: "Инвентаризация",
+            ImportType.ASSETS: "??????",
+            ImportType.EMPLOYEES: "??????????",
+            ImportType.DEPARTMENTS: "?????????????",
+            ImportType.SUPPLIERS: "??????????",
+            ImportType.CONTRACTS: "????????",
+            ImportType.INVENTORY: "??????????????",
         }
         return types.get(self.import_type, str(self.import_type))
     
     def __str__(self) -> str:
         return f"ImportJob(id={self.id}, filename='{self.filename}', type={self.import_type})"
+

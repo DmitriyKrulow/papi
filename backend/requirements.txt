@@ -9,3 +9,7 @@ jinja2
 python-jose
 passlib
 python-multipart
+sqlalchemy
+openpyxl
+pydantic
+pydantic-settings

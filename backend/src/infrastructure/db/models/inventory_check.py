@@ -18,7 +18,7 @@ Base = declarative_base()
 
 
 class InventoryCheck(Base):
-    """Модель инвентаризации"""
+    """?????? ??????????????"""
     __tablename__ = "inventory_checks"
 
     id = Column(Integer, primary_key=True)
@@ -53,3 +53,5 @@ class InventoryCheck(Base):
 
     def __repr__(self) -> str:
         return f"<InventoryCheck(id={self.id}, name='{self.name}', date={self.check_date}, status='{self.status}')>"
+
+

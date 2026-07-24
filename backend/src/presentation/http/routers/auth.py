@@ -1,168 +1,102 @@
 from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import Optional
 
-from fastapi import APIRouter, HTTPException, status, Depends, Header
+from fastapi import APIRouter, Depends, HTTPException
+from jose import JWTError, jwt
+from sqlalchemy.orm import Session
 
-from backend.src.presentation.http.schemas.auth import (
-    UserCreate, UserResponse, UserLogin, UserToken,
-    ProfileUpdate, ChangePasswordRequest
-)
-from backend.src.presentation.http.schemas.users import UserResponse as UserResponseBase
-from backend.src.core.security.jwt_handler import create_access_token, verify_token
-from backend.src.use_cases.auth.register_user import register_user
-from backend.src.use_cases.auth.login_user import login_user
+from src.infrastructure.db.init_db import get_db
+from src.core.value_objects.password_hash import PasswordHash
+from src.infrastructure.db.models.user import User
+from ..schemas.auth import UserLogin as LoginRequest, UserCreate as RegisterRequest
+from ..schemas.auth import UserToken, UserResponse
+from ..dependencies.auth import get_current_user
 
-router = APIRouter()
+router = APIRouter(prefix="/auth", tags=["auth"])
+
+SECRET_KEY = "your-secret-key-change-in-production"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 
-@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-async def register(user: UserCreate):
-    try:
-        new_user = await register_user(user.model_dump())
-        return UserResponse(
-            id=new_user.id,
-            created_at=new_user.created_at,
-            updated_at=new_user.updated_at,
-            username=new_user.username,
-            email=str(new_user.email),
-            full_name=new_user.full_name,
-            phone=str(new_user.phone) if new_user.phone else None,
-            department=None,
-            role=new_user.role,
-            is_active=new_user.is_active,
-        )
-    except Exception as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+@router.post("/register")
+def register(user: RegisterRequest, db: Session = Depends(get_db)):
+    from src.infrastructure.db.models.user import User
+    if db.query(User).filter(User.username == user.username).first():
+        raise HTTPException(status_code=400, detail="Username already registered")
+    if db.query(User).filter(User.email == user.email).first():
+        raise HTTPException(status_code=400, detail="Email already registered")
+    password_hash = PasswordHash.from_plain_password(user.password)
+    new_user = User(
+        username=user.username,
+        email=user.email,
+        full_name=user.full_name,
+        phone=user.phone,
+        password_hash=str(password_hash),
+        role="user",
+        is_active=True,
+        department_id=user.department,
+        created_at=datetime.now(),
+        updated_at=datetime.now(),
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return {"id": new_user.id, "username": new_user.username, "email": new_user.email}
 
 
 @router.post("/login", response_model=UserToken)
-async def login(user: UserLogin):
+def login(credentials: LoginRequest, db: Session = Depends(get_db)):
+    from src.infrastructure.db.models.user import User
     try:
-        authenticated_user = await login_user(user.username, user.password)
+        user = db.query(User).filter(User.username == credentials.username).first()
+        if not user:
+            raise HTTPException(status_code=400, detail="Incorrect username or password")
         
-        if not authenticated_user:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+        if not user.password_hash:
+            raise HTTPException(status_code=400, detail="Password not set for user")
         
-        access_token = create_access_token(
-            data={"sub": authenticated_user.username, "role": authenticated_user.role},
-            expires_delta=timedelta(days=1)
-        )
-        
-        return UserToken(access_token=access_token, token_type="bearer")
+        password_hash = PasswordHash.from_hash_string(user.password_hash)
+        if not password_hash.verify(credentials.password):
+            raise HTTPException(status_code=400, detail="Incorrect username or password")
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
-
-
-@router.get("/me", response_model=UserResponseBase)
-async def get_me(authorization: Optional[str] = Header(default=None)):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token format")
+        raise HTTPException(status_code=400, detail=f"Authentication error: {str(e)}")
     
-    token = authorization[7:]
-    token_data = verify_token(token)
-    
-    if not token_data:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-    
-    from backend.src.infrastructure.db.repositories.user_repository import InMemoryUserRepository
-    user_repo = InMemoryUserRepository()
-    user = await user_repo.get_by_username(token_data.username)
-    
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    
-    if not user.is_active:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is not active")
-    
-    return UserResponseBase(
-        id=user.id,
-        created_at=user.created_at,
-        updated_at=user.updated_at,
-        username=user.username,
-        email=str(user.email),
-        full_name=user.full_name,
-        phone=str(user.phone) if user.phone else None,
-        department=None,
-        role=user.role,
-        is_active=user.is_active,
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.username, "role": user.role},
+        expires_delta=access_token_expires,
     )
+    return UserToken(access_token=access_token, token_type="bearer")
 
 
-@router.put("/profile", response_model=UserResponseBase)
-async def update_profile(
-    profile: ProfileUpdate,
-    authorization: Optional[str] = Header(default=None)
-):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token format")
-    
-    token = authorization[7:]
-    token_data = verify_token(token)
-    
-    if not token_data:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-    
-    from backend.src.infrastructure.db.repositories.user_repository import InMemoryUserRepository
-    from backend.src.core.value_objects.email import Email
-    user_repo = InMemoryUserRepository()
-    user = await user_repo.get_by_username(token_data.username)
-    
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    
-    if profile.username is not None:
-        user.username = profile.username
-    if profile.email is not None:
-        user.change_email(Email(profile.email))
-    if profile.full_name is not None:
-        user.full_name = profile.full_name
-    if profile.phone is not None:
-        from backend.src.core.value_objects.phone import Phone
-        user.phone = Phone(profile.phone)
-    
-    await user_repo.update(user)
-    
-    return UserResponseBase(
-        id=user.id,
-        created_at=user.created_at,
-        updated_at=user.updated_at,
-        username=user.username,
-        email=str(user.email),
-        full_name=user.full_name,
-        phone=str(user.phone) if user.phone else None,
-        department=None,
-        role=user.role,
-        is_active=user.is_active,
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
+@router.post("/refresh", response_model=UserToken)
+def refresh_token(refresh_token: str):
+    pass
+
+
+@router.get("/me", response_model=UserResponse)
+def get_me(current_user: User = Depends(get_current_user)):
+    return UserResponse(
+        id=current_user.id,
+        username=current_user.username,
+        email=current_user.email,
+        full_name=current_user.full_name,
+        phone=current_user.phone,
+        role=current_user.role,
+        is_active=current_user.is_active,
+        created_at=current_user.created_at,
+        updated_at=current_user.updated_at,
     )
-
-
-@router.post("/change-password")
-async def change_password(
-    request: ChangePasswordRequest,
-    authorization: Optional[str] = Header(default=None)
-):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token format")
-    
-    token = authorization[7:]
-    token_data = verify_token(token)
-    
-    if not token_data:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-    
-    from backend.src.infrastructure.db.repositories.user_repository import InMemoryUserRepository
-    from backend.src.core.value_objects.password_hash import PasswordHash
-    user_repo = InMemoryUserRepository()
-    user = await user_repo.get_by_username(token_data.username)
-    
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    
-    if not user.verify_password(request.old_password):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid old password")
-    
-    new_password_hash = PasswordHash.from_plain_password(request.new_password)
-    user.change_password(new_password_hash)
-    await user_repo.update(user)
-    
-    return {"message": "Password changed successfully"}

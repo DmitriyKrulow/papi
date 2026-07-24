@@ -4,20 +4,21 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-
         {
             "name": "Python Debugger: FastAPI",
             "type": "debugpy",
             "request": "launch",
             "module": "uvicorn",
             "args": [
-                "backend.src.infrastructure.main:app",
+                "backend.start:app",
                 "--reload",
-                "--port=8888",
-                "--app-dir",
-                "."
+                "--port=8888"
             ],
-            "jinja": true
+            "jinja": true,
+            "env": {
+                "PYTHONPATH": "F:\\Code\\papi"
+            },
+            "cwd": "F:\\Code\\papi\\backend"
         }
     ]
 }

@@ -17,7 +17,7 @@ Base = declarative_base()
 
 
 class AssetType(Base):
-    """Модель типа актива"""
+    """?????? ???? ??????"""
     __tablename__ = "asset_types"
 
     id = Column(Integer, primary_key=True)
@@ -47,3 +47,5 @@ class AssetType(Base):
 
     def __repr__(self) -> str:
         return f"<AssetType(id={self.id}, name='{self.name}', code='{self.code}')>"
+
+

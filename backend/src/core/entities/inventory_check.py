@@ -7,13 +7,13 @@ from typing import Optional, List
 @dataclass
 class InventoryCheck:
     """
-    Сущность "Инвентаризация".
+    ???????? "??????????????".
     """
     id: int
     name: str
     check_date: date
     
-    # Поля со значениями по умолчанию
+    # ???? ?? ?????????? ?? ?????????
     department_id: Optional[int] = None
     
     total_checked: int = 0
@@ -30,7 +30,7 @@ class InventoryCheck:
     completed_at: Optional[datetime] = None
     
     def get_summary(self) -> dict:
-        """Сводка по инвентаризации"""
+        """?????? ?? ??????????????"""
         return {
             'total': self.total_checked,
             'found': self.found,
@@ -44,3 +44,4 @@ class InventoryCheck:
     
     def __str__(self) -> str:
         return f"InventoryCheck(id={self.id}, name='{self.name}', date={self.check_date})"
+

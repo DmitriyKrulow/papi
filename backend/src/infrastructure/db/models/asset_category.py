@@ -10,6 +10,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    Numeric,
 )
 from sqlalchemy.orm import declarative_base, relationship
 
@@ -17,7 +18,7 @@ Base = declarative_base()
 
 
 class AssetCategory(Base):
-    """Модель категории активов"""
+    """?????? ????????? ???????"""
     __tablename__ = "asset_categories"
 
     id = Column(Integer, primary_key=True)
@@ -54,3 +55,5 @@ class AssetCategory(Base):
 
     def __repr__(self) -> str:
         return f"<AssetCategory(id={self.id}, name='{self.name}', code='{self.code}')>"
+
+

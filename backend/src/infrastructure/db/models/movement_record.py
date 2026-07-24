@@ -17,7 +17,7 @@ Base = declarative_base()
 
 
 class MovementRecord(Base):
-    """Модель записи о перемещении актива"""
+    """?????? ?????? ? ??????????? ??????"""
     __tablename__ = "movement_records"
 
     id = Column(Integer, primary_key=True)
@@ -60,3 +60,5 @@ class MovementRecord(Base):
 
     def __repr__(self) -> str:
         return f"<MovementRecord(id={self.id}, asset_id={self.asset_id}, date={self.movement_date})>"
+
+

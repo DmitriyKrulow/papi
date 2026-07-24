@@ -1,101 +1,158 @@
-from datetime import datetime
-from typing import List, Optional
+# backend/src/presentation/http/routers/admin.py
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from typing import Optional, Any
+from src.infrastructure.db.init_db import get_db
+from src.infrastructure.db.models.user import User
+from src.presentation.http.dependencies.auth import get_current_admin
 
-from fastapi import APIRouter, HTTPException, status, Depends, Header
-
-from backend.src.presentation.http.schemas.auth import (
-    UserLogin, UserToken
-)
-from backend.src.core.security.jwt_handler import verify_token
-from backend.src.infrastructure.db.repositories.user_repository import InMemoryUserRepository
-
-router = APIRouter()
+router = APIRouter(prefix="/admin", tags=["admin"])
 
 
-@router.get("/admin/users", response_model=List[dict], status_code=status.HTTP_200_OK)
-async def get_all_users_admin(authorization: Optional[str] = Header(default=None)):
-    """Админ-эндпоинт: получить всех пользователей"""
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token format")
-    
-    token = authorization[7:]
-    token_data = verify_token(token)
-    
-    if not token_data:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-    
-    if token_data.role != "admin":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
-    
-    user_repo = InMemoryUserRepository()
-    users = user_repo.get_all()
-    
+def safe_isoformat(value: Optional[Any]) -> Optional[str]:
+    """Безопасно преобразует дату в ISO формат"""
+    if value is None:
+        return None
+    try:
+        if hasattr(value, 'isoformat') and callable(getattr(value, 'isoformat')):
+            return value.isoformat()
+        return str(value)
+    except (AttributeError, ValueError):
+        return None
+
+
+def safe_str(value: Optional[Any], default: str = "") -> str:
+    """Безопасно преобразует в строку"""
+    if value is None:
+        return default
+    try:
+        return str(value)
+    except (TypeError, ValueError):
+        return default
+
+
+@router.get("/users")
+async def list_users(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin),
+):
+    """Получить список всех пользователей (только для админов)"""
+    users = db.query(User).all()
     return [
         {
-            "id": user.id,
-            "username": user.username,
-            "email": str(user.email),
-            "full_name": user.full_name,
-            "phone": str(user.phone) if user.phone else None,
-            "role": user.role,
-            "is_active": user.is_active,
-            "created_at": user.created_at.isoformat() if user.created_at else None,
+            "id": getattr(u, 'id', None),
+            "username": safe_str(getattr(u, 'username', None)),
+            "email": safe_str(getattr(u, 'email', None)),
+            "full_name": safe_str(getattr(u, 'full_name', None)),
+            "phone": safe_str(getattr(u, 'phone', None)),
+            "role": safe_str(getattr(u, 'role', None)),
+            "is_active": getattr(u, 'is_active', False),
+            "created_at": safe_isoformat(getattr(u, 'created_at', None)),
         }
-        for user in users
+        for u in users
     ]
 
 
-@router.delete("/admin/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_user_admin(user_id: int, authorization: Optional[str] = Header(default=None)):
-    """Админ-эндпоинт: удалить пользователя"""
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token format")
-    
-    token = authorization[7:]
-    token_data = verify_token(token)
-    
-    if not token_data:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-    
-    if token_data.role != "admin":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
-    
-    user_repo = InMemoryUserRepository()
-    await user_repo.delete(user_id)
-    return None
-
-
-@router.put("/admin/users/{user_id}/role", response_model=dict, status_code=status.HTTP_200_OK)
-async def update_user_role(
+@router.get("/users/{user_id}")
+async def get_user(
     user_id: int,
-    role: str,
-    authorization: Optional[str] = Header(default=None)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin),
 ):
-    """Админ-эндпоинт: изменить роль пользователя"""
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token format")
-    
-    token = authorization[7:]
-    token_data = verify_token(token)
-    
-    if not token_data:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-    
-    if token_data.role != "admin":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
-    
-    user_repo = InMemoryUserRepository()
-    user = await user_repo.get_by_id(user_id)
-    
+    """Получить пользователя по ID (только для админов)"""
+    user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    
-    user.role = role
-    await user_repo.update(user)
+        raise HTTPException(status_code=404, detail="User not found")
     
     return {
-        "message": "Role updated successfully",
-        "user_id": user.id,
-        "username": user.username,
-        "role": user.role,
+        "id": getattr(user, 'id', None),
+        "username": safe_str(getattr(user, 'username', None)),
+        "email": safe_str(getattr(user, 'email', None)),
+        "full_name": safe_str(getattr(user, 'full_name', None)),
+        "phone": safe_str(getattr(user, 'phone', None)),
+        "role": safe_str(getattr(user, 'role', None)),
+        "is_active": getattr(user, 'is_active', False),
+        "created_at": safe_isoformat(getattr(user, 'created_at', None)),
+    }
+
+
+@router.delete("/users/{user_id}")
+async def delete_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin),
+):
+    """Удалить пользователя (только для админов)"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Не даем удалить себя - получаем ID через getattr
+    user_id_val = getattr(user, 'id', None)
+    current_user_id_val = getattr(current_user, 'id', None)
+    if user_id_val is not None and current_user_id_val is not None and user_id_val == current_user_id_val:
+        raise HTTPException(status_code=400, detail="Cannot delete yourself")
+    
+    db.delete(user)
+    db.commit()
+    return {"message": "User deleted successfully"}
+
+
+@router.put("/users/{user_id}/role")
+async def update_user_role(
+    user_id: int,
+    role_data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin),
+):
+    """Обновить роль пользователя (только для админов)"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    new_role = role_data.get("role")
+    if new_role not in ["admin", "user", "viewer"]:
+        raise HTTPException(status_code=400, detail="Invalid role. Allowed: admin, user, viewer")
+    
+    user.role = new_role  # type: ignore
+    db.commit()
+    db.refresh(user)
+    
+    return {
+        "id": getattr(user, 'id', None),
+        "username": safe_str(getattr(user, 'username', None)),
+        "role": safe_str(getattr(user, 'role', None)),
+    }
+
+
+@router.put("/users/{user_id}/status")
+async def update_user_status(
+    user_id: int,
+    status_data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin),
+):
+    """Активировать/деактивировать пользователя (только для админов)"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Не даем деактивировать себя
+    user_id_val = getattr(user, 'id', None)
+    current_user_id_val = getattr(current_user, 'id', None)
+    if user_id_val is not None and current_user_id_val is not None and user_id_val == current_user_id_val:
+        raise HTTPException(status_code=400, detail="Cannot change your own status")
+    
+    is_active = status_data.get("is_active")
+    if is_active is None:
+        raise HTTPException(status_code=400, detail="is_active is required")
+    
+    user.is_active = bool(is_active)  # type: ignore
+    db.commit()
+    db.refresh(user)
+    
+    return {
+        "id": getattr(user, 'id', None),
+        "username": safe_str(getattr(user, 'username', None)),
+        "is_active": getattr(user, 'is_active', False),
     }

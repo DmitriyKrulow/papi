@@ -1,6 +1,4 @@
-import { useCallback } from 'react';
+// frontend/src/hooks/useAuth.ts
 import { useAuthContext } from '../context/AuthContext';
 
-export const useAuth = () => {
-  return useAuthContext();
-};
+export const useAuth = useAuthContext;
