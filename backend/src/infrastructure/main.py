@@ -1,8 +1,14 @@
 # src/main.py
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from src.infrastructure.db.init_db import init_db, get_or_create_admin
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Создаем необходимые папки
 import os
@@ -40,6 +46,7 @@ def register_routers():
     from src.presentation.http.routers.asset_photos import router as asset_photos_router
     from src.presentation.http.routers.reports import router as reports_router
     from src.presentation.http.routers.admin import router as admin_router
+    from src.presentation.http.routers.inventory_import import router as inventory_import_router
 
     app.include_router(assets_router, prefix="/api")
     app.include_router(users_router, prefix="/api")
@@ -49,6 +56,7 @@ def register_routers():
     app.include_router(asset_photos_router, prefix="/api")
     app.include_router(reports_router, prefix="/api")        # ✅ Роутер отчетов
     app.include_router(admin_router, prefix="/api")
+    app.include_router(inventory_import_router, prefix="/api")
 
 
 @app.on_event("startup")
@@ -57,6 +65,16 @@ def startup_event():
     get_or_create_admin()
 
 
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    logger.error(f"Validation error: {exc.errors()}")
+    return JSONResponse(status_code=422, content={"detail": exc.errors()})
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Global exception: {exc}", exc_info=True)
+    return JSONResponse(status_code=500, content={"detail": str(exc)})
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],
@@ -64,5 +82,46 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def add_trailing_slash(request: Request, call_next):
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    # Обрабатываем preflight OPTIONS запросы
+    if request.method == "OPTIONS":
+        response = JSONResponse(status_code=200, content={"detail": "OK"})
+        response.headers['Access-Control-Allow-Origin'] = 'http://localhost:5173'
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, PATCH, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Authorization, Content-Type'
+        response.headers['Access-Control-Expose-Headers'] = 'Authorization'
+        return response
+    
+    # Добавляем trailing slash, если его нет (кроме корня и статических путей)
+    # Исключаем API пути из редиректа, чтобы избежать проблем с CORS
+    if not request.url.path.endswith("/") and request.url.path != "/" and "." not in request.url.path.split("/")[-1] and not request.url.path.startswith("/api"):
+        from fastapi.responses import RedirectResponse
+        redirect_url = request.url.path + "/"
+        if request.url.query:
+            redirect_url += "?" + request.url.query
+        response = RedirectResponse(url=redirect_url, status_code=308)
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        response.headers['Access-Control-Expose-Headers'] = 'Authorization'
+        return response
+    
+    logger.info(f"[Request] {request.method} {request.url.path}")
+    headers_dict = dict(request.headers)
+    logger.info(f"[Request] Headers: {headers_dict}")
+    content_type = headers_dict.get('content-type', '')
+    logger.info(f"[Request] Content-Type: {content_type}")
+    if 'authorization' not in headers_dict:
+        logger.error("[Request] ❌ NO AUTHORIZATION HEADER - This is the problem!")
+    else:
+        logger.info(f"[Request] ✅ Authorization header present: {headers_dict['authorization'][:50]}...")
+    response = await call_next(request)
+    return response
+
 
 register_routers()

@@ -12,6 +12,15 @@ from .asset_category import AssetCategory
 from .document import Document
 from .report import Report
 from .depreciation_record import DepreciationRecord
+from .repair_request import RepairRequest
+from .repair_template import RepairTemplate
+from .maintenance_record import MaintenanceRecord
+from .movement_record import MovementRecord
+from .inventory_check import InventoryCheck
+from .employee import Employee
+from .asset_type import AssetType
+from .asset_photo import AssetPhoto
+from .import_job import ImportJob
 
 __all__ = [
     "Base",
@@ -22,4 +31,13 @@ __all__ = [
     "Document",
     "Report",
     "DepreciationRecord",
+    "RepairRequest",
+    "RepairTemplate",
+    "MaintenanceRecord",
+    "MovementRecord",
+    "InventoryCheck",
+    "Employee",
+    "AssetType",
+    "AssetPhoto",
+    "ImportJob",
 ]

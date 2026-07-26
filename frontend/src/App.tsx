@@ -1,6 +1,7 @@
 // frontend/src/App.tsx
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { useAuth } from './hooks/useAuth';
 import Navbar from './components/common/Navbar';
 import Footer from './components/common/Footer';
 import Home from './pages/Home';
@@ -10,6 +11,9 @@ import AssetCreate from './pages/AssetCreate';
 import AssetDetail from './pages/AssetDetail';
 import AssetEdit from './pages/AssetEdit';
 import Reports from './pages/Reports';
+import RepairList from './pages/RepairList';
+import RepairCreate from './pages/RepairCreate';
+import RepairEdit from './pages/RepairEdit';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Profile from './pages/Profile';
@@ -18,8 +22,9 @@ import './index.css';
 
 // Компонент для защиты маршрутов (требуется авторизация)
 const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const token = localStorage.getItem('token');
-  if (!token) {
+  const { user } = useAuth();
+  
+  if (!user) {
     return <Navigate to="/login" replace />;
   }
   return <>{children}</>;
@@ -27,19 +32,13 @@ const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
 // Компонент для защиты админ-маршрутов (требуется роль admin)
 const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const token = localStorage.getItem('token');
-  const userStr = localStorage.getItem('user');
+  const { user } = useAuth();
   
-  if (!token) {
+  if (!user) {
     return <Navigate to="/login" replace />;
   }
   
-  try {
-    const user = userStr ? JSON.parse(userStr) : null;
-    if (!user || user.role !== 'admin') {
-      return <Navigate to="/dashboard" replace />;
-    }
-  } catch {
+  if (user.role !== 'admin') {
     return <Navigate to="/dashboard" replace />;
   }
   
@@ -88,6 +87,28 @@ function App() {
               <Route path="/reports" element={
                 <PrivateRoute>
                   <Reports />
+                </PrivateRoute>
+              } />
+              
+              {/* Маршруты для заявок на ремонт */}
+              <Route path="/repairs" element={
+                <PrivateRoute>
+                  <RepairList />
+                </PrivateRoute>
+              } />
+              <Route path="/repairs/create" element={
+                <PrivateRoute>
+                  <RepairCreate />
+                </PrivateRoute>
+              } />
+              <Route path="/repairs/:id" element={
+                <PrivateRoute>
+                  <RepairEdit />
+                </PrivateRoute>
+              } />
+              <Route path="/repairs/:id/edit" element={
+                <PrivateRoute>
+                  <RepairEdit />
                 </PrivateRoute>
               } />
               <Route path="/profile" element={

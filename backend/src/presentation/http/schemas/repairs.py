@@ -6,45 +6,103 @@ from typing import Optional
 from pydantic import BaseModel, Field, ConfigDict
 
 
-class RepairBase(BaseModel):
-    asset_id: int = Field(..., gt=0, description="ID ??????")
-    repair_date: date = Field(..., description="???? ???????")
-    repair_type: str = Field(..., max_length=100, description="??? ???????")
-    description: str = Field(..., max_length=1000, description="???????? ???????")
-    cost: Optional[Decimal] = Field(None, gt=0, description="????????? ???????")
-    performer: Optional[str] = Field(None, max_length=255, description="???????????")
-    status: str = Field("draft", max_length=50, description="?????? ???????")
+class RepairRequestBase(BaseModel):
+    asset_id: int = Field(..., gt=0, description="ID актива")
+    title: str = Field(..., max_length=255, description="Название заявки")
+    description: str = Field(..., max_length=1000, description="Описание заявки")
+    priority: str = Field("medium", description="Приоритет заявки")
+    desired_completion_date: Optional[date] = Field(None, description="Желаемая дата завершения")
+    deadline: Optional[date] = Field(None, description="Срок выполнения")
+    estimated_cost: Optional[Decimal] = Field(None, ge=0, description="Ориентировочная стоимость")
 
 
-class RepairCreate(RepairBase):
+class RepairRequestCreate(RepairRequestBase):
     pass
 
 
-class RepairUpdate(BaseModel):
-    asset_id: Optional[int] = Field(None, gt=0, description="ID ??????")
-    repair_date: Optional[date] = Field(None, description="???? ???????")
-    repair_type: Optional[str] = Field(None, max_length=100, description="??? ???????")
-    description: Optional[str] = Field(None, max_length=1000, description="???????? ???????")
-    cost: Optional[Decimal] = Field(None, gt=0, description="????????? ???????")
-    performer: Optional[str] = Field(None, max_length=255, description="???????????")
-    status: Optional[str] = Field(None, max_length=50, description="?????? ???????")
-    started_at: Optional[datetime] = Field(None, description="?????? ???????")
-    completed_at: Optional[datetime] = Field(None, description="????????? ???????")
+class RepairRequestUpdate(BaseModel):
+    title: Optional[str] = Field(None, max_length=255, description="Название заявки")
+    description: Optional[str] = Field(None, max_length=1000, description="Описание заявки")
+    priority: Optional[str] = Field(None, description="Приоритет заявки")
+    desired_completion_date: Optional[date] = Field(None, description="Желаемая дата завершения")
+    deadline: Optional[date] = Field(None, description="Срок выполнения")
+    estimated_cost: Optional[Decimal] = Field(None, ge=0, description="Ориентировочная стоимость")
 
 
-class RepairResponse(RepairBase):
-    id: int = Field(..., description="ID ???????")
-    asset_id: int = Field(..., description="ID ??????")
-    repair_date: date = Field(..., description="???? ???????")
-    repair_type: str = Field(..., description="??? ???????")
-    description: str = Field(..., description="???????? ???????")
-    cost: Optional[Decimal] = Field(None, description="????????? ???????")
-    performer: Optional[str] = Field(None, description="???????????")
-    status: str = Field("draft", description="?????? ???????")
-    started_at: Optional[datetime] = Field(None, description="?????? ???????")
-    completed_at: Optional[datetime] = Field(None, description="????????? ???????")
-    created_at: datetime = Field(..., description="???? ????????")
+class RepairStatusUpdate(BaseModel):
+    status: str
+    assigned_to: Optional[int] = None
+    actual_completion_date: Optional[date] = None
+    actual_cost: Optional[Decimal] = None
+    completion_notes: Optional[str] = None
+    rejection_reason: Optional[str] = None
+
+
+class RepairPriorityUpdate(BaseModel):
+    priority: str = Field(..., description="Новый приоритет заявки")
+
+
+class RepairTemplateBase(BaseModel):
+    name: str = Field(..., max_length=255, description="Название шаблона")
+    description: Optional[str] = Field(None, max_length=1000, description="Описание шаблона")
+    template_data: Optional[dict] = Field(default_factory=dict, description="Данные шаблона")
+    is_default: bool = Field(False, description="Шаблон по умолчанию")
+
+
+class RepairTemplateCreate(RepairTemplateBase):
+    pass
+
+
+class RepairTemplateUpdate(BaseModel):
+    name: Optional[str] = Field(None, max_length=255, description="Название шаблона")
+    description: Optional[str] = Field(None, max_length=1000, description="Описание шаблона")
+    template_data: Optional[dict] = Field(default_factory=dict, description="Данные шаблона")
+    is_default: Optional[bool] = Field(None, description="Шаблон по умолчанию")
+
+
+class RepairTemplateApply(BaseModel):
+    asset_id: int = Field(..., gt=0, description="ID актива для применения шаблона")
+
+
+class RepairRequestResponse(RepairRequestBase):
+    id: int = Field(..., description="ID заявки")
+    status: str = Field(..., description="Статус заявки")
+    created_by: int = Field(..., description="ID создателя")
+    creator_name: Optional[str] = Field(None, description="Имя создателя")
+    created_at: datetime = Field(..., description="Дата создания")
+    assigned_to: Optional[int] = Field(None, description="ID исполнителя")
+    assigned_at: Optional[datetime] = Field(None, description="Дата назначения")
+    actual_completion_date: Optional[date] = Field(None, description="Фактическая дата завершения")
+    actual_cost: Optional[Decimal] = Field(None, description="Фактическая стоимость")
+    completion_notes: Optional[str] = Field(None, description="Примечания о завершении")
+    rejection_reason: Optional[str] = Field(None, description="Причина отклонения")
+    updated_at: datetime = Field(..., description="Дата обновления")
+    asset_name: Optional[str] = Field(None, description="Название актива")
+    inventory_number: Optional[str] = Field(None, description="Инвентарный номер")
+    assigned_to_name: Optional[str] = Field(None, description="Имя исполнителя")
 
     model_config = ConfigDict(from_attributes=True)
 
 
+class RepairTemplateResponse(RepairTemplateBase):
+    id: int = Field(..., description="ID шаблона")
+    is_active: bool = Field(..., description="Активен ли шаблон")
+    created_by: int = Field(..., description="ID создателя")
+    created_at: datetime = Field(..., description="Дата создания")
+    updated_at: datetime = Field(..., description="Дата обновления")
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class RepairRequestListResponse(BaseModel):
+    items: list[RepairRequestResponse]
+    total: int
+    skip: int
+    limit: int
+
+
+class RepairTemplateListResponse(BaseModel):
+    items: list[RepairTemplateResponse]
+    total: int
+    skip: int
+    limit: int

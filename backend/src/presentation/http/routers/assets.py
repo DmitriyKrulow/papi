@@ -48,7 +48,7 @@ def safe_isoformat(value: Optional[Any]) -> Optional[str]:
 @router.get("/")
 async def list_assets(
     skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
+    limit: int = Query(50, ge=1, le=10000),
     status: Optional[str] = None,
     search: Optional[str] = None,
     db: Session = Depends(get_db),

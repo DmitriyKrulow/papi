@@ -1,157 +1,103 @@
 import { useState, useEffect, useCallback } from 'react';
 import axios, { AxiosError } from 'axios';
-import { useAuth } from './useAuth';
-
-interface RepairPriority {
-  LOW: 'low';
-  MEDIUM: 'medium';
-  HIGH: 'high';
-  URGENT: 'urgent';
-}
-
-interface RepairStatus {
-  DRAFT: 'draft';
-  SUBMITTED: 'submitted';
-  APPROVED: 'approved';
-  IN_PROGRESS: 'in_progress';
-  COMPLETED: 'completed';
-  REJECTED: 'rejected';
-  CANCELLED: 'cancelled';
-}
-
-interface Repair {
-  id: number;
-  asset_id: number;
-  title: string;
-  description: string;
-  priority: RepairPriority[keyof RepairPriority];
-  status: RepairStatus[keyof RepairStatus];
-  created_at: string;
-  created_by: number;
-  assigned_to?: number;
-  assigned_at?: string;
-  desired_completion_date?: string;
-  actual_completion_date?: string;
-  deadline?: string;
-  estimated_cost?: number;
-  actual_cost?: number;
-  completion_notes?: string;
-  rejection_reason?: string;
-  maintenance_record_id?: number;
-  updated_at: string;
-  updated_by?: number;
-}
-
-interface RepairListResponse {
-  total: number;
-  items: Repair[];
-}
-
-interface RepairCreate {
-  asset_id: number;
-  title: string;
-  description: string;
-  priority?: RepairPriority[keyof RepairPriority];
-  created_by: number;
-  desired_completion_date?: string;
-  deadline?: string;
-  estimated_cost?: number;
-}
-
-interface RepairUpdate {
-  title?: string;
-  description?: string;
-  priority?: RepairPriority[keyof RepairPriority];
-  assigned_to?: number;
-  desired_completion_date?: string;
-  actual_completion_date?: string;
-  deadline?: string;
-  estimated_cost?: number;
-  actual_cost?: number;
-  completion_notes?: string;
-  rejection_reason?: string;
-  maintenance_record_id?: number;
-  updated_by?: number;
-}
+import { apiClient } from '../api/client';
+import { useAuth } from '../hooks/useAuth';
+import { useAssets } from '../hooks/useAssets';
 
 export const useRepairs = () => {
+  const { user } = useAuth();
+  const token = localStorage.getItem('token');
+  console.log('[useRepairs] user:', user?.username);
+  console.log('[useRepairs] token:', token ? token.substring(0, 20) + '...' : 'NONE');
   const [repairs, setRepairs] = useState<Repair[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [total, setTotal] = useState<number>(0);
-  const { getToken } = useAuth();
+  
+  // Вызываем useAssets для обновления активов при изменении статуса заявки
+  const { fetchAssets } = useAssets();
+
+  const repairTemplates = [
+    {
+      id: 'template_electrical',
+      title: 'Электрические проблемы',
+      description: 'Проблемы с электрическими цепями, проводкой, розетками',
+    },
+    {
+      id: 'template_mechanical',
+      title: 'Механические повреждения',
+      description: 'Износ механизмов, шум, вибрация, скрипы',
+    },
+    {
+      id: 'template_software',
+      title: 'Проблемы ПО',
+      description: 'Сбои в программном обеспечении, обновления',
+    },
+    {
+      id: 'template_network',
+      title: 'Сетевые проблемы',
+      description: 'Проблемы с сетевым подключением, маршрутизацией',
+    },
+    {
+      id: 'template_hvac',
+      title: 'Климатическое оборудование',
+      description: 'Проблемы с отоплением, вентиляцией, кондиционированием',
+    },
+    {
+      id: 'template_safety',
+      title: 'Системы безопасности',
+      description: 'Проблемы с охраной, пожарной сигнализацией, видеонаблюдением',
+    },
+  ];
 
   const fetchRepairs = useCallback(async () => {
+    console.log('[useRepairs] fetchRepairs called');
+    console.log('[useRepairs] Token before fetch:', localStorage.getItem('token') ? localStorage.getItem('token')!.substring(0, 30) + '...' : 'NONE');
     setLoading(true);
     setError(null);
     try {
-      const token = await getToken();
-      const response = await axios.get<RepairListResponse>('/api/repairs', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await apiClient.repairs.list();
+      console.log('[useRepairs] fetchRepairs success, items count:', response.data.items?.length);
       setRepairs(response.data.items);
       setTotal(response.data.total);
     } catch (err) {
       const axiosError = err as AxiosError;
+      console.error('[useRepairs] fetchRepairs error:', axiosError.response?.status, axiosError.response?.data);
       setError(axiosError.message || 'Failed to fetch repairs');
     } finally {
       setLoading(false);
     }
-  }, [getToken]);
+  }, []);
 
-  const fetchRepairById = useCallback(async (id: number) => {
+  const createRepair = useCallback(async (repairData: any) => {
+    console.log('[useRepairs] createRepair called with:', repairData);
     setLoading(true);
     setError(null);
     try {
-      const token = await getToken();
-      const response = await axios.get<Repair>(`/api/repairs/${id}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      return response.data;
-    } catch (err) {
-      const axiosError = err as AxiosError;
-      setError(axiosError.message || `Failed to fetch repair with id ${id}`);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, [getToken]);
-
-  const createRepair = useCallback(async (repairData: RepairCreate) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const token = await getToken();
-      const response = await axios.post<Repair>('/api/repairs', repairData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await apiClient.repairs.create(repairData);
+      console.log('[useRepairs] createRepair success:', response.data);
       setRepairs((prev) => [...prev, response.data]);
       return response.data;
     } catch (err) {
       const axiosError = err as AxiosError;
-      setError(axiosError.message || 'Failed to create repair');
+      console.error('[useRepairs] createRepair error status:', axiosError.response?.status);
+      console.error('[useRepairs] createRepair error data:', axiosError.response?.data);
+      if (axiosError.response?.data && typeof axiosError.response.data === 'object' && 'detail' in axiosError.response.data) {
+        console.error('[useRepairs] createRepair error detail:', (axiosError.response.data as any).detail);
+      }
+      console.error('[useRepairs] createRepair error message:', axiosError.message);
+      setError(axiosError.response?.data || axiosError.message || 'Failed to create repair');
       throw err;
     } finally {
       setLoading(false);
     }
-  }, [getToken]);
+  }, []);
 
   const updateRepair = useCallback(async (id: number, repairData: RepairUpdate) => {
     setLoading(true);
     setError(null);
     try {
-      const token = await getToken();
-      const response = await axios.put<Repair>(`/api/repairs/${id}`, repairData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await apiClient.repairs.update(id, repairData);
       setRepairs((prev) => prev.map((repair) => (repair.id === id ? response.data : repair)));
       return response.data;
     } catch (err) {
@@ -161,39 +107,42 @@ export const useRepairs = () => {
     } finally {
       setLoading(false);
     }
-  }, [getToken]);
+  }, []);
 
   const updateRepairStatus = useCallback(async (id: number, status: string) => {
+    console.log('[useRepairs] updateRepairStatus called with id:', id, 'status:', status);
+    const token = localStorage.getItem('token');
+    console.log('[useRepairs] Token in localStorage:', token ? token.substring(0, 30) + '...' : 'NONE');
+    console.log('[useRepairs] Token first 50 chars:', token?.substring(0, 50));
+    console.log('[useRepairs] Token length:', token?.length);
+    console.log('[useRepairs] localStorage keys:', Object.keys(localStorage));
     setLoading(true);
     setError(null);
     try {
-      const token = await getToken();
-      const response = await axios.patch<Repair>(`/api/repairs/${id}/status`, { status }, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await apiClient.repairs.updateStatus(id, status);
+      console.log('[useRepairs] updateRepairStatus success:', response.data);
       setRepairs((prev) => prev.map((repair) => (repair.id === id ? response.data : repair)));
+      // Обновляем активы после изменения статуса заявки
+      console.log('[useRepairs] Calling fetchAssets to update asset status...');
+      fetchAssets();
       return response.data;
     } catch (err) {
       const axiosError = err as AxiosError;
+      console.error('[useRepairs] updateRepairStatus error status:', axiosError.response?.status);
+      console.error('[useRepairs] updateRepairStatus error data:', axiosError.response?.data);
+      console.error('[useRepairs] updateRepairStatus error headers:', axiosError.response?.headers);
       setError(axiosError.message || `Failed to update repair status with id ${id}`);
       throw err;
     } finally {
       setLoading(false);
     }
-  }, [getToken]);
+  }, [fetchAssets]);
 
   const updateRepairPriority = useCallback(async (id: number, priority: string) => {
     setLoading(true);
     setError(null);
     try {
-      const token = await getToken();
-      const response = await axios.patch<Repair>(`/api/repairs/${id}/priority`, { priority }, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await apiClient.repairs.updatePriority(id, priority);
       setRepairs((prev) => prev.map((repair) => (repair.id === id ? response.data : repair)));
       return response.data;
     } catch (err) {
@@ -203,18 +152,13 @@ export const useRepairs = () => {
     } finally {
       setLoading(false);
     }
-  }, [getToken]);
+  }, []);
 
   const deleteRepair = useCallback(async (id: number) => {
     setLoading(true);
     setError(null);
     try {
-      const token = await getToken();
-      await axios.delete(`/api/repairs/${id}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      await apiClient.repairs.delete(id);
       setRepairs((prev) => prev.filter((repair) => repair.id !== id));
     } catch (err) {
       const axiosError = err as AxiosError;
@@ -223,7 +167,22 @@ export const useRepairs = () => {
     } finally {
       setLoading(false);
     }
-  }, [getToken]);
+  }, []);
+
+  const fetchRepairById = useCallback(async (id: number) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await apiClient.repairs.get(id);
+      return response.data;
+    } catch (err) {
+      const axiosError = err as AxiosError;
+      setError(axiosError.message || `Failed to fetch repair with id ${id}`);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     fetchRepairs();
@@ -241,5 +200,6 @@ export const useRepairs = () => {
     updateRepairStatus,
     updateRepairPriority,
     deleteRepair,
+    repairTemplates,
   };
 };

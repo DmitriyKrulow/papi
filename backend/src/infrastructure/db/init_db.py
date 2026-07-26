@@ -17,10 +17,9 @@ def get_db() -> Session:
 
 
 def init_db():
-    from sqlalchemy import create_engine
+    from src.infrastructure.db.session import engine
     from src.infrastructure.db.models.user import Base
 
-    engine = create_engine("sqlite:///./papi.db", connect_args={"check_same_thread": False})
     Base.metadata.create_all(bind=engine)
 
 
@@ -44,6 +43,26 @@ def get_or_create_admin() -> Optional[User]:
             db.add(admin)
             db.commit()
             db.refresh(admin)
+        else:
+            # Check if password_hash is valid
+            if not admin.password_hash:
+                password_hash = PasswordHash.from_plain_password("admin123")
+                admin.password_hash = str(password_hash)
+                db.commit()
+            else:
+                # Try to verify the password to check if hash is valid
+                try:
+                    password_hash = PasswordHash.from_hash_string(admin.password_hash)
+                    # Test with admin123 - if it fails, reset the password
+                    if not password_hash.verify("admin123"):
+                        password_hash = PasswordHash.from_plain_password("admin123")
+                        admin.password_hash = str(password_hash)
+                        db.commit()
+                except (ValueError, AttributeError):
+                    # Invalid hash, reset password
+                    password_hash = PasswordHash.from_plain_password("admin123")
+                    admin.password_hash = str(password_hash)
+                    db.commit()
         return admin
     finally:
         db.close()

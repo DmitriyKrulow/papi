@@ -11,9 +11,8 @@ from sqlalchemy import (
     String,
     Text,
 )
-from sqlalchemy.orm import declarative_base, relationship
-
-Base = declarative_base()
+from sqlalchemy.orm import relationship
+from . import Base
 
 
 class Department(Base):
@@ -46,11 +45,11 @@ class Department(Base):
     # Self-referential relationship for hierarchy
     parent = relationship("Department", remote_side=[id], backref="subdepartments")
 
-    # Relationships
-    users = relationship("User", back_populates="department")
-    created_assets = relationship(
-        "Asset", back_populates="department_asset", foreign_keys="[Asset.department_code]"
-    )
+
+    employees = relationship("Employee", back_populates="department")
+    outgoing_movements = relationship("MovementRecord", foreign_keys="[MovementRecord.from_department_id]", back_populates="from_department")
+    incoming_movements = relationship("MovementRecord", foreign_keys="[MovementRecord.to_department_id]", back_populates="to_department")
+    inventory_checks = relationship("InventoryCheck", back_populates="department")
 
     def __repr__(self) -> str:
         return f"<Department(id={self.id}, name='{self.name}', code='{self.code}')>"

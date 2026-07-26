@@ -32,9 +32,12 @@ const Home: React.FC = () => {
           <p className="text-gray-600 text-sm mb-3">
             Заявки и обслуживание
           </p>
-          <span className="inline-block text-gray-400 font-medium">
-            В разработке →
-          </span>
+          <Link
+            to="/repairs"
+            className="inline-block text-blue-600 hover:text-blue-800 font-medium"
+          >
+            Перейти →
+          </Link>
         </div>
         
         <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-xl transition card-hover">

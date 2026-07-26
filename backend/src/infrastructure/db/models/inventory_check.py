@@ -12,9 +12,8 @@ from sqlalchemy import (
     String,
     Text,
 )
-from sqlalchemy.orm import declarative_base, relationship
-
-Base = declarative_base()
+from sqlalchemy.orm import relationship
+from . import Base
 
 
 class InventoryCheck(Base):
@@ -47,9 +46,9 @@ class InventoryCheck(Base):
         Index("idx_inventory_checks_created_at", "created_at"),
     )
 
-    # Relationships
-    department = relationship("Department", backref="inventory_checks")
-    responsible = relationship("User", backref="inventory_checks")
+    department = relationship("Department", back_populates="inventory_checks")
+    responsible = relationship("User", back_populates="inventory_checks")
+    asset_photos = relationship("AssetPhoto", back_populates="inventory_check")
 
     def __repr__(self) -> str:
         return f"<InventoryCheck(id={self.id}, name='{self.name}', date={self.check_date}, status='{self.status}')>"

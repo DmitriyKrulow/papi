@@ -12,9 +12,8 @@ from sqlalchemy import (
     String,
     Text,
 )
-from sqlalchemy.orm import declarative_base, relationship
-
-Base = declarative_base()
+from sqlalchemy.orm import relationship
+from . import Base
 
 
 class Employee(Base):
@@ -52,7 +51,6 @@ class Employee(Base):
         Index("idx_employees_created_at", "created_at"),
     )
 
-    # Relationships
     department = relationship("Department", back_populates="employees")
     user = relationship("User", back_populates="employees")
 

@@ -1,8 +1,6 @@
 // frontend/src/pages/Assets.tsx
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-// Удаляем неиспользуемый импорт
-// import { apiClient } from '../api/client';
 import type { Asset } from '../types';
 import { AssetStatusMap } from '../types';
 import { formatMoney } from '../utils/helpers';
@@ -11,117 +9,61 @@ import AssetModal from '../components/assets/AssetModal';
 import AddAssetForm from '../components/assets/AddAssetForm';
 import EditAssetForm from '../components/assets/EditAssetForm';
 import AssetDetailsModal from '../components/assets/AssetDetailsModal';
+import ImportAssetsModal from '../components/assets/ImportAssetsModal';
+import { useAuth } from '../hooks/useAuth';
 
 const Assets: React.FC = () => {
   const navigate = useNavigate();
+  const { getToken } = useAuth();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [sortField, setSortField] = useState<keyof Asset>('created_at');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  const [itemsPerPage, setItemsPerPage] = useState<number>(10);
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState<boolean>(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const [currentAsset, setCurrentAsset] = useState<Asset | null>(null);
 
-  useEffect(() => {
-    const fetchAssets = async () => {
-      try {
-        setLoading(true);
-        const token = localStorage.getItem('token');
-        const response = await fetch('/api/assets', {
-          headers: {
-            'Authorization': token ? `Bearer ${token}` : '',
-          },
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          setAssets(data.items || data || []);
-          setError(null);
-        } else {
-          setError('Ошибка загрузки активов');
-          toast.error('Ошибка загрузки активов');
-        }
-      } catch (err: any) {
-        setError('Ошибка загрузки активов: ' + (err.message || 'Неизвестная ошибка'));
-        toast.error('Ошибка загрузки активов');
-      } finally {
-        setLoading(false);
-      }
-    };
+  const filteredAssets = assets.filter((asset) =>
+    asset.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    asset.inventory_number.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
+  const fetchAssets = async () => {
+    try {
+      setLoading(true);
+      const token = await getToken();
+      const response = await fetch('/api/assets/?limit=10000', {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setAssets(data.items || data || []);
+        setError(null);
+      } else {
+        setError('Ошибка загрузки активов');
+        toast.error('Ошибка загрузки активов');
+      }
+    } catch (err: any) {
+      setError('Ошибка загрузки активов: ' + (err.message || 'Неизвестная ошибка'));
+      toast.error('Ошибка загрузки активов');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchAssets();
   }, []);
 
-  const filteredAssets = useMemo(() => {
-    return assets.filter((asset) => {
-      const matchesSearch =
-        asset.inventory_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        asset.name?.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesStatus = statusFilter === 'all' || asset.status === statusFilter;
-      return matchesSearch && matchesStatus;
-    });
-  }, [assets, searchQuery, statusFilter]);
-
-  const sortedAssets = useMemo(() => {
-    return [...filteredAssets].sort((a, b) => {
-      const aValue = a[sortField];
-      const bValue = b[sortField];
-
-      if (aValue === undefined && bValue === undefined) return 0;
-      if (aValue === undefined) return 1;
-      if (bValue === undefined) return -1;
-
-      if (typeof aValue === 'number' && typeof bValue === 'number') {
-        return sortOrder === 'asc' ? aValue - bValue : bValue - aValue;
-      }
-
-      if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
-      if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
-      return 0;
-    });
-  }, [filteredAssets, sortField, sortOrder]);
-
-  const totalPages = Math.ceil(sortedAssets.length / itemsPerPage);
-  const paginatedAssets = sortedAssets.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
-
-  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value);
-    setCurrentPage(1);
-  };
-
-  const handleStatusFilter = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setStatusFilter(e.target.value);
-    setCurrentPage(1);
-  };
-
-  const handleSort = (field: keyof Asset) => {
-    if (sortField === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortOrder('asc');
-    }
-  };
-
-  const handlePageChange = (page: number) => {
-    if (page >= 1 && page <= totalPages) {
-      setCurrentPage(page);
-    }
-  };
-
   const handleAddAsset = async (asset: Omit<Asset, 'id' | 'created_at' | 'updated_at'>) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/assets', {
+      const token = await getToken();
+      const response = await fetch('/api/assets/', {
         method: 'POST',
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
@@ -136,7 +78,8 @@ const Assets: React.FC = () => {
         toast.success('Актив добавлен');
         setIsAddModalOpen(false);
       } else {
-        toast.error('Ошибка добавления актива');
+        const errorData = await response.json();
+        toast.error(errorData.detail || 'Ошибка добавления актива');
       }
     } catch (err: any) {
       toast.error('Ошибка добавления актива');
@@ -145,8 +88,8 @@ const Assets: React.FC = () => {
 
   const handleEditAsset = async (asset: Asset) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/assets/${asset.id}`, {
+      const token = await getToken();
+      const response = await fetch(`/api/assets/${asset.id}/`, {
         method: 'PUT',
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
@@ -164,7 +107,8 @@ const Assets: React.FC = () => {
         setIsEditModalOpen(false);
         setCurrentAsset(null);
       } else {
-        toast.error('Ошибка обновления актива');
+        const errorData = await response.json();
+        toast.error(errorData.detail || 'Ошибка обновления актива');
       }
     } catch (err: any) {
       toast.error('Ошибка обновления актива');
@@ -174,8 +118,8 @@ const Assets: React.FC = () => {
   const handleDeleteAsset = async (id: number) => {
     if (!window.confirm('Вы уверены, что хотите удалить этот актив?')) return;
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/assets/${id}`, {
+      const token = await getToken();
+      const response = await fetch(`/api/assets/${id}/`, {
         method: 'DELETE',
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
@@ -186,7 +130,8 @@ const Assets: React.FC = () => {
         setAssets((prev) => prev.filter((a) => a.id !== id));
         toast.success('Актив удален');
       } else {
-        toast.error('Ошибка удаления актива');
+        const errorData = await response.json();
+        toast.error(errorData.detail || 'Ошибка удаления актива');
       }
     } catch (err: any) {
       toast.error('Ошибка удаления актива');
@@ -239,7 +184,14 @@ const Assets: React.FC = () => {
     <div>
       <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
         <h1 className="text-2xl font-bold text-gray-800">📦 Активы</h1>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <input
+            type="text"
+            placeholder="Поиск..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
           <button
             onClick={() => navigate('/assets/create')}
             className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition flex items-center gap-2"
@@ -247,89 +199,43 @@ const Assets: React.FC = () => {
             <span>➕</span> Добавить актив
           </button>
           <button
-            onClick={() => setIsAddModalOpen(true)}
+            onClick={() => setIsImportModalOpen(true)}
             className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition flex items-center gap-2"
           >
-            <span>📤</span> Быстрое добавление
+            <span>📤</span> Загрузить из файла
           </button>
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow p-4 mb-6 space-y-4">
-        <div className="flex flex-wrap gap-4">
-          <input
-            type="text"
-            placeholder="Поиск по инвентарному номеру или названию..."
-            value={searchQuery}
-            onChange={handleSearch}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-          <select
-            value={statusFilter}
-            onChange={handleStatusFilter}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="all">Все статусы</option>
-            {Object.keys(AssetStatusMap).map((status) => (
-              <option key={status} value={status}>
-                {AssetStatusMap[status as keyof typeof AssetStatusMap].label}
-              </option>
-            ))}
-          </select>
-          <select
-            value={itemsPerPage}
-            onChange={(e) => {
-              setItemsPerPage(Number(e.target.value));
-              setCurrentPage(1);
-            }}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value={10}>10 шт.</option>
-            <option value={20}>20 шт.</option>
-            <option value={50}>50 шт.</option>
-          </select>
-        </div>
-      </div>
-
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        {paginatedAssets.length === 0 ? (
+        {filteredAssets.length === 0 ? (
           <div className="text-center py-12">
             <div className="text-4xl mb-4">📭</div>
-            <p className="text-gray-500">Нет активов для отображения</p>
-            <p className="text-gray-400 text-sm mt-1">
-              {searchQuery || statusFilter !== 'all'
-                ? 'Попробуйте изменить фильтры поиска'
-                : 'Добавьте первый актив, нажав кнопку выше'}
+            <p className="text-gray-500">
+              {searchTerm ? 'Ничего не найдено' : 'Нет активов для отображения'}
             </p>
+            {searchTerm && (
+              <p className="text-gray-400 text-sm mt-1">
+                Попробуйте изменить параметры поиска
+              </p>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50 border-b">
                 <tr>
-                  <th
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition"
-                    onClick={() => handleSort('inventory_number')}
-                  >
-                    Инв. номер {sortField === 'inventory_number' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Инв. номер
                   </th>
-                  <th
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition"
-                    onClick={() => handleSort('name')}
-                  >
-                    Название {sortField === 'name' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Название
                   </th>
-                  <th
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition"
-                    onClick={() => handleSort('current_value')}
-                  >
-                    Стоимость {sortField === 'current_value' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Стоимость
                   </th>
-                  <th
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition"
-                    onClick={() => handleSort('status')}
-                  >
-                    Статус {sortField === 'status' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Статус
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Действия
@@ -337,7 +243,7 @@ const Assets: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {paginatedAssets.map((asset) => (
+                {filteredAssets.map((asset) => (
                   <tr key={asset.id} className="hover:bg-gray-50 transition">
                     <td className="px-6 py-4 text-sm font-mono text-gray-900">
                       {asset.inventory_number}
@@ -381,30 +287,9 @@ const Assets: React.FC = () => {
           </div>
         )}
 
-        {totalPages > 1 && (
-          <div className="px-6 py-4 border-t flex items-center justify-between">
-            <span className="text-sm text-gray-500">
-              Показано {paginatedAssets.length} из {sortedAssets.length} активов
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => handlePageChange(currentPage - 1)}
-                disabled={currentPage === 1}
-                className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                ← Назад
-              </button>
-              <span className="px-3 py-1">
-                {currentPage} / {totalPages}
-              </span>
-              <button
-                onClick={() => handlePageChange(currentPage + 1)}
-                disabled={currentPage === totalPages}
-                className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Вперед →
-              </button>
-            </div>
+        {filteredAssets.length > 0 && (
+          <div className="px-6 py-4 border-t text-sm text-gray-500">
+            Найдено активов: {filteredAssets.length}
           </div>
         )}
       </div>
@@ -419,6 +304,12 @@ const Assets: React.FC = () => {
           onClose={() => setIsAddModalOpen(false)}
         />
       </AssetModal>
+
+      <ImportAssetsModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onSuccess={fetchAssets}
+      />
 
       {currentAsset && (
         <>

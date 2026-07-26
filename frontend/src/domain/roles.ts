@@ -1,4 +1,4 @@
-import { UserRole } from '../domain/roles';
-
-export { UserRole };
-export * from '../domain/roles';
+export enum UserRole {
+  ADMIN = 'admin',
+  USER = 'user',
+}

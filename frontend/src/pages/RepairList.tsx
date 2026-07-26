@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useRepairs } from '../hooks/useRepairs';
 import { useAuth } from '../hooks/useAuth';
@@ -9,9 +9,11 @@ const RepairList: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  const [searchTerm, setSearchTerm] = useState('');
+  
   const filteredRepairs = repairs.filter((repair) =>
-    repair.title.toLowerCase().includes('') ||
-    repair.asset_id.toString().includes('')
+    repair.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    repair.asset_id.toString().includes(searchTerm)
   );
 
   const getStatusColor = (status: string) => {
@@ -42,19 +44,56 @@ const RepairList: React.FC = () => {
     }
   };
 
+  const getStatusLabel = (status: string) => {
+    const statusMap: Record<string, string> = {
+      draft: 'Черновик',
+      submitted: 'Подана',
+      approved: 'Одобрена',
+      in_progress: 'В работе',
+      completed: 'Выполнена',
+      rejected: 'Отклонена',
+      cancelled: 'Отменена',
+    };
+    return statusMap[status] || status;
+  };
+
+  const getPriorityLabel = (priority: string) => {
+    const priorityMap: Record<string, string> = {
+      low: 'Низкий',
+      medium: 'Средний',
+      high: 'Высокий',
+      urgent: 'Срочный',
+    };
+    return priorityMap[priority] || priority;
+  };
+
   if (loading) return <div>Загрузка...</div>;
   if (error) return <div className="text-red-500">Ошибка: {error}</div>;
 
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Заявки на ремонт</h1>
-        <button
-          onClick={() => navigate('/repairs/create')}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-        >
-          Новая заявка
-        </button>
+      <div className="mb-6">
+        <div className="flex justify-between items-center mb-4">
+          <h1 className="text-3xl font-bold text-gray-900">Заявки на ремонт</h1>
+          <button
+            onClick={() => navigate('/repairs/create')}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          >
+            Новая заявка
+          </button>
+        </div>
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="Поиск по названию или ID актива..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full px-4 py-2 border rounded-md pl-10"
+          />
+          <div className="absolute left-3 top-2.5 text-gray-400">
+            🔍
+          </div>
+        </div>
       </div>
 
       <div className="bg-white shadow overflow-hidden sm:rounded-lg">
@@ -77,10 +116,10 @@ const RepairList: React.FC = () => {
                   </div>
                   <div className="ml-2 flex-shrink-0 flex space-x-2">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(repair.status)}`}>
-                      {repair.status}
+                      {getStatusLabel(repair.status)}
                     </span>
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPriorityColor(repair.priority)}`}>
-                      {repair.priority}
+                      {getPriorityLabel(repair.priority)}
                     </span>
                   </div>
                 </div>

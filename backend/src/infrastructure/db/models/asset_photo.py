@@ -11,9 +11,8 @@ from sqlalchemy import (
     String,
     Text,
 )
-from sqlalchemy.orm import declarative_base, relationship
-
-Base = declarative_base()
+from sqlalchemy.orm import relationship
+from . import Base
 
 
 class AssetPhoto(Base):
@@ -46,12 +45,11 @@ class AssetPhoto(Base):
         Index("idx_asset_photos_uploaded_at", "uploaded_at"),
     )
 
-    # Relationships
     asset = relationship("Asset", back_populates="asset_photos")
-    document = relationship("Document", backref="asset_photos")
-    uploaded_by_user = relationship("User", backref="asset_photos")
-    inventory_check = relationship("InventoryCheck", backref="asset_photos")
-    repair_request = relationship("RepairRequest", backref="asset_photos")
+    document = relationship("Document", back_populates="asset_photos")
+    uploaded_by_user = relationship("User", back_populates="asset_photos")
+    inventory_check = relationship("InventoryCheck", back_populates="asset_photos")
+    repair_request = relationship("RepairRequest", back_populates="asset_photos")
 
     def __repr__(self) -> str:
         return f"<AssetPhoto(id={self.id}, asset_id={self.asset_id}, stage='{self.stage}')>"

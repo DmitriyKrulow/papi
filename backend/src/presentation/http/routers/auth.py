@@ -48,17 +48,24 @@ def register(user: RegisterRequest, db: Session = Depends(get_db)):
 @router.post("/login", response_model=UserToken)
 def login(credentials: LoginRequest, db: Session = Depends(get_db)):
     from src.infrastructure.db.models.user import User
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"[Auth] Login attempt for username: {credentials.username}")
     try:
         user = db.query(User).filter(User.username == credentials.username).first()
+        logger.info(f"[Auth] User found: {user}")
         if not user:
             raise HTTPException(status_code=400, detail="Incorrect username or password")
         
         if not user.password_hash:
             raise HTTPException(status_code=400, detail="Password not set for user")
         
-        password_hash = PasswordHash.from_hash_string(user.password_hash)
-        if not password_hash.verify(credentials.password):
-            raise HTTPException(status_code=400, detail="Incorrect username or password")
+        try:
+            password_hash = PasswordHash.from_hash_string(user.password_hash)
+            if not password_hash.verify(credentials.password):
+                raise HTTPException(status_code=400, detail="Incorrect username or password")
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=f"Invalid password format: {str(e)}")
     except HTTPException:
         raise
     except Exception as e:
@@ -69,6 +76,7 @@ def login(credentials: LoginRequest, db: Session = Depends(get_db)):
         data={"sub": user.username, "role": user.role},
         expires_delta=access_token_expires,
     )
+    logger.info(f"[Auth] Login successful for user: {user.username}, token: {access_token[:50]}...")
     return UserToken(access_token=access_token, token_type="bearer")
 
 
@@ -89,6 +97,9 @@ def refresh_token(refresh_token: str):
 
 @router.get("/me", response_model=UserResponse)
 def get_me(current_user: User = Depends(get_current_user)):
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"[Auth] get_me called for user: {current_user.username}")
     return UserResponse(
         id=current_user.id,
         username=current_user.username,

@@ -11,9 +11,8 @@ from sqlalchemy import (
     String,
     Text,
 )
-from sqlalchemy.orm import declarative_base, relationship
-
-Base = declarative_base()
+from sqlalchemy.orm import relationship
+from . import Base
 
 
 class AssetType(Base):
@@ -39,11 +38,7 @@ class AssetType(Base):
         Index("idx_asset_types_created_at", "created_at"),
     )
 
-    # Relationships
     category = relationship("AssetCategory", back_populates="asset_types")
-    assets = relationship(
-        "Asset", back_populates="asset_type_rel", foreign_keys="[Asset.asset_type]"
-    )
 
     def __repr__(self) -> str:
         return f"<AssetType(id={self.id}, name='{self.name}', code='{self.code}')>"

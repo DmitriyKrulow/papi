@@ -13,9 +13,8 @@ from sqlalchemy import (
     String,
     Text,
 )
-from sqlalchemy.orm import declarative_base, relationship
-
-Base = declarative_base()
+from sqlalchemy.orm import relationship
+from . import Base
 
 
 class MaintenanceRecord(Base):
@@ -48,7 +47,6 @@ class MaintenanceRecord(Base):
         Index("idx_maintenance_records_created_at", "created_at"),
     )
 
-    # Relationships
     asset = relationship("Asset", back_populates="maintenance_records")
 
     def __repr__(self) -> str:

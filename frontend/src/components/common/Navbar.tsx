@@ -13,6 +13,7 @@ const Navbar: React.FC = () => {
     { path: '/', label: '🏠 Главная' },
     { path: '/dashboard', label: '📊 Дашборд' },
     { path: '/assets', label: '📦 Активы' },
+    { path: '/repairs', label: '🔧 Ремонты' },
   ];
 
   const adminItems = [

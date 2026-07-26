@@ -44,5 +44,12 @@ class User(Base):
         Index("idx_users_created_at", "created_at"),
     )
 
+    created_repairs = relationship("RepairRequest", foreign_keys="RepairRequest.created_by", back_populates="creator")
+    assigned_repairs = relationship("RepairRequest", foreign_keys="RepairRequest.assigned_to", back_populates="assignee")
+    inventory_checks = relationship("InventoryCheck", back_populates="responsible")
+    employees = relationship("Employee", back_populates="user")
+    asset_photos = relationship("AssetPhoto", back_populates="uploaded_by_user")
+    documents = relationship("Document", foreign_keys="Document.uploaded_by", back_populates="uploader")
+
     def __repr__(self) -> str:
         return f"<User(id={self.id}, username='{self.username}', email='{self.email}')>"

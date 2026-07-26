@@ -1,24 +1,32 @@
-import React from 'react';
-import { useForm, SubmitHandler, Controller } from 'react-hook-form';
+import React, { useEffect } from 'react';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+
+interface Asset {
+  id: number;
+  name: string;
+  inventory_number: string;
+}
 
 interface RepairFormProps {
   onSubmit: (data: RepairFormData) => void;
   defaultValue?: RepairFormData;
   loading?: boolean;
   assetId?: number;
+  assets?: Asset[];
+  onApplyTemplate?: (title: string, description: string) => void;
 }
 
 const repairSchema = z.object({
-  title: z.string().min(1, 'Обязательное поле').max(255, 'Максимум 255 символов'),
-  description: z.string().min(1, 'Обязательное поле'),
-  asset_id: z.number().int().positive(),
-  priority: z.enum(['low', 'medium', 'high', 'urgent']).default('medium'),
-  created_by: z.number().int().positive(),
-  desired_completion_date: z.coerce.date().optional(),
-  deadline: z.coerce.date().optional(),
-  estimated_cost: z.coerce.number().min(0, 'Не может быть отрицательным').optional(),
+  title: z.string().min(1, { message: 'Обязательное поле' }).max(255, 'Максимум 255 символов'),
+  description: z.string().min(1, { message: 'Обязательное поле' }),
+  asset_id: z.number().int().positive('ID актива должен быть больше 0'),
+  priority: z.enum(['low', 'medium', 'high', 'urgent'] as const, { message: 'Некорректный приоритет' }),
+  created_by: z.number().int().optional(),
+  desired_completion_date: z.string().optional(),
+  deadline: z.string().optional(),
+  estimated_cost: z.number().min(0, { message: 'Не может быть отрицательным' }).optional(),
 });
 
 type RepairFormData = z.infer<typeof repairSchema>;
@@ -28,22 +36,63 @@ const RepairForm: React.FC<RepairFormProps> = ({
   defaultValue,
   loading = false,
   assetId,
+  assets = [],
+  onApplyTemplate,
 }) => {
   const {
     control,
-    register,
     handleSubmit,
     formState: { errors },
+    setValue,
   } = useForm<RepairFormData>({
     resolver: zodResolver(repairSchema),
-    defaultValues: defaultValue || {
+    defaultValues: {
+      title: '',
+      description: '',
       priority: 'medium',
-      asset_id: assetId || 0,
+      asset_id: assetId || undefined,
+      desired_completion_date: '',
+      deadline: '',
+      estimated_cost: undefined,
     },
   });
 
+  const handleApplyTemplate = (templateTitle: string, templateDescription: string) => {
+    setValue('title', templateTitle, { shouldValidate: true });
+    setValue('description', templateDescription, { shouldValidate: true });
+    onApplyTemplate?.(templateTitle, templateDescription);
+  };
+
+  console.log('[RepairForm] Component rendered');
+  console.log('[RepairForm] assetId:', assetId);
+  console.log('[RepairForm] defaultValue:', defaultValue);
+  console.log('[RepairForm] formState errors:', errors);
+
+  useEffect(() => {
+    if (assetId) {
+      console.log('[RepairForm] assetId changed to:', assetId);
+      setValue('asset_id', assetId, { shouldValidate: true });
+    }
+  }, [assetId, setValue]);
+
+  useEffect(() => {
+    if (defaultValue?.title) {
+      console.log('[RepairForm] defaultValue.title changed to:', defaultValue.title);
+      setValue('title', defaultValue.title, { shouldValidate: true });
+    }
+    if (defaultValue?.description) {
+      console.log('[RepairForm] defaultValue.description changed to:', defaultValue.description);
+      setValue('description', defaultValue.description, { shouldValidate: true });
+    }
+  }, [defaultValue, setValue]);
+
+  const handleFormSubmit = (data: any) => {
+    console.log('[RepairForm] handleFormSubmit called with:', data);
+    return onSubmit(data);
+  };
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
       <div>
         <label className="block text-sm font-medium mb-1">Название</label>
         <Controller
@@ -54,6 +103,7 @@ const RepairForm: React.FC<RepairFormProps> = ({
               {...field}
               className="w-full px-3 py-2 border rounded-md"
               placeholder="Краткое описание проблемы"
+              readOnly={!!defaultValue?.title}
             />
           )}
         />
@@ -71,6 +121,7 @@ const RepairForm: React.FC<RepairFormProps> = ({
               className="w-full px-3 py-2 border rounded-md"
               rows={4}
               placeholder="Подробное описание неисправности"
+              readOnly={!!defaultValue?.description}
             />
           )}
         />

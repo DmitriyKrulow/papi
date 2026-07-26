@@ -11,7 +11,7 @@ from sqlalchemy import (
     Text,
     Numeric,
 )
-from sqlalchemy.orm import declarative_base
+from sqlalchemy.orm import relationship
 
 # Импортируем Base из __init__.py
 from . import Base
@@ -43,6 +43,11 @@ class Asset(Base):
         Index("idx_assets_status", "status"),
         Index("idx_assets_created_at", "created_at"),
     )
+
+    repair_requests = relationship("RepairRequest", back_populates="asset")
+    maintenance_records = relationship("MaintenanceRecord", back_populates="asset")
+    movement_records = relationship("MovementRecord", back_populates="asset")
+    asset_photos = relationship("AssetPhoto", back_populates="asset")
 
     def __repr__(self) -> str:
         return f"<Asset(id={self.id}, name='{self.name}', status='{self.status}')>"

@@ -13,9 +13,8 @@ from sqlalchemy import (
     Text,
     BigInteger,
 )
-from sqlalchemy.orm import declarative_base, relationship
-
-Base = declarative_base()
+from sqlalchemy.orm import relationship
+from . import Base
 
 
 class Document(Base):
@@ -53,8 +52,8 @@ class Document(Base):
         Index("idx_documents_category", "category"),
     )
 
-    # Relationships
-    uploader = relationship("User", foreign_keys=[uploaded_by])
+    uploader = relationship("User", foreign_keys=[uploaded_by], back_populates="documents")
+    asset_photos = relationship("AssetPhoto", back_populates="document")
 
     def __repr__(self) -> str:
         return f"<Document(id={self.id}, filename='{self.filename}', type='{self.document_type}')>"

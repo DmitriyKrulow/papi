@@ -12,9 +12,8 @@ from sqlalchemy import (
     Text,
     Numeric,
 )
-from sqlalchemy.orm import declarative_base, relationship
-
-Base = declarative_base()
+from sqlalchemy.orm import relationship
+from . import Base
 
 
 class AssetCategory(Base):
@@ -45,12 +44,14 @@ class AssetCategory(Base):
 
     # Self-referential relationship for hierarchy
     parent = relationship(
-        "AssetCategory", remote_side=[id], backref="subcategories"
+        "AssetCategory", remote_side=[id], back_populates="subcategories"
     )
 
-    # Relationships
     asset_types = relationship(
         "AssetType", back_populates="category", cascade="all, delete-orphan"
+    )
+    subcategories = relationship(
+        "AssetCategory", remote_side=[parent_id], back_populates="parent"
     )
 
     def __repr__(self) -> str:

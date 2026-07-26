@@ -11,9 +11,8 @@ from sqlalchemy import (
     String,
     Text,
 )
-from sqlalchemy.orm import declarative_base, relationship
-
-Base = declarative_base()
+from sqlalchemy.orm import relationship
+from . import Base
 
 
 class MovementRecord(Base):
@@ -49,13 +48,12 @@ class MovementRecord(Base):
         Index("idx_movement_records_created_at", "created_at"),
     )
 
-    # Relationships
     asset = relationship("Asset", back_populates="movement_records")
     from_department = relationship(
-        "Department", foreign_keys=[from_department_id], backref="outgoing_movements"
+        "Department", foreign_keys=[from_department_id], back_populates="outgoing_movements"
     )
     to_department = relationship(
-        "Department", foreign_keys=[to_department_id], backref="incoming_movements"
+        "Department", foreign_keys=[to_department_id], back_populates="incoming_movements"
     )
 
     def __repr__(self) -> str:

@@ -13,9 +13,8 @@ from sqlalchemy import (
     Text,
     JSON,
 )
-from sqlalchemy.orm import declarative_base, relationship
-
-Base = declarative_base()
+from sqlalchemy.orm import relationship
+from . import Base
 
 
 class Report(Base):
