@@ -68,9 +68,6 @@ const RepairEdit: React.FC = () => {
   };
 
   const handleStatusChange = async (newStatus: string) => {
-    console.log('[RepairEdit] handleStatusChange called with newStatus:', newStatus);
-    const token = localStorage.getItem('token');
-    console.log('[RepairEdit] Token in localStorage before request:', token ? token.substring(0, 30) + '...' : 'NONE');
     try {
       await updateRepairStatus(repairId, newStatus);
       setStatus(newStatus);

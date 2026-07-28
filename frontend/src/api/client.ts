@@ -14,57 +14,29 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
-    console.log('[Interceptor] BEFORE: Token from localStorage:', token ? token.substring(0, 30) + '...' : 'NONE');
-    console.log('[Interceptor] BEFORE: config.headers:', config.headers);
-    console.log('[Interceptor] BEFORE: Authorization header?', config.headers.Authorization ? 'EXISTS' : 'MISSING');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-      console.log('[Interceptor] ✅ Set Authorization header:', token.substring(0, 30) + '...');
-    } else {
-      console.error('[Interceptor] ❌ NO TOKEN - This is the problem!');
-      console.error('[Interceptor] ❌ localStorage keys:', Object.keys(localStorage));
     }
-    console.log('[Interceptor] AFTER: config.headers after modification:', config.headers);
-    console.log('[Interceptor] AFTER: Authorization header?', config.headers.Authorization ? 'EXISTS' : 'MISSING');
     return config;
   },
   (error) => {
-    console.error('[Interceptor] Error:', error);
     return Promise.reject(error);
   }
+);
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => Promise.reject(error)
 );
 
 // Перехватчик для обработки ошибок
 api.interceptors.response.use(
-  (response) => {
-    return response;
-  },
+  (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      window.location.href = '/login';
-    }
     return Promise.reject(error);
   }
 );
 
-// Проверка токена перед каждым запросом
-const checkToken = () => {
-  const token = localStorage.getItem('token');
-  console.log('[Client Check] Token exists:', !!token);
-  if (!token) {
-    console.error('[Client Check] ❌ NO TOKEN IN LOCALSTORAGE!');
-    console.error('[Client Check] localStorage contents:', {
-      keys: Object.keys(localStorage),
-      user: localStorage.getItem('user'),
-    });
-  } else {
-    console.log('[Client Check] ✅ Token found:', token.substring(0, 30) + '...');
-  }
-  return token;
-};
-
-// API-методы
 export const apiClient = {
   // Аутентификация
   auth: {
@@ -91,51 +63,23 @@ export const apiClient = {
   },
   
   // База данных
-  checkDB: () => {
-    checkToken();
-    return api.get('/db-check');
-  },
+  checkDB: () => api.get('/db-check'),
   
   // Активы
   assets: {
-    list: () => {
-      checkToken();
-      return api.get('/assets/');
-    },
-    get: (id: number) => {
-      checkToken();
-      return api.get(`/assets/${id}/`);
-    },
-    create: (data: any) => {
-      checkToken();
-      return api.post('/assets/', data);
-    },
-    update: (id: number, data: any) => {
-      checkToken();
-      return api.put(`/assets/${id}/`, data);
-    },
-    hide: (id: number) => {
-      checkToken();
-      return api.put(`/assets/${id}/hide/`);
-    },
-    delete: (id: number) => {
-      checkToken();
-      return api.delete(`/assets/${id}/`);
-    },
+    list: () => api.get('/assets/'),
+    get: (id: number) => api.get(`/assets/${id}/`),
+    create: (data: any) => api.post('/assets/', data),
+    update: (id: number, data: any) => api.put(`/assets/${id}/`, data),
+    hide: (id: number) => api.put(`/assets/${id}/hide/`),
+    delete: (id: number) => api.delete(`/assets/${id}/`),
   },
   
   // Документы/Файлы
   documents: {
-    list: () => {
-      checkToken();
-      return api.get('/documents');
-    },
-    get: (id: number) => {
-      checkToken();
-      return api.get(`/documents/${id}`);
-    },
+    list: () => api.get('/documents'),
+    get: (id: number) => api.get(`/documents/${id}`),
     upload: (file: File, data?: any) => {
-      checkToken();
       const formData = new FormData();
       formData.append('file', file);
       if (data) {
@@ -149,16 +93,12 @@ export const apiClient = {
         },
       });
     },
-    delete: (id: number) => {
-      checkToken();
-      return api.delete(`/documents/${id}`);
-    },
+    delete: (id: number) => api.delete(`/documents/${id}`),
   },
   
   // Фотографии активов
   assetPhotos: {
     upload: (assetId: number, file: File, data?: any) => {
-      checkToken();
       const formData = new FormData();
       formData.append('file', file);
       if (data) {
@@ -172,17 +112,54 @@ export const apiClient = {
         },
       });
     },
-    list: (assetId: number) => {
-      checkToken();
-      return api.get(`/asset-photos/${assetId}/photos`);
+    list: (assetId: number) => api.get(`/asset-photos/${assetId}/photos`),
+    get: (photoId: number) => api.get(`/asset-photos/${photoId}`),
+    delete: (photoId: number) => api.delete(`/asset-photos/${photoId}`),
+  },
+  
+  // Размещения (подразделения)
+  placements: {
+    list: (params?: Record<string, any>) => {
+      const query = new URLSearchParams(params as any).toString();
+      return api.get(`/admin/placements/?${query}`);
     },
-    get: (photoId: number) => {
-      checkToken();
-      return api.get(`/asset-photos/${photoId}`);
+    get: (id: number) => api.get(`/admin/placements/${id}/`),
+    create: (data: any) => api.post('/admin/placements/', data),
+    update: (id: number, data: any) => api.put(`/admin/placements/${id}/`, data),
+    delete: (id: number) => api.delete(`/admin/placements/${id}/`),
+    options: () => api.get('/admin/placements/options'),
+    getEmployees: (id: number) => api.get(`/admin/placements/${id}/employees`),
+  },
+  
+  // Сотрудники
+  employees: {
+    list: (params?: Record<string, any>) => {
+      const query = new URLSearchParams(params as any).toString();
+      return api.get(`/admin/employees/?${query}`);
     },
-    delete: (photoId: number) => {
-      checkToken();
-      return api.delete(`/asset-photos/${photoId}`);
+    get: (id: number) => api.get(`/admin/employees/${id}/`),
+    create: (data: any) => api.post('/admin/employees/', data),
+    update: (id: number, data: any) => api.put(`/admin/employees/${id}/`, data),
+    delete: (id: number) => api.delete(`/admin/employees/${id}/`),
+    options: () => api.get('/admin/employees/options'),
+  },
+  
+  // Размещение активов
+  placementAssignments: {
+    list: (params?: Record<string, any>) => {
+      const query = new URLSearchParams(params as any).toString();
+      return api.get(`/admin/placement-assignments/?${query}`);
+    },
+    create: (data: any) => api.post('/admin/placement-assignments/', data),
+    update: (id: number, data: any) => api.put(`/admin/placement-assignments/${id}/`, data),
+    delete: (id: number) => api.delete(`/admin/placement-assignments/${id}/`),
+    departments: (params?: Record<string, any>) => {
+      const query = new URLSearchParams(params as any).toString();
+      return api.get(`/admin/placement-assignments/departments?${query}`);
+    },
+    employees: (params?: Record<string, any>) => {
+      const query = new URLSearchParams(params as any).toString();
+      return api.get(`/admin/placement-assignments/employees?${query}`);
     },
   },
   
@@ -190,22 +167,18 @@ export const apiClient = {
   repairs: {
     list: () => {
       console.log('[API Client] repairs.list called');
-      checkToken();
       return api.get('/repairs/');
     },
     get: (id: number) => {
       console.log('[API Client] repairs.get called with id:', id);
-      checkToken();
       return api.get(`/repairs/${id}/`);
     },
     create: (data: any) => {
       console.log('[API Client] repairs.create called');
-      checkToken();
       return api.post('/repairs/', data);
     },
     update: (id: number, data: any) => {
       console.log('[API Client] repairs.update called with id:', id);
-      checkToken();
       return api.put(`/repairs/${id}/`, data);
     },
     updateStatus: (id: number, status: string) => {
@@ -215,19 +188,16 @@ export const apiClient = {
       console.log('[API Client] Token type:', typeof token);
       console.log('[API Client] Token length:', token?.length);
       console.log('[API Client] Token first 100 chars:', token?.substring(0, 100));
-      checkToken();
       const result = api.patch(`/repairs/${id}/status/`, { status_update: { status } });
       console.log('[API Client] PATCH result:', result);
       return result;
     },
     updatePriority: (id: number, priority: string) => {
       console.log('[API Client] repairs.updatePriority called with id:', id, 'priority:', priority);
-      checkToken();
       return api.patch(`/repairs/${id}/priority/`, { priority });
     },
     delete: (id: number) => {
       console.log('[API Client] repairs.delete called with id:', id);
-      checkToken();
       return api.delete(`/repairs/${id}/`);
     },
   },

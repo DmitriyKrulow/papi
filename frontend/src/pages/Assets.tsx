@@ -1,7 +1,7 @@
 // frontend/src/pages/Assets.tsx
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { Asset } from '../types';
+import type { Asset, AssetTypeConfig } from '../types';
 import { AssetStatusMap } from '../types';
 import { formatMoney } from '../utils/helpers';
 import toast from 'react-hot-toast';
@@ -23,12 +23,42 @@ const Assets: React.FC = () => {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState<boolean>(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [filterAssetType, setFilterAssetType] = useState('');
+  const [filterLocation, setFilterLocation] = useState('');
+  const [filterDepartment, setFilterDepartment] = useState('');
+  const [filterResponsible, setFilterResponsible] = useState('');
+  const [filterEmployee, setFilterEmployee] = useState('');
   const [currentAsset, setCurrentAsset] = useState<Asset | null>(null);
+  const [assetTypeConfigs, setAssetTypeConfigs] = useState<AssetTypeConfig[]>([]);
+  const [departments, setDepartments] = useState<Array<{id: number; name: string; code: string; location: string; full_name: string}>>([]);
+  const [employees, setEmployees] = useState<Array<{id: number; full_name: string; position: string; department_name: string; department_code: string}>>([]);
+  const [deptSearch, setDeptSearch] = useState('');
+  const [empSearch, setEmpSearch] = useState('');
 
-  const filteredAssets = assets.filter((asset) =>
-    asset.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    asset.inventory_number.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const getAssetTypeIcon = (assetType: string | undefined): string => {
+    if (!assetType) return '📦';
+    const config = assetTypeConfigs.find(c => c.code === assetType);
+    return config?.icon || '📦';
+  };
+
+  const filteredAssets = assets.filter((asset) => {
+    const matchesSearch =
+      asset.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      asset.inventory_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (asset.responsible_person || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = !filterStatus || asset.status === filterStatus;
+    const matchesAssetType = !filterAssetType || asset.asset_type === filterAssetType;
+    const matchesLocation = !filterLocation || (asset.location_address || '').toLowerCase().includes(filterLocation.toLowerCase());
+    const matchesDepartment = !filterDepartment || 
+      (asset.department_code || '').toLowerCase().includes(filterDepartment.toLowerCase()) ||
+      (asset.department_name || '').toLowerCase().includes(filterDepartment.toLowerCase());
+    const matchesResponsible = !filterResponsible || (asset.responsible_person || '').toLowerCase().includes(filterResponsible.toLowerCase());
+    const matchesEmployee = !filterEmployee || 
+      (asset.employee_name || '').toLowerCase().includes(filterEmployee.toLowerCase()) ||
+      (asset.responsible_person || '').toLowerCase().includes(filterEmployee.toLowerCase());
+    return matchesSearch && matchesStatus && matchesAssetType && matchesLocation && matchesDepartment && matchesResponsible && matchesEmployee;
+  });
 
   const fetchAssets = async () => {
     try {
@@ -58,7 +88,63 @@ const Assets: React.FC = () => {
 
   useEffect(() => {
     fetchAssets();
+    fetchAssetTypes();
+    fetchDepartments();
+    fetchEmployees();
   }, []);
+
+  const fetchAssetTypes = async () => {
+    try {
+      const token = await getToken();
+      const response = await fetch('/api/asset-types/', {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setAssetTypeConfigs(data);
+      }
+    } catch (err) {
+      console.error('Ошибка загрузки типов:', err);
+    }
+  };
+
+  const fetchDepartments = async () => {
+    try {
+      const token = await getToken();
+      const params = deptSearch ? `?search=${encodeURIComponent(deptSearch)}` : '';
+      const response = await fetch(`/api/admin/placement-assignments/departments${params}`, {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setDepartments(data);
+      }
+    } catch (err) {
+      console.error('Ошибка загрузки подразделений:', err);
+    }
+  };
+
+  const fetchEmployees = async () => {
+    try {
+      const token = await getToken();
+      const params = empSearch ? `?search=${encodeURIComponent(empSearch)}` : '';
+      const response = await fetch(`/api/admin/placement-assignments/employees${params}`, {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setEmployees(data);
+      }
+    } catch (err) {
+      console.error('Ошибка загрузки сотрудников:', err);
+    }
+  };
 
   const handleAddAsset = async (asset: Omit<Asset, 'id' | 'created_at' | 'updated_at'>) => {
     try {
@@ -184,23 +270,82 @@ const Assets: React.FC = () => {
     <div>
       <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
         <h1 className="text-2xl font-bold text-gray-800">📦 Активы</h1>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap flex-1 max-w-2xl">
           <input
             type="text"
-            placeholder="Поиск..."
+            placeholder="Поиск по названию или инв. номеру..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent flex-1 min-w-[200px]"
           />
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="">Все статусы</option>
+            <option value="active">Активен</option>
+            <option value="maintenance">На ремонте</option>
+            <option value="reserved">В резерве</option>
+            <option value="decommissioned">Выведен</option>
+            <option value="lost">Утерян</option>
+            <option value="written_off">Списан</option>
+          </select>
+          <select
+            value={filterAssetType}
+            onChange={(e) => setFilterAssetType(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="">Все типы</option>
+            {assetTypeConfigs.map(config => (
+              <option key={config.code} value={config.code}>{config.icon} {config.name}</option>
+            ))}
+          </select>
+          <input
+            type="text"
+            placeholder="Поиск по размещению..."
+            value={filterLocation}
+            onChange={(e) => setFilterLocation(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent min-w-[180px]"
+          />
+          <select
+            value={filterDepartment}
+            onChange={(e) => setFilterDepartment(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent min-w-[200px]"
+          >
+            <option value="">Все подразделения</option>
+            {departments.map(dept => (
+              <option key={dept.id} value={dept.code}>{dept.full_name}</option>
+            ))}
+          </select>
+          <input
+            type="text"
+            placeholder="Поиск по человеку..."
+            value={filterResponsible}
+            onChange={(e) => setFilterResponsible(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent min-w-[180px]"
+          />
+          <select
+            value={filterEmployee}
+            onChange={(e) => setFilterEmployee(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent min-w-[200px]"
+          >
+            <option value="">Все сотрудники</option>
+            {employees.map(emp => (
+              <option key={emp.id} value={emp.full_name}>{emp.full_name} — {emp.position || 'без должности'}</option>
+            ))}
+          </select>
+        </div>
+        <div className="flex gap-2 flex-wrap">
           <button
             onClick={() => navigate('/assets/create')}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition flex items-center gap-2"
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition flex items-center gap-2 whitespace-nowrap"
           >
             <span>➕</span> Добавить актив
           </button>
           <button
             onClick={() => setIsImportModalOpen(true)}
-            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition flex items-center gap-2"
+            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition flex items-center gap-2 whitespace-nowrap"
           >
             <span>📤</span> Загрузить из файла
           </button>
@@ -232,10 +377,25 @@ const Assets: React.FC = () => {
                     Название
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Тип
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Стоимость
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Статус
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Подразделение
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Ответственный
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Сотрудники
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Местоположение
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Действия
@@ -251,11 +411,26 @@ const Assets: React.FC = () => {
                     <td className="px-6 py-4 text-sm text-gray-900">
                       {asset.name}
                     </td>
+                    <td className="px-6 py-4 text-sm text-gray-700">
+                      {getAssetTypeIcon(asset.asset_type)} {asset.asset_type || '—'}
+                    </td>
                     <td className="px-6 py-4 text-sm text-gray-900">
                       {formatMoney(asset.current_value)}
                     </td>
                     <td className="px-6 py-4">
                       {getStatusBadge(asset.status)}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-900">
+                      {asset.department_name || asset.department_code || '—'}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-700">
+                      {asset.responsible_person || '—'}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600">
+                      {asset.employee_name || '—'}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-700">
+                      {asset.location_address || '—'}
                     </td>
                     <td className="px-6 py-4 text-sm">
                       <button

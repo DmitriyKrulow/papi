@@ -26,11 +26,6 @@ const Dashboard: React.FC = () => {
   });
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      window.location.href = '/login';
-      return;
-    }
-
     const fetchData = async () => {
       try {
         setLoading(true);

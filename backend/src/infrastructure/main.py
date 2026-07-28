@@ -5,6 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from src.infrastructure.db.init_db import init_db, get_or_create_admin
+from src.infrastructure.db.session import SessionLocal
+from src.infrastructure.db.models.asset_type_config import seed_asset_types
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -47,22 +49,38 @@ def register_routers():
     from src.presentation.http.routers.reports import router as reports_router
     from src.presentation.http.routers.admin import router as admin_router
     from src.presentation.http.routers.inventory_import import router as inventory_import_router
+    from src.presentation.http.routers.asset_types import router as asset_types_router
+    from src.presentation.http.routers.maintenance_events import router as maintenance_events_router
+    from src.presentation.http.routers.placements import router as placements_router
+    from src.presentation.http.routers.employees import router as employees_router
+    from src.presentation.http.routers.placement_assignments import router as placement_assignments_router
 
     app.include_router(assets_router, prefix="/api")
     app.include_router(users_router, prefix="/api")
     app.include_router(auth_router, prefix="/api")
     app.include_router(repairs_router, prefix="/api")
-    app.include_router(documents_router, prefix="/api")      # ✅ Роутер документов
+    app.include_router(documents_router, prefix="/api")
     app.include_router(asset_photos_router, prefix="/api")
-    app.include_router(reports_router, prefix="/api")        # ✅ Роутер отчетов
+    app.include_router(reports_router, prefix="/api")
     app.include_router(admin_router, prefix="/api")
     app.include_router(inventory_import_router, prefix="/api")
+    app.include_router(asset_types_router, prefix="/api")
+    app.include_router(maintenance_events_router, prefix="/api")
+    app.include_router(placements_router, prefix="/api")
+    app.include_router(employees_router, prefix="/api")
+    app.include_router(placement_assignments_router, prefix="/api")
 
 
 @app.on_event("startup")
 def startup_event():
     init_db()
     get_or_create_admin()
+    try:
+        db = SessionLocal()
+        seed_asset_types(db)
+        db.close()
+    except Exception as e:
+        logger.warning(f"Could not seed asset types: {e}")
 
 
 @app.exception_handler(RequestValidationError)

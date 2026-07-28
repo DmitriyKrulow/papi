@@ -57,7 +57,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState<boolean>(false); // Начальное состояние
+  const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
 
@@ -68,15 +68,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const response = await axios.post<UserToken>('/api/auth/register', userData);
       const token = response.data.access_token;
       const meResponse = await axios.get<User>('/api/auth/me', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
       setUser(meResponse.data);
       setToken(token);
       localStorage.setItem('token', token);
-      console.log('[Auth] Token saved to localStorage:', token.substring(0, 30) + '...');
-      console.log('[Auth] localStorage.token after save:', localStorage.getItem('token')?.substring(0, 30) + '...');
       return meResponse.data;
     } catch (err) {
       const axiosError = err as AxiosError;
@@ -91,37 +87,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setLoading(true);
     setError(null);
     try {
-      console.log('[Auth] Login called with username:', credentials.username);
       const response = await axios.post<UserToken>('/api/auth/login', credentials);
-      console.log('[Auth] Login full response:', response);
-      console.log('[Auth] Login response.data:', response.data);
-      console.log('[Auth] Login response.data type:', typeof response.data);
-      console.log('[Auth] Login response.data keys:', Object.keys(response.data));
       const token = response.data.access_token;
-      console.log('[Auth] Extracted token:', token ? token.substring(0, 30) + '...' : 'NO TOKEN');
-      console.log('[Auth] Token is string?', typeof token === 'string');
-      console.log('[Auth] Token length:', token?.length);
       setToken(token);
       localStorage.setItem('token', token);
-      console.log('[Auth] Login - Token saved to localStorage:', token.substring(0, 30) + '...');
-      console.log('[Auth] Token in localStorage after save:', localStorage.getItem('token')?.substring(0, 30) + '...');
-      console.log('[Auth] localStorage keys after save:', Object.keys(localStorage));
-      
-      const savedToken = localStorage.getItem('token');
-      if (!savedToken) {
-        console.error('[Auth] CRITICAL ERROR: Token not saved to localStorage!');
-      } else if (savedToken !== token) {
-        console.error('[Auth] CRITICAL ERROR: Token mismatch! Expected:', token.substring(0, 30) + '...', 'Got:', savedToken.substring(0, 30) + '...');
-      } else {
-        console.log('[Auth] ✅ Token verified in localStorage');
-      }
-      
-      console.log('[Auth] About to call /api/auth/me with token:', token?.substring(0, 30) + '...');
       
       const meResponse = await axios.get<User>('/api/auth/me', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
       
       setUser(meResponse.data);
@@ -163,13 +135,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return null;
       }
       const response = await axios.get<User>('/api/auth/me', {
-        headers: {
-          Authorization: `Bearer ${storedToken}`,
-        },
+        headers: { Authorization: `Bearer ${storedToken}` },
       });
       setUser(response.data);
       localStorage.setItem('user', JSON.stringify(response.data));
-      setUser(response.data);
       return response.data;
     } catch (err) {
       const axiosError = err as AxiosError;
@@ -187,13 +156,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setError(null);
     try {
       const storedToken = localStorage.getItem('token');
-      if (!storedToken) {
-        throw new Error('Not authenticated');
-      }
+      if (!storedToken) throw new Error('Not authenticated');
       const response = await axios.put<User>('/api/auth/profile', profileData, {
-        headers: {
-          Authorization: `Bearer ${storedToken}`,
-        },
+        headers: { Authorization: `Bearer ${storedToken}` },
       });
       setUser(response.data);
       localStorage.setItem('user', JSON.stringify(response.data));
@@ -212,16 +177,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setError(null);
     try {
       const storedToken = localStorage.getItem('token');
-      if (!storedToken) {
-        throw new Error('Not authenticated');
-      }
+      if (!storedToken) throw new Error('Not authenticated');
       await axios.post('/api/auth/change-password', {
         old_password: oldPassword,
         new_password: newPassword,
       }, {
-        headers: {
-          Authorization: `Bearer ${storedToken}`,
-        },
+        headers: { Authorization: `Bearer ${storedToken}` },
       });
       return true;
     } catch (err) {
@@ -233,13 +194,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, []);
 
-  // useEffect отключён — инициализация происходит только при login()
-  // useEffect(() => {
-  //   const initAuth = async () => {
-  //     await getCurrentUser();
-  //   };
-  //   initAuth();
-  // }, [getCurrentUser]);
+  useEffect(() => {
+    const initAuth = async () => {
+      const storedToken = localStorage.getItem('token');
+      if (storedToken) {
+        setToken(storedToken);
+        try {
+          await getCurrentUser();
+        } catch {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          setUser(null);
+        }
+      }
+    };
+    initAuth();
+  }, []);
 
   const isAdmin = user?.role === 'admin';
 

@@ -34,15 +34,20 @@ def register(user: RegisterRequest, db: Session = Depends(get_db)):
         phone=user.phone,
         password_hash=str(password_hash),
         role="user",
-        is_active=True,
-        department_id=user.department,
+        is_active=False,
         created_at=datetime.now(),
         updated_at=datetime.now(),
     )
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
-    return {"id": new_user.id, "username": new_user.username, "email": new_user.email}
+    
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": new_user.username, "role": new_user.role},
+        expires_delta=access_token_expires,
+    )
+    return UserToken(access_token=access_token, token_type="bearer")
 
 
 @router.post("/login", response_model=UserToken)
@@ -59,6 +64,9 @@ def login(credentials: LoginRequest, db: Session = Depends(get_db)):
         
         if not user.password_hash:
             raise HTTPException(status_code=400, detail="Password not set for user")
+        
+        if not user.is_active:
+            raise HTTPException(status_code=403, detail="Аккаунт неактивен. Обратитесь к администратору для активации.")
         
         try:
             password_hash = PasswordHash.from_hash_string(user.password_hash)

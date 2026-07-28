@@ -22,27 +22,42 @@ import './index.css';
 
 // Компонент для защиты маршрутов (требуется авторизация)
 const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user } = useAuth();
+  const { loading } = useAuth();
+  const token = localStorage.getItem('token');
+
+  if (token) {
+    return <>{children}</>;
+  }
   
-  if (!user) {
+  if (!loading) {
     return <Navigate to="/login" replace />;
   }
-  return <>{children}</>;
+  
+  return null;
 };
 
 // Компонент для защиты админ-маршрутов (требуется роль admin)
 const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user } = useAuth();
-  
-  if (!user) {
-    return <Navigate to="/login" replace />;
+  const { loading, user } = useAuth();
+  const token = localStorage.getItem('token');
+
+  if (token && user && user.role === 'admin') {
+    return <>{children}</>;
   }
   
-  if (user.role !== 'admin') {
+  if (token && user && user.role !== 'admin') {
     return <Navigate to="/dashboard" replace />;
   }
   
-  return <>{children}</>;
+  if (token) {
+    return children;
+  }
+  
+  if (!loading) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  return null;
 };
 
 function App() {

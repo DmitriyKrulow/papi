@@ -1,0 +1,240 @@
+# backend/src/presentation/http/routers/placements.py
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session, joinedload
+from typing import Optional, Any
+from datetime import datetime
+
+from src.infrastructure.db.init_db import get_db
+from src.infrastructure.db.models.department import Department
+from src.infrastructure.db.models.employee import Employee
+from src.presentation.http.dependencies.auth import get_current_admin
+
+router = APIRouter(prefix="/admin/placements", tags=["placements"])
+
+
+def safe_isoformat(value: Optional[Any]) -> Optional[str]:
+    if value is None:
+        return None
+    try:
+        if hasattr(value, 'isoformat') and callable(getattr(value, 'isoformat')):
+            return value.isoformat()
+        return str(value)
+    except (AttributeError, ValueError):
+        return None
+
+
+def safe_str(value: Optional[Any], default: str = "") -> str:
+    if value is None:
+        return default
+    try:
+        return str(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def department_to_dict(dept):
+    return {
+        "id": getattr(dept, 'id', None),
+        "name": safe_str(getattr(dept, 'name', None)),
+        "code": safe_str(getattr(dept, 'code', None)),
+        "parent_id": getattr(dept, 'parent_id', None),
+        "head": safe_str(getattr(dept, 'head', None)),
+        "phone": safe_str(getattr(dept, 'phone', None)),
+        "email": safe_str(getattr(dept, 'email', None)),
+        "location": safe_str(getattr(dept, 'location', None)),
+        "is_active": getattr(dept, 'is_active', True),
+        "created_at": safe_isoformat(getattr(dept, 'created_at', None)),
+        "updated_at": safe_isoformat(getattr(dept, 'updated_at', None)),
+    }
+
+
+@router.get("/")
+async def list_departments(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
+    search: Optional[str] = None,
+    is_active: Optional[bool] = None,
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(get_current_admin),
+):
+    query = db.query(Department)
+    
+    if search:
+        query = query.filter(
+            (Department.name.contains(search)) | 
+            (Department.code.contains(search))
+        )
+    
+    if is_active is not None:
+        query = query.filter(Department.is_active == is_active)
+    
+    total = query.count()
+    departments = query.offset(skip).limit(limit).all()
+    
+    return {
+        "items": [department_to_dict(d) for d in departments],
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+    }
+
+
+@router.get("/options")
+async def get_department_options(
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(get_current_admin),
+):
+    departments = db.query(Department).filter(
+        Department.is_active == True
+    ).order_by(Department.name).all()
+    
+    return [
+        {
+            "id": d.id,
+            "name": d.name,
+            "code": d.code,
+            "location": d.location or "",
+            "full_name": f"{d.name} ({d.code})" if d.code else d.name,
+        }
+        for d in departments
+    ]
+
+
+@router.get("/{department_id}")
+async def get_department(
+    department_id: int,
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(get_current_admin),
+):
+    dept = db.query(Department).filter(Department.id == department_id).first()
+    if not dept:
+        raise HTTPException(status_code=404, detail="Department not found")
+    
+    return department_to_dict(dept)
+
+
+@router.post("/")
+async def create_department(
+    data: dict,
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(get_current_admin),
+):
+    name = data.get("name")
+    code = data.get("code")
+    
+    if not name or not code:
+        raise HTTPException(status_code=400, detail="name and code are required")
+    
+    existing = db.query(Department).filter(Department.code == code).first()
+    if existing:
+        raise HTTPException(status_code=400, detail=f"Department with code '{code}' already exists")
+    
+    dept = Department(
+        organization_id=1,
+        name=name,
+        code=code,
+        parent_id=data.get("parent_id"),
+        head=data.get("head"),
+        phone=data.get("phone"),
+        email=data.get("email"),
+        location=data.get("location"),
+        is_active=True,
+        created_at=datetime.now(),
+        updated_at=datetime.now(),
+    )
+    
+    db.add(dept)
+    db.commit()
+    db.refresh(dept)
+    
+    return department_to_dict(dept)
+
+
+@router.put("/{department_id}")
+async def update_department(
+    department_id: int,
+    data: dict,
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(get_current_admin),
+):
+    dept = db.query(Department).filter(Department.id == department_id).first()
+    if not dept:
+        raise HTTPException(status_code=404, detail="Department not found")
+    
+    if "name" in data:
+        dept.name = data["name"]
+    if "code" in data:
+        existing = db.query(Department).filter(
+            Department.code == data["code"],
+            Department.id != department_id
+        ).first()
+        if existing:
+            raise HTTPException(status_code=400, detail=f"Department with code '{data['code']}' already exists")
+        dept.code = data["code"]
+    if "parent_id" in data:
+        dept.parent_id = data["parent_id"]
+    if "head" in data:
+        dept.head = data["head"]
+    if "phone" in data:
+        dept.phone = data["phone"]
+    if "email" in data:
+        dept.email = data["email"]
+    if "location" in data:
+        dept.location = data["location"]
+    if "is_active" in data:
+        dept.is_active = data["is_active"]
+    
+    dept.updated_at = datetime.now()
+    db.commit()
+    db.refresh(dept)
+    
+    return department_to_dict(dept)
+
+
+@router.delete("/{department_id}")
+async def delete_department(
+    department_id: int,
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(get_current_admin),
+):
+    dept = db.query(Department).filter(Department.id == department_id).first()
+    if not dept:
+        raise HTTPException(status_code=404, detail="Department not found")
+    
+    db.delete(dept)
+    db.commit()
+    
+    return {"message": "Department deleted successfully"}
+
+
+@router.get("/{department_id}/employees")
+async def get_department_employees(
+    department_id: int,
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(get_current_admin),
+):
+    dept = db.query(Department).filter(Department.id == department_id).first()
+    if not dept:
+        raise HTTPException(status_code=404, detail="Department not found")
+    
+    employees = db.query(Employee).filter(
+        Employee.department_id == department_id,
+        Employee.is_active == True
+    ).order_by(Employee.last_name, Employee.first_name).all()
+    
+    return [
+        {
+            "id": e.id,
+            "first_name": safe_str(getattr(e, 'first_name', None)),
+            "last_name": safe_str(getattr(e, 'last_name', None)),
+            "middle_name": safe_str(getattr(e, 'middle_name', None)),
+            "full_name": f"{getattr(e, 'last_name', '')} {getattr(e, 'first_name', '')} {getattr(e, 'middle_name', '')}".strip(),
+            "position": safe_str(getattr(e, 'position', None)),
+            "phone": safe_str(getattr(e, 'phone', None)),
+            "email": safe_str(getattr(e, 'email', None)),
+            "employee_number": safe_str(getattr(e, 'employee_number', None)),
+            "department_id": getattr(e, 'department_id', None),
+            "department_name": dept.name,
+        }
+        for e in employees
+    ]

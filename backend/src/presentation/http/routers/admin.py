@@ -2,8 +2,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import Optional, Any
+from datetime import datetime
 from src.infrastructure.db.init_db import get_db
 from src.infrastructure.db.models.user import User
+from src.core.value_objects.password_hash import PasswordHash
 from src.presentation.http.dependencies.auth import get_current_admin
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -96,6 +98,86 @@ async def delete_user(
     db.delete(user)
     db.commit()
     return {"message": "User deleted successfully"}
+
+
+@router.put("/users/{user_id}")
+async def update_user(
+    user_id: int,
+    user_data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin),
+):
+    """Обновить данные пользователя (только для админов)"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if user_id != current_user.id:
+        if "is_active" in user_data:
+            user.is_active = bool(user_data["is_active"])
+        if "username" in user_data:
+            existing = db.query(User).filter(User.username == user_data["username"], User.id != user_id).first()
+            if existing:
+                raise HTTPException(status_code=400, detail="Username already taken")
+            user.username = user_data["username"]
+        if "email" in user_data:
+            existing = db.query(User).filter(User.email == user_data["email"], User.id != user_id).first()
+            if existing:
+                raise HTTPException(status_code=400, detail="Email already taken")
+            user.email = user_data["email"]
+        if "full_name" in user_data:
+            user.full_name = user_data["full_name"]
+        if "phone" in user_data:
+            user.phone = user_data["phone"]
+        if "role" in user_data:
+            if user_data["role"] not in ["admin", "user", "viewer"]:
+                raise HTTPException(status_code=400, detail="Invalid role")
+            user.role = user_data["role"]
+    
+    user.updated_at = datetime.now()
+    db.commit()
+    db.refresh(user)
+    
+    return {
+        "id": getattr(user, 'id', None),
+        "username": safe_str(getattr(user, 'username', None)),
+        "email": safe_str(getattr(user, 'email', None)),
+        "full_name": safe_str(getattr(user, 'full_name', None)),
+        "phone": safe_str(getattr(user, 'phone', None)),
+        "role": safe_str(getattr(user, 'role', None)),
+        "is_active": getattr(user, 'is_active', False),
+        "created_at": safe_isoformat(getattr(user, 'created_at', None)),
+        "updated_at": safe_isoformat(getattr(user, 'updated_at', None)),
+    }
+
+
+@router.put("/users/{user_id}/password")
+async def reset_user_password(
+    user_id: int,
+    password_data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin),
+):
+    """Сбросить пароль пользователя (только для админов)"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    new_password = password_data.get("password")
+    if not new_password or len(new_password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+    
+    password_hash = PasswordHash.from_plain_password(new_password)
+    user.password_hash = str(password_hash)
+    user.updated_at = datetime.now()
+    db.commit()
+    db.refresh(user)
+    
+    return {
+        "message": "Password updated successfully",
+        "user_id": getattr(user, 'id', None),
+        "username": safe_str(getattr(user, 'username', None)),
+    }
 
 
 @router.put("/users/{user_id}/role")

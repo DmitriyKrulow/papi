@@ -4,8 +4,10 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from src.infrastructure.db.models.user import User
+from src.infrastructure.db.models import Base
 from src.infrastructure.db.session import SessionLocal, engine
 from src.core.value_objects.password_hash import PasswordHash
+from src.infrastructure.db.models.asset_type_config import seed_asset_types
 
 
 def get_db() -> Session:
@@ -17,9 +19,6 @@ def get_db() -> Session:
 
 
 def init_db():
-    from src.infrastructure.db.session import engine
-    from src.infrastructure.db.models.user import Base
-
     Base.metadata.create_all(bind=engine)
 
 

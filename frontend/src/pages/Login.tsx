@@ -4,24 +4,18 @@ import { useAuth } from '../hooks/useAuth';
 import LoginForm from '../components/forms/LoginForm';
 
 const Login: React.FC = () => {
-  const { login, loading, error } = useAuth();
+  const { login, loading, error, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
+  React.useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/assets');
+    }
+  }, [isAuthenticated, navigate]);
+
   const handleSubmit = async (data: any) => {
-    console.log('[Login] handleSubmit called with:', data);
-    const tokenBefore = localStorage.getItem('token');
-    console.log('[Login] Token before login:', tokenBefore ? tokenBefore.substring(0, 30) + '...' : 'NONE');
     try {
-      const result = await login(data);
-      console.log('[Login] Login result:', result);
-      const tokenAfter = localStorage.getItem('token');
-      console.log('[Login] Token after login:', tokenAfter ? tokenAfter.substring(0, 30) + '...' : 'NONE');
-      console.log('[Login] localStorage keys:', Object.keys(localStorage));
-      if (!tokenAfter) {
-        console.error('[Login] ERROR: Token not saved after login!');
-      } else if (tokenAfter === tokenBefore) {
-        console.error('[Login] ERROR: Token not changed after login!');
-      }
+      await login(data);
       navigate('/assets');
     } catch (err) {
       console.error('Login failed:', err);

@@ -1,7 +1,8 @@
 // frontend/src/components/assets/EditAssetForm.tsx
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import type { Asset } from '../../types';
+import type { Asset, AssetTypeConfig } from '../../types';
+import { AssetTypeNames, MaintenanceEventTypes } from '../../types';
 
 interface EditAssetFormProps {
   existingAsset: Asset;
@@ -16,18 +17,36 @@ interface FormData {
   model?: string;
   manufacturer_code?: string;
   manufacturer_name?: string;
+  asset_type?: string;
   purchase_price?: number;
   current_value?: number;
   status: string;
   location_address?: string;
   responsible_person?: string;
   department_code?: string;
+  purchase_date?: string;
+  commissioning_date?: string;
+  warranty_expiry?: string;
+  serial_number?: string;
+  capacity?: number;
+  power?: string;
+  weight?: string;
+  consumable_type?: string;
+  crypto_wallet_address?: string;
+  crypto_token_symbol?: string;
+  depreciation_years?: number;
+  next_maintenance_date?: string;
 }
 
 const EditAssetForm: React.FC<EditAssetFormProps> = ({ existingAsset, onSubmit, onClose }) => {
+  const [assetTypes, setAssetTypes] = useState<AssetTypeConfig[]>([]);
+  const [selectedType, setSelectedType] = useState<string>(existingAsset.asset_type || '');
+
   const {
     register,
     handleSubmit,
+    watch,
+    setValue,
     formState: { errors, isSubmitting },
     reset,
   } = useForm<FormData>({
@@ -38,14 +57,57 @@ const EditAssetForm: React.FC<EditAssetFormProps> = ({ existingAsset, onSubmit, 
       model: existingAsset.model || '',
       manufacturer_code: existingAsset.manufacturer_code || '',
       manufacturer_name: existingAsset.manufacturer_name || '',
+      asset_type: existingAsset.asset_type || '',
       purchase_price: existingAsset.purchase_price || 0,
       current_value: existingAsset.current_value || 0,
       status: existingAsset.status,
       location_address: existingAsset.location_address || '',
       responsible_person: existingAsset.responsible_person || '',
       department_code: existingAsset.department_code || '',
+      purchase_date: existingAsset.purchase_date || '',
+      commissioning_date: existingAsset.commissioning_date || '',
+      warranty_expiry: existingAsset.warranty_expiry || '',
+      serial_number: existingAsset.serial_number || '',
+      capacity: existingAsset.capacity || undefined,
+      power: existingAsset.power || '',
+      weight: existingAsset.weight || '',
+      consumable_type: existingAsset.consumable_type || '',
+      crypto_wallet_address: existingAsset.crypto_wallet_address || '',
+      crypto_token_symbol: existingAsset.crypto_token_symbol || '',
+      depreciation_years: existingAsset.depreciation_years || undefined,
+      next_maintenance_date: existingAsset.next_maintenance_date || '',
     },
   });
+
+  const watchAssetType = watch('asset_type');
+
+  useEffect(() => {
+    fetch('/api/asset-types/')
+      .then(r => r.json())
+      .then(setAssetTypes)
+      .catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    const initialType = existingAsset.asset_type || '';
+    setSelectedType(initialType);
+    if (initialType) {
+      const typeConfig = assetTypes.find(t => t.code === initialType);
+      if (typeConfig && typeConfig.default_depreciation_years) {
+        setValue('depreciation_years', typeConfig.default_depreciation_years);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (watchAssetType) {
+      setSelectedType(watchAssetType);
+      const typeConfig = assetTypes.find(t => t.code === watchAssetType);
+      if (typeConfig && typeConfig.default_depreciation_years) {
+        setValue('depreciation_years', typeConfig.default_depreciation_years);
+      }
+    }
+  }, [watchAssetType, assetTypes]);
 
   const handleSubmitForm = async (data: FormData) => {
     try {
@@ -57,12 +119,25 @@ const EditAssetForm: React.FC<EditAssetFormProps> = ({ existingAsset, onSubmit, 
         model: data.model,
         manufacturer_code: data.manufacturer_code,
         manufacturer_name: data.manufacturer_name,
+        asset_type: data.asset_type,
         purchase_price: data.purchase_price ? Number(data.purchase_price) : undefined,
         current_value: data.current_value ? Number(data.current_value) : undefined,
         status: data.status as Asset['status'],
         location_address: data.location_address,
         responsible_person: data.responsible_person,
         department_code: data.department_code,
+        purchase_date: data.purchase_date,
+        commissioning_date: data.commissioning_date,
+        warranty_expiry: data.warranty_expiry,
+        serial_number: data.serial_number,
+        capacity: data.capacity ? Number(data.capacity) : undefined,
+        power: data.power,
+        weight: data.weight,
+        consumable_type: data.consumable_type,
+        crypto_wallet_address: data.crypto_wallet_address,
+        crypto_token_symbol: data.crypto_token_symbol,
+        depreciation_years: data.depreciation_years ? Number(data.depreciation_years) : undefined,
+        next_maintenance_date: data.next_maintenance_date,
       });
     } catch (error) {
       console.error('Ошибка отправки формы:', error);
@@ -108,17 +183,215 @@ const EditAssetForm: React.FC<EditAssetFormProps> = ({ existingAsset, onSubmit, 
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="Название актива"
           />
-          {errors.name && (
-            <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
-          )}
+            {errors.name && (
+              <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
+            )}
+          </div>
         </div>
-      </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Модель
-          </label>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Тип актива
+            </label>
+            <select
+              {...register('asset_type')}
+              onChange={(e) => {
+                register('asset_type').onChange(e);
+                setSelectedType(e.target.value);
+                const typeConfig = assetTypes.find(t => t.code === e.target.value);
+                if (typeConfig && typeConfig.default_depreciation_years && !existingAsset.depreciation_years) {
+                  setValue('depreciation_years', typeConfig.default_depreciation_years);
+                }
+              }}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">Не выбран</option>
+              {assetTypes.map((type) => (
+                <option key={type.code} value={type.code}>
+                  {type.icon} {type.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Срок амортизации (лет)
+            </label>
+            <input
+              type="number"
+              min="1"
+              {...register('depreciation_years', {
+                valueAsNumber: true,
+              })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="5"
+            />
+          </div>
+        </div>
+
+        {selectedType === 'fire_extinguisher' && (
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Объём (л)
+              </label>
+              <input
+                type="number"
+                step="0.1"
+                {...register('capacity', { valueAsNumber: true })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="2"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Следующая проверка
+              </label>
+              <input
+                type="date"
+                {...register('next_maintenance_date')}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+        )}
+
+        {(selectedType === 'computer' || selectedType === 'printer') && (
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Серийный номер
+              </label>
+              <input
+                type="text"
+                {...register('serial_number')}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="SN-12345"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Мощность (Вт)
+              </label>
+              <input
+                type="text"
+                {...register('power')}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="300"
+              />
+            </div>
+          </div>
+        )}
+
+        {selectedType === 'printer' && (
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Тип тонера
+              </label>
+              <input
+                type="text"
+                {...register('consumable_type')}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="CF280A"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Следующее обслуживание
+              </label>
+              <input
+                type="date"
+                {...register('next_maintenance_date')}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+        )}
+
+        {selectedType === 'crypto_token' && (
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Имя пользователя / Логин
+              </label>
+              <input
+                type="text"
+                {...register('crypto_wallet_address')}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="ivanov.a"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Серийный номер / Идентификатор
+              </label>
+              <input
+                type="text"
+                {...register('crypto_token_symbol')}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="SN-XXXXX"
+              />
+            </div>
+          </div>
+        )}
+
+        {selectedType === 'consumables' && (
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Тип расходника
+              </label>
+              <input
+                type="text"
+                {...register('consumable_type')}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Бумага А4"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Вес (кг)
+              </label>
+              <input
+                type="text"
+                {...register('weight')}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="1.5"
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Дата покупки
+            </label>
+            <input
+              type="date"
+              {...register('purchase_date')}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Гарантия до
+            </label>
+            <input
+              type="date"
+              {...register('warranty_expiry')}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Модель
+            </label>
           <input
             type="text"
             {...register('model')}

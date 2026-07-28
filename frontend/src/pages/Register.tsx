@@ -4,8 +4,14 @@ import { useAuth } from '../hooks/useAuth';
 import RegisterForm from '../components/forms/RegisterForm';
 
 const Register: React.FC = () => {
-  const { register, loading, error } = useAuth();
+  const { register, loading, error, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+
+  React.useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/assets');
+    }
+  }, [isAuthenticated, navigate]);
 
   const handleSubmit = async (data: any) => {
     try {

@@ -9,6 +9,8 @@ from .user import User
 from .asset import Asset
 from .department import Department
 from .asset_category import AssetCategory
+from .asset_type_config import AssetTypeConfig
+from .maintenance_event import MaintenanceEvent
 from .document import Document
 from .report import Report
 from .depreciation_record import DepreciationRecord
@@ -28,6 +30,8 @@ __all__ = [
     "Asset",
     "Department",
     "AssetCategory",
+    "AssetTypeConfig",
+    "MaintenanceEvent",
     "Document",
     "Report",
     "DepreciationRecord",
