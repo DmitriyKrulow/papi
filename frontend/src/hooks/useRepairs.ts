@@ -1,15 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
-import axios, { AxiosError } from 'axios';
+import { AxiosError } from 'axios';
 import { apiClient } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
 import { useAssets } from '../hooks/useAssets';
+import type { RepairRequest } from '../types';
 
 export const useRepairs = () => {
   const { user } = useAuth();
   const token = localStorage.getItem('token');
   console.log('[useRepairs] user:', user?.username);
   console.log('[useRepairs] token:', token ? token.substring(0, 20) + '...' : 'NONE');
-  const [repairs, setRepairs] = useState<Repair[]>([]);
+  const [repairs, setRepairs] = useState<RepairRequest[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [total, setTotal] = useState<number>(0);
@@ -86,14 +87,14 @@ export const useRepairs = () => {
         console.error('[useRepairs] createRepair error detail:', (axiosError.response.data as any).detail);
       }
       console.error('[useRepairs] createRepair error message:', axiosError.message);
-      setError(axiosError.response?.data || axiosError.message || 'Failed to create repair');
+      setError(String(axiosError.response?.data || axiosError.message || 'Failed to create repair'));
       throw err;
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const updateRepair = useCallback(async (id: number, repairData: RepairUpdate) => {
+  const updateRepair = useCallback(async (id: number, repairData: Partial<RepairRequest>) => {
     setLoading(true);
     setError(null);
     try {

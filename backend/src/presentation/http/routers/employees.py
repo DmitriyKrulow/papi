@@ -1,6 +1,6 @@
 # backend/src/presentation/http/routers/employees.py
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from typing import Optional, Any
 from datetime import datetime, date
 
@@ -78,8 +78,8 @@ async def list_employees(
     current_user: Any = Depends(get_current_admin),
 ):
     query = db.query(Employee).options(
-        joinedload(Employee.department),
-        joinedload(Employee.user)
+        selectinload(Employee.department),
+        selectinload(Employee.user)
     )
     
     if search:
@@ -113,7 +113,10 @@ async def get_employee_options(
     db: Session = Depends(get_db),
     current_user: Any = Depends(get_current_admin),
 ):
-    employees = db.query(Employee).filter(
+    employees = db.query(Employee).options(
+        selectinload(Employee.department),
+        selectinload(Employee.user)
+    ).filter(
         Employee.is_active == True
     ).order_by(Employee.last_name, Employee.first_name).all()
     
@@ -136,8 +139,8 @@ async def get_employee(
     current_user: Any = Depends(get_current_admin),
 ):
     emp = db.query(Employee).options(
-        joinedload(Employee.department),
-        joinedload(Employee.user)
+        selectinload(Employee.department),
+        selectinload(Employee.user)
     ).filter(Employee.id == employee_id).first()
     if not emp:
         raise HTTPException(status_code=404, detail="Employee not found")
@@ -209,8 +212,8 @@ async def update_employee(
     current_user: Any = Depends(get_current_admin),
 ):
     emp = db.query(Employee).options(
-        joinedload(Employee.department),
-        joinedload(Employee.user)
+        selectinload(Employee.department),
+        selectinload(Employee.user)
     ).filter(Employee.id == employee_id).first()
     if not emp:
         raise HTTPException(status_code=404, detail="Employee not found")

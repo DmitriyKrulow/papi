@@ -57,6 +57,13 @@ def asset_to_dict(asset, db: Optional[Session] = None):
     
     department_name = None
     employee_name = None
+    assigned_employee_name = None
+    
+    if getattr(asset, 'employee_id', None) and db is not None:
+        emp = db.query(Employee).filter(Employee.id == asset.employee_id).first()
+        if emp:
+            assigned_employee_name = f"{emp.last_name} {emp.first_name}"
+    
     if db and getattr(asset, 'department_code', None):
         dept = db.query(Department).filter(
             (Department.code == asset.department_code) | (Department.name == asset.department_code),
@@ -64,16 +71,15 @@ def asset_to_dict(asset, db: Optional[Session] = None):
         ).first()
         if dept:
             department_name = f"{dept.name} ({dept.code})"
-            employees = db.query(Employee).filter(
-                Employee.department_id == dept.id,
-                Employee.is_active == True
-            ).order_by(Employee.last_name, Employee.first_name).all()
-            if employees:
-                emp_names = [f"{e.last_name} {e.first_name}" for e in employees]
-                employee_name = ", ".join(emp_names[:5])
-                if len(employees) > 5:
-                    employee_name += f" (+{len(employees) - 5})"
-    
+            if not assigned_employee_name:
+                employees = db.query(Employee).filter(
+                    Employee.department_id == dept.id,
+                    Employee.is_active == True
+                ).order_by(Employee.last_name, Employee.first_name).all()
+                if employees:
+                    emp_names = [f"{e.last_name} {e.first_name}" for e in employees]
+                    employee_name = ", ".join(emp_names[:5])
+
     return {
         "id": getattr(asset, 'id', None),
         "inventory_number": safe_str(getattr(asset, 'inventory_number', None)),
@@ -84,10 +90,12 @@ def asset_to_dict(asset, db: Optional[Session] = None):
         "status": safe_str(getattr(asset, 'status', None)),
         "purchase_price": safe_decimal_to_float(getattr(asset, 'purchase_price', None)),
         "current_value": safe_decimal_to_float(getattr(asset, 'current_value', None)),
+        "quantity": getattr(asset, 'quantity', 1),
         "department_code": safe_str(getattr(asset, 'department_code', None)),
         "department_name": safe_str(department_name),
         "responsible_person": safe_str(getattr(asset, 'responsible_person', None)),
-        "employee_name": safe_str(employee_name),
+        "employee_name": safe_str(assigned_employee_name or employee_name),
+        "assigned_employee_id": getattr(asset, 'employee_id', None),
         "location_address": safe_str(getattr(asset, 'location_address', None)),
         "manufacturer_code": safe_str(getattr(asset, 'manufacturer_code', None)),
         "manufacturer_name": safe_str(getattr(asset, 'manufacturer_name', None)),
@@ -105,7 +113,9 @@ def asset_to_dict(asset, db: Optional[Session] = None):
         "next_maintenance_date": safe_isoformat(getattr(asset, 'next_maintenance_date', None)),
         "created_at": safe_isoformat(getattr(asset, 'created_at', None)),
         "updated_at": safe_isoformat(getattr(asset, 'updated_at', None)),
+        "is_active": getattr(asset, 'is_active', True),
     }
+
 
 
 @router.get("/")
@@ -118,6 +128,7 @@ async def list_assets(
     department: Optional[str] = None,
     responsible: Optional[str] = None,
     employee: Optional[str] = None,
+    include_hidden: bool = False,
     db: Session = Depends(get_db),
 ):
     """
@@ -125,6 +136,9 @@ async def list_assets(
     """
     try:
         query = db.query(Asset).options(joinedload(Asset.asset_type_config))
+        
+        if not include_hidden:
+            query = query.filter(Asset.is_active == True)
         
         if status:
             query = query.filter(Asset.status == status)
@@ -198,6 +212,10 @@ async def get_asset(
     except HTTPException:
         raise
     except Exception as e:
+        db.rollback()
+        import traceback
+        print(f"ERROR updating asset {asset_id}: {e}")
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -259,6 +277,7 @@ async def create_asset(
             status=asset_data.get("status", "active"),
             purchase_price=Decimal(str(asset_data.get("purchase_price", 0))),
             current_value=Decimal(str(asset_data.get("current_value", 0))),
+            quantity=int(asset_data.get("quantity", 1)),
             department_code=asset_data.get("department_code"),
             responsible_person=asset_data.get("responsible_person"),
             location_address=asset_data.get("location_address"),
@@ -276,6 +295,7 @@ async def create_asset(
             crypto_token_symbol=asset_data.get("crypto_token_symbol"),
             depreciation_years=asset_data.get("depreciation_years"),
             next_maintenance_date=next_maintenance_date,
+            employee_id=asset_data.get("employee_id"),
             created_at=datetime.now(),
             updated_at=datetime.now(),
         )
@@ -284,7 +304,7 @@ async def create_asset(
         db.commit()
         db.refresh(asset)
         
-        return asset_to_dict(asset)
+        return asset_to_dict(asset, db)
         
     except HTTPException:
         raise
@@ -352,9 +372,11 @@ async def update_asset(
         if "status" in asset_data:
             asset.status = asset_data["status"]
         if "purchase_price" in asset_data:
-            asset.purchase_price = Decimal(str(asset_data["purchase_price"]))
+            asset.purchase_price = Decimal(str(asset_data["purchase_price"])) if asset_data["purchase_price"] is not None else None
         if "current_value" in asset_data:
-            asset.current_value = Decimal(str(asset_data["current_value"]))
+            asset.current_value = Decimal(str(asset_data["current_value"])) if asset_data["current_value"] is not None else None
+        if "quantity" in asset_data:
+            asset.quantity = int(asset_data["quantity"]) if asset_data["quantity"] is not None else 1
         if "department_code" in asset_data:
             asset.department_code = asset_data["department_code"]
         if "responsible_person" in asset_data:
@@ -367,8 +389,8 @@ async def update_asset(
             asset.manufacturer_name = asset_data["manufacturer_name"]
         if "serial_number" in asset_data:
             asset.serial_number = asset_data["serial_number"]
-        if "capacity" in asset_data and asset_data["capacity"] is not None:
-            asset.capacity = Decimal(str(asset_data["capacity"]))
+        if "capacity" in asset_data:
+            asset.capacity = Decimal(str(asset_data["capacity"])) if asset_data["capacity"] is not None else None
         if "power" in asset_data:
             asset.power = asset_data["power"]
         if "weight" in asset_data:
@@ -380,14 +402,16 @@ async def update_asset(
         if "crypto_token_symbol" in asset_data:
             asset.crypto_token_symbol = asset_data["crypto_token_symbol"]
         if "depreciation_years" in asset_data:
-            asset.depreciation_years = asset_data["depreciation_years"]
+            asset.depreciation_years = asset_data["depreciation_years"] if asset_data["depreciation_years"] is not None else None
+        if "employee_id" in asset_data:
+            asset.employee_id = asset_data["employee_id"] if asset_data["employee_id"] is not None else None
         
         asset.updated_at = datetime.now()
         
         db.commit()
         db.refresh(asset)
         
-        return asset_to_dict(asset)
+        return asset_to_dict(asset, db)
         
     except HTTPException:
         raise
@@ -402,17 +426,45 @@ async def delete_asset(
     db: Session = Depends(get_db),
 ):
     """
-    Удалить актив.
+    Скрыть актив (soft delete).
     """
     try:
         asset = db.query(Asset).filter(Asset.id == asset_id).first()
         if not asset:
             raise HTTPException(status_code=404, detail="Asset not found")
         
-        db.delete(asset)
+        asset.is_active = False
+        asset.updated_at = datetime.now()
         db.commit()
         
-        return {"message": "Asset deleted successfully"}
+        return {"message": "Asset hidden successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/{asset_id}/restore")
+async def restore_asset(
+    asset_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Восстановить скрытый актив.
+    """
+    try:
+        asset = db.query(Asset).filter(Asset.id == asset_id).first()
+        if not asset:
+            raise HTTPException(status_code=404, detail="Asset not found")
+        
+        asset.is_active = True
+        asset.updated_at = datetime.now()
+        db.commit()
+        db.refresh(asset)
+        
+        return asset_to_dict(asset, db)
         
     except HTTPException:
         raise

@@ -50,8 +50,31 @@ class Department(Base):
     outgoing_movements = relationship("MovementRecord", foreign_keys="[MovementRecord.from_department_id]", back_populates="from_department")
     incoming_movements = relationship("MovementRecord", foreign_keys="[MovementRecord.to_department_id]", back_populates="to_department")
     inventory_checks = relationship("InventoryCheck", back_populates="department")
+    rooms = relationship("Room", back_populates="department", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<Department(id={self.id}, name='{self.name}', code='{self.code}')>"
+
+
+
+class Room(Base):
+    __tablename__ = "rooms"
+
+    id = Column(Integer, primary_key=True)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
+    name = Column(String(100), nullable=False)
+    floor = Column(String(20), nullable=True)
+    building = Column(String(255), nullable=True)
+
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.now)
+    updated_at = Column(
+        DateTime, nullable=False, default=datetime.now, onupdate=datetime.now
+    )
+
+    department = relationship("Department", back_populates="rooms")
+
+    def __repr__(self) -> str:
+        return f"<Room(id={self.id}, name='{self.name}', department_id={self.department_id})>"
 
 

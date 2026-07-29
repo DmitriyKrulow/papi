@@ -1,9 +1,15 @@
+import os
+from dotenv import load_dotenv
+
+# Загружаем .env ДО создания engine
+env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), '.env')
+if os.path.exists(env_path):
+    load_dotenv(env_path)
+elif os.path.exists(os.path.join(os.getcwd(), '.env')):
+    load_dotenv(os.path.join(os.getcwd(), '.env'))
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from dotenv import load_dotenv
-import os
-
-load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./papi.db")
 

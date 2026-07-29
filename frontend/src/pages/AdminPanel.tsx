@@ -1,8 +1,27 @@
 ﻿// frontend/src/pages/AdminPanel.tsx
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import type { Department, DepartmentOption, Employee, EmployeeOption } from '../types';
+import type { Department, Employee } from '../types';
+
+interface TreeDepartment {
+  id: number;
+  name: string;
+  code: string;
+  parent_id?: number;
+  head?: string;
+  phone?: string;
+  email?: string;
+  location?: string;
+  is_active: boolean;
+  rooms: TreeRoom[];
+}
+
+interface TreeRoom {
+  id: number;
+  name: string;
+  floor?: string;
+  building?: string;
+}
 
 interface User {
   id: number;
@@ -51,8 +70,13 @@ interface EmployeeFormData {
   employee_number: string;
 }
 
+interface RoomFormData {
+  name: string;
+  floor: string;
+  building: string;
+}
+
 const AdminPanel: React.FC = () => {
-  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'users' | 'placements' | 'employees'>('users');
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -72,7 +96,7 @@ const AdminPanel: React.FC = () => {
   const [resettingPassword, setResettingPassword] = useState<number | null>(null);
 
   // Placements state
-  const [departments, setDepartments] = useState<Department[]>([]);
+  const [deptTree, setDeptTree] = useState<TreeDepartment[]>([]);
   const [deptLoading, setDeptLoading] = useState(false);
   const [deptSearch, setDeptSearch] = useState('');
   const [showDeptForm, setShowDeptForm] = useState(false);
@@ -80,9 +104,6 @@ const AdminPanel: React.FC = () => {
   const [deptFormData, setDeptFormData] = useState<DepartmentFormData>({
     name: '', code: '', head: '', phone: '', email: '', location: ''
   });
-  const [deptOptions, setDeptOptions] = useState<DepartmentOption[]>([]);
-
-  // Employees state
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [empLoading, setEmpLoading] = useState(false);
   const [empSearch, setEmpSearch] = useState('');
@@ -92,14 +113,22 @@ const AdminPanel: React.FC = () => {
   const [empFormData, setEmpFormData] = useState<EmployeeFormData>({
     first_name: '', last_name: '', middle_name: '', department_id: 0, position: '', phone: '', email: '', employee_number: ''
   });
-  const [empOptions, setEmpOptions] = useState<EmployeeOption[]>([]);
+
+  // Rooms state
+  const [expandedDepts, setExpandedDepts] = useState<Set<number>>(new Set());
+  const [showRoomForm, setShowRoomForm] = useState(false);
+  const [editingRoom, setEditingRoom] = useState<TreeRoom | null>(null);
+  const [roomFormData, setRoomFormData] = useState<RoomFormData>({
+    name: '', floor: '', building: ''
+  });
+  const [roomDeptId, setRoomDeptId] = useState<number | null>(null);
 
   useEffect(() => {
     fetchUsers();
   }, []);
 
   useEffect(() => {
-    if (activeTab === 'placements') {
+    if (activeTab === 'placements' || activeTab === 'employees') {
       fetchDepartments();
       fetchDeptOptions();
     }
@@ -113,13 +142,12 @@ const AdminPanel: React.FC = () => {
     try {
       setDeptLoading(true);
       const token = localStorage.getItem('token');
-      const params = deptSearch ? `?search=${encodeURIComponent(deptSearch)}` : '';
-      const response = await fetch(`/api/admin/placements/${params}`, {
+      const response = await fetch('/api/admin/placements/tree', {
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
       });
       if (response.ok) {
         const data = await response.json();
-        setDepartments(data.items || []);
+        setDeptTree(data);
       }
     } catch (err) {
       console.error(err);
@@ -136,7 +164,7 @@ const AdminPanel: React.FC = () => {
       });
       if (response.ok) {
         const data = await response.json();
-        setDeptOptions(data);
+        console.log('Dept options loaded:', data.length);
       }
     } catch (err) {
       console.error(err);
@@ -173,7 +201,7 @@ const AdminPanel: React.FC = () => {
       });
       if (response.ok) {
         const data = await response.json();
-        setEmpOptions(data);
+        console.log('Emp options loaded:', data.length);
       }
     } catch (err) {
       console.error(err);
@@ -358,7 +386,7 @@ const AdminPanel: React.FC = () => {
     }
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/admin/placements/', {
+      const response = await fetch('/api/admin/placements', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(deptFormData),
@@ -367,7 +395,7 @@ const AdminPanel: React.FC = () => {
         toast.success('Подразделение создано');
         setShowDeptForm(false);
         setDeptFormData({ name: '', code: '', head: '', phone: '', email: '', location: '' });
-        fetchDepartments();
+        await fetchDepartments();
       } else {
         const data = await response.json();
         toast.error(data.detail || 'Ошибка создания');
@@ -390,7 +418,7 @@ const AdminPanel: React.FC = () => {
         toast.success('Подразделение обновлено');
         setShowDeptForm(false);
         setEditingDept(null);
-        fetchDepartments();
+        await fetchDepartments();
       } else {
         const data = await response.json();
         toast.error(data.detail || 'Ошибка обновления');
@@ -410,13 +438,118 @@ const AdminPanel: React.FC = () => {
       });
       if (response.ok) {
         toast.success('Подразделение удалено');
-        fetchDepartments();
+        await fetchDepartments();
       } else {
         toast.error('Ошибка удаления');
       }
     } catch (err) {
       toast.error('Ошибка удаления подразделения');
     }
+  };
+
+  // Room handlers
+  const toggleDeptRooms = async (deptId: number) => {
+    if (expandedDepts.has(deptId)) {
+      setExpandedDepts(prev => {
+        const next = new Set(prev);
+        next.delete(deptId);
+        return next;
+      });
+    } else {
+      setExpandedDepts(prev => new Set([...prev, deptId]));
+    }
+  };
+
+  const handleCreateRoom = async () => {
+    if (!roomFormData.name || roomDeptId === null) {
+      toast.error('Название обязательно и подразделение не выбрано');
+      return;
+    }
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/admin/placements/${roomDeptId}/rooms`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(roomFormData),
+      });
+      if (response.ok) {
+        toast.success('Кабинет добавлен');
+        setShowRoomForm(false);
+        setRoomFormData({ name: '', floor: '', building: '' });
+        setRoomDeptId(null);
+        setEditingRoom(null);
+        await fetchDepartments();
+      } else {
+        const data = await response.json();
+        toast.error(data.detail || 'Ошибка добавления');
+      }
+    } catch (err) {
+      toast.error('Ошибка добавления кабинета');
+    }
+  };
+
+  const handleUpdateRoom = async () => {
+    if (!editingRoom || !roomFormData.name) return;
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/admin/placements/rooms/${editingRoom.id}`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(roomFormData),
+      });
+      if (response.ok) {
+        toast.success('Кабинет обновлен');
+        setShowRoomForm(false);
+        setEditingRoom(null);
+        setRoomFormData({ name: '', floor: '', building: '' });
+        await fetchDepartments();
+      } else {
+        const data = await response.json();
+        toast.error(data.detail || 'Ошибка обновления');
+      }
+    } catch (err) {
+      toast.error('Ошибка обновления кабинета');
+    }
+  };
+
+  const handleDeleteRoom = async (roomId: number) => {
+    if (!window.confirm('Удалить кабинет?')) return;
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/admin/placements/rooms/${roomId}/`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (response.ok) {
+        toast.success('Кабинет удален');
+        await fetchDepartments();
+      } else {
+        toast.error('Ошибка удаления');
+      }
+    } catch (err) {
+      toast.error('Ошибка удаления кабинета');
+    }
+  };
+
+  const findDeptInTree = (tree: TreeDepartment[], id: number): TreeDepartment | null => {
+    for (const dept of tree) {
+      if (dept.id === id) return dept;
+      if (dept.rooms) {
+        for (const room of dept.rooms) {
+          if (room.id === id) return dept;
+        }
+      }
+      const found = findDeptInTree(dept.rooms ? [] : [], id);
+      if (found) return found;
+    }
+    return null;
+  };
+
+  const handleEditRoom = (dept: TreeDepartment, room: TreeRoom) => {
+    setEditingRoom(room);
+    setRoomFormData({ name: room.name, floor: room.floor || '', building: room.building || '' });
+    setRoomDeptId(dept.id);
+    setShowRoomForm(true);
   };
 
   // Employee handlers
@@ -427,7 +560,7 @@ const AdminPanel: React.FC = () => {
     }
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/admin/employees/', {
+      const response = await fetch('/api/admin/employees', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(empFormData),
@@ -488,61 +621,65 @@ const AdminPanel: React.FC = () => {
     }
   };
 
-  if (loading && users.length === 0) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="text-2xl font-bold text-gray-900">Загрузка...</div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       <main className="flex-grow container mx-auto px-4 py-8">
         <div className="max-w-6xl mx-auto">
           <div className="bg-white shadow rounded-lg p-6 mb-6">
-            <div className="flex justify-between items-center mb-4">
-              <h1 className="text-2xl font-bold text-gray-900">👑 Админ-панель</h1>
-                <button
-                  onClick={() => window.location.href = '/dashboard'}
-                className="text-blue-600 hover:text-blue-800 transition"
-              >
-                ← Назад в дашборд
-              </button>
-            </div>
-            <p className="text-sm text-gray-500 mb-4">Управление системой</p>
+            {loading ? (
+              <div className="text-center py-8 text-gray-500">Загрузка...</div>
+            ) : (
+              <>
+                <div className="flex justify-between items-center mb-4">
+                  <h1 className="text-2xl font-bold text-gray-900">👑 Админ-панель</h1>
+                    <button
+                      onClick={() => window.location.href = '/dashboard'}
+                    className="text-blue-600 hover:text-blue-800 transition"
+                  >
+                    ← Назад в дашборд
+                  </button>
+                </div>
+                <p className="text-sm text-gray-500 mb-4">Управление системой</p>
 
-            <div className="flex gap-1 mb-6 border-b">
-              <button
-                onClick={() => setActiveTab('users')}
-                className={`px-4 py-2 font-medium text-sm rounded-t-lg transition ${activeTab === 'users' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-              >
-                👥 Пользователи
-              </button>
-              <button
-                onClick={() => setActiveTab('placements')}
-                className={`px-4 py-2 font-medium text-sm rounded-t-lg transition ${activeTab === 'placements' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-              >
-                🏢 Размещения
-              </button>
-              <button
-                onClick={() => setActiveTab('employees')}
-                className={`px-4 py-2 font-medium text-sm rounded-t-lg transition ${activeTab === 'employees' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-              >
-                👤 Сотрудники
-              </button>
-            </div>
-            
-            {error && activeTab === 'users' && (
-              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-                ❌ {error}
-              </div>
-            )}
+                <div className="flex gap-1 mb-6 border-b">
+                  <button
+                    onClick={() => setActiveTab('users')}
+                    className={`px-4 py-2 font-medium text-sm rounded-t-lg transition ${activeTab === 'users' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                  >
+                    👥 Пользователи
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('placements')}
+                    className={`px-4 py-2 font-medium text-sm rounded-t-lg transition ${activeTab === 'placements' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                  >
+                    🏢 Размещения
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('employees')}
+                    className={`px-4 py-2 font-medium text-sm rounded-t-lg transition ${activeTab === 'employees' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                  >
+                    👤 Сотрудники
+                  </button>
+                </div>
+                
+                {error && activeTab === 'users' && (
+                  <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+                    ❌ {error}
+                  </div>
+                )}
 
             {activeTab === 'users' && (
               <>
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-lg font-semibold text-gray-800">Пользователи системы</h2>
+                  <button
+                    onClick={() => { setEditingUser(null); setUserFormData({ username: '', email: '', full_name: '', phone: '', role: 'user', is_active: true }); setShowUserForm(true); setShowPasswordReset(false); }}
+                    className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition text-sm"
+                  >
+                    ➕ Создать пользователя
+                  </button>
+                </div>
+
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
@@ -581,7 +718,7 @@ const AdminPanel: React.FC = () => {
                               >
                                 <option value="user">Пользователь</option>
                                 <option value="admin">Администратор</option>
-                                <option value="viewer">Наблюдатель</option>
+                                <option value="responsible">Ответственный</option>
                               </select>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
@@ -625,7 +762,7 @@ const AdminPanel: React.FC = () => {
                       <select value={userFormData.role} onChange={(e) => setUserFormData({...userFormData, role: e.target.value})} className="px-3 py-2 border rounded text-sm">
                         <option value="user">Пользователь</option>
                         <option value="admin">Администратор</option>
-                        <option value="viewer">Наблюдатель</option>
+                        <option value="responsible">Ответственный</option>
                       </select>
                       <label className="flex items-center gap-2 text-sm">
                         <input type="checkbox" checked={userFormData.is_active} onChange={(e) => setUserFormData({...userFormData, is_active: e.target.checked})} className="rounded" />
@@ -684,7 +821,7 @@ const AdminPanel: React.FC = () => {
                   </div>
                   <div>
                     <span className="text-xs text-gray-500">Роль</span>
-                    <p className="text-sm font-medium">{viewingUser.role === 'admin' ? 'Администратор' : viewingUser.role === 'viewer' ? 'Наблюдатель' : 'Пользователь'}</p>
+                    <p className="text-sm font-medium">{viewingUser.role === 'admin' ? 'Администратор' : viewingUser.role === 'responsible' ? 'Ответственный' : 'Пользователь'}</p>
                   </div>
                   <div>
                     <span className="text-xs text-gray-500">Статус</span>
@@ -748,37 +885,135 @@ const AdminPanel: React.FC = () => {
 
                 {deptLoading ? (
                   <div className="text-center py-8 text-gray-500">Загрузка...</div>
+                ) : deptTree.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">Нет подразделений</div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Код</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Название</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Руководитель</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Местоположение</th>
-                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Действия</th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {departments.length === 0 ? (
-                          <tr><td colSpan={5} className="px-4 py-4 text-center text-gray-500 text-sm">Нет подразделений</td></tr>
-                        ) : (
-                          departments.map((dept) => (
-                            <tr key={dept.id} className="hover:bg-gray-50">
-                              <td className="px-4 py-2 text-sm font-mono text-gray-900">{dept.code}</td>
-                              <td className="px-4 py-2 text-sm text-gray-900">{dept.name}</td>
-                              <td className="px-4 py-2 text-sm text-gray-600">{dept.head || '—'}</td>
-                              <td className="px-4 py-2 text-sm text-gray-600">{dept.location || '—'}</td>
-                              <td className="px-4 py-2 text-right text-sm">
-                                <button onClick={() => { setEditingDept(dept); setDeptFormData({ name: dept.name, code: dept.code, head: dept.head || '', phone: dept.phone || '', email: dept.email || '', location: dept.location || '' }); setShowDeptForm(true); }} className="text-blue-600 hover:text-blue-800 mr-3">✏️</button>
-                                <button onClick={() => handleDeleteDepartment(dept.id)} className="text-red-600 hover:text-red-900">🗑️</button>
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
+                  <div className="space-y-2">
+                    {deptTree.filter(d => 
+                      !deptSearch || 
+                      d.name.toLowerCase().includes(deptSearch.toLowerCase()) ||
+                      d.code.toLowerCase().includes(deptSearch.toLowerCase()) ||
+                      (d.head || '').toLowerCase().includes(deptSearch.toLowerCase()) ||
+                      (d.location || '').toLowerCase().includes(deptSearch.toLowerCase())
+                    ).map((dept) => {
+                      const isExpanded = expandedDepts.has(dept.id);
+                      const sortedRooms = [...(dept.rooms || [])].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+                      return (
+                        <div key={dept.id} className="border border-gray-200 rounded-lg overflow-hidden">
+                          <div className="flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition cursor-pointer" onClick={() => toggleDeptRooms(dept.id)}>
+                            <div className="flex items-center gap-4 flex-1 min-w-0">
+                              <span className="text-purple-600 text-sm flex-shrink-0">{isExpanded ? '▼' : '▶'}</span>
+                              <span className="font-mono text-sm font-medium text-gray-900 flex-shrink-0 bg-purple-50 px-2 py-0.5 rounded">{dept.code}</span>
+                              <span className="text-sm font-medium text-gray-900 truncate">{dept.name}</span>
+                              <span className="text-sm text-gray-600 truncate hidden sm:inline">{dept.head || '—'}</span>
+                              <span className="text-sm text-gray-500 truncate hidden md:inline">{dept.location || '—'}</span>
+                              <span className="text-xs text-gray-400 flex-shrink-0 ml-auto hidden sm:inline">{sortedRooms.length} комн.</span>
+                            </div>
+                            <div className="flex items-center gap-1 flex-shrink-0 ml-4">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setEditingDept(dept); setDeptFormData({ name: dept.name, code: dept.code, head: dept.head || '', phone: dept.phone || '', email: dept.email || '', location: dept.location || '' }); setShowDeptForm(true); }}
+                                className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition"
+                                title="Редактировать подразделение"
+                              >
+                                ✏️
+                              </button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleDeleteDepartment(dept.id); }}
+                                className="p-1.5 text-red-600 hover:text-red-900 hover:bg-red-50 rounded transition"
+                                title="Удалить подразделение"
+                              >
+                                🗑️
+                              </button>
+                            </div>
+                          </div>
+                          {isExpanded && (
+                            <div className="px-4 py-3 bg-white border-t border-gray-100">
+                              <div className="flex justify-between items-center mb-3">
+                                <span className="text-xs font-semibold text-purple-700 uppercase tracking-wide">Кабинеты подразделения {dept.name}</span>
+                                <button
+                                  onClick={() => { setEditingRoom(null); setRoomFormData({ name: '', floor: '', building: '' }); setRoomDeptId(dept.id); setShowRoomForm(true); }}
+                                  className="bg-purple-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-purple-700 transition"
+                                >
+                                  ➕ Добавить кабинет
+                                </button>
+                              </div>
+
+                              {showRoomForm && roomDeptId === dept.id && !editingRoom && (
+                                <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 mb-3">
+                                  <div className="text-xs font-semibold text-purple-800 mb-2">Новый кабинет</div>
+                                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2">
+                                    <input type="text" placeholder="Название *" value={roomFormData.name} onChange={(e) => setRoomFormData({...roomFormData, name: e.target.value})} className="px-3 py-1.5 border border-purple-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-purple-400" />
+                                    <div className="flex flex-col gap-1">
+                                      <label className="text-xs text-purple-700 font-medium">Этаж</label>
+                                      <input type="text" placeholder="напр. 2" value={roomFormData.floor} onChange={(e) => setRoomFormData({...roomFormData, floor: e.target.value})} className="px-3 py-1.5 border border-purple-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-purple-400" />
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                      <label className="text-xs text-purple-700 font-medium">Корпус / Здание</label>
+                                      <input type="text" placeholder="напр. Корп. А" value={roomFormData.building} onChange={(e) => setRoomFormData({...roomFormData, building: e.target.value})} className="px-3 py-1.5 border border-purple-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-purple-400" />
+                                    </div>
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <button onClick={handleCreateRoom} className="bg-blue-600 text-white px-4 py-1.5 rounded text-sm hover:bg-blue-700 transition">Добавить</button>
+                                    <button onClick={() => { setShowRoomForm(false); setEditingRoom(null); setRoomDeptId(null); setRoomFormData({ name: '', floor: '', building: '' }); }} className="bg-gray-300 text-gray-700 px-4 py-1.5 rounded text-sm hover:bg-gray-400 transition">Отмена</button>
+                                  </div>
+                                </div>
+                              )}
+
+                              {editingRoom && roomDeptId === dept.id && (
+                                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-3">
+                                  <div className="text-xs font-semibold text-yellow-800 mb-2">Редактирование: {editingRoom.name}</div>
+                                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2">
+                                    <input type="text" placeholder="Название *" value={roomFormData.name} onChange={(e) => setRoomFormData({...roomFormData, name: e.target.value})} className="px-3 py-1.5 border border-yellow-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400" />
+                                    <div className="flex flex-col gap-1">
+                                      <label className="text-xs text-yellow-700 font-medium">Этаж</label>
+                                      <input type="text" placeholder="напр. 2" value={roomFormData.floor} onChange={(e) => setRoomFormData({...roomFormData, floor: e.target.value})} className="px-3 py-1.5 border border-yellow-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400" />
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                      <label className="text-xs text-yellow-700 font-medium">Корпус / Здание</label>
+                                      <input type="text" placeholder="напр. Корп. А" value={roomFormData.building} onChange={(e) => setRoomFormData({...roomFormData, building: e.target.value})} className="px-3 py-1.5 border border-yellow-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400" />
+                                    </div>
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <button onClick={handleUpdateRoom} className="bg-blue-600 text-white px-4 py-1.5 rounded text-sm hover:bg-blue-700 transition">Сохранить</button>
+                                    <button onClick={() => { setShowRoomForm(false); setEditingRoom(null); setRoomDeptId(null); setRoomFormData({ name: '', floor: '', building: '' }); }} className="bg-gray-300 text-gray-700 px-4 py-1.5 rounded text-sm hover:bg-gray-400 transition">Отмена</button>
+                                  </div>
+                                </div>
+                              )}
+
+                              {sortedRooms.length === 0 ? (
+                                <div className="text-center py-4 text-gray-400 text-sm">Нет кабинетов</div>
+                              ) : (
+                                <div className="flex flex-wrap gap-2">
+                                  {sortedRooms.map((room) => (
+                                    <div key={room.id} className="inline-flex items-center gap-1.5 bg-purple-50 border border-purple-200 rounded-full pl-3 pr-1 py-1">
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="text-sm font-medium text-gray-900">{room.name}</span>
+                                        {room.floor && <span className="text-xs text-purple-600 bg-purple-100 px-1.5 py-0.5 rounded-full">Эт. {room.floor}</span>}
+                                        {room.building && <span className="text-xs text-purple-600 bg-purple-100 px-1.5 py-0.5 rounded-full">Корп. {room.building}</span>}
+                                      </div>
+                                      <button
+                                        onClick={() => handleEditRoom(dept, room)}
+                                        className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded-full transition flex-shrink-0"
+                                        title="Редактировать"
+                                      >
+                                        ✏️
+                                      </button>
+                                      <button
+                                        onClick={() => handleDeleteRoom(room.id)}
+                                        className="p-1 text-red-600 hover:text-red-900 hover:bg-red-100 rounded-full transition flex-shrink-0"
+                                        title="Удалить"
+                                      >
+                                        🗑️
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
 
@@ -811,7 +1046,7 @@ const AdminPanel: React.FC = () => {
                       <input type="text" placeholder="Отчество" value={empFormData.middle_name} onChange={(e) => setEmpFormData({...empFormData, middle_name: e.target.value})} className="px-3 py-2 border rounded text-sm" />
                       <select value={empFormData.department_id} onChange={(e) => setEmpFormData({...empFormData, department_id: Number(e.target.value)})} className="px-3 py-2 border rounded text-sm">
                         <option value={0}>Выберите подразделение</option>
-                        {departments.map(d => <option key={d.id} value={d.id}>{d.name} ({d.code})</option>)}
+                        {deptTree.map(d => <option key={d.id} value={d.id}>{d.name} ({d.code})</option>)}
                       </select>
                       <input type="text" placeholder="Должность" value={empFormData.position} onChange={(e) => setEmpFormData({...empFormData, position: e.target.value})} className="px-3 py-2 border rounded text-sm" />
                       <input type="text" placeholder="Телефон" value={empFormData.phone} onChange={(e) => setEmpFormData({...empFormData, phone: e.target.value})} className="px-3 py-2 border rounded text-sm" />
@@ -839,7 +1074,7 @@ const AdminPanel: React.FC = () => {
                     className="px-4 py-2 border border-gray-300 rounded-lg text-sm"
                   >
                     <option value="">Все подразделения</option>
-                    {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    {deptTree.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                   </select>
                 </div>
 
@@ -897,6 +1132,8 @@ const AdminPanel: React.FC = () => {
                 <li>Начальный администратор: <strong>admin</strong> (пароль: <strong>admin123</strong>)</li>
               </ul>
             </div>
+            </>
+            )}
           </div>
         </div>
       </main>

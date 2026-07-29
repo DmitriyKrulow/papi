@@ -1,4 +1,5 @@
 // frontend/src/App.tsx
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { useAuth } from './hooks/useAuth';
@@ -20,26 +21,61 @@ import Profile from './pages/Profile';
 import AdminPanel from './pages/AdminPanel';
 import './index.css';
 
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-red-50">
+          <div className="text-center p-8">
+            <h1 className="text-2xl font-bold text-red-600 mb-4">Ошибка приложения</h1>
+            <p className="text-gray-700 mb-4">{this.state.error?.message}</p>
+            <pre className="bg-white p-4 rounded text-left text-sm overflow-auto max-w-2xl">
+              {this.state.error?.stack}
+            </pre>
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              Перезагрузить
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 // Компонент для защиты маршрутов (требуется авторизация)
 const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { loading } = useAuth();
-  const token = localStorage.getItem('token');
+  const { loading, token } = useAuth();
 
   if (token) {
     return <>{children}</>;
   }
   
-  if (!loading) {
-    return <Navigate to="/login" replace />;
+  if (loading) {
+    return <div className="flex justify-center items-center py-12"><div className="text-gray-500">⏳ Загрузка...</div></div>;
   }
   
-  return null;
+  return <Navigate to="/login" replace />;
 };
 
 // Компонент для защиты админ-маршрутов (требуется роль admin)
 const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { loading, user } = useAuth();
-  const token = localStorage.getItem('token');
+  const { loading, user, token } = useAuth();
 
   if (token && user && user.role === 'admin') {
     return <>{children}</>;
@@ -50,18 +86,19 @@ const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   }
   
   if (token) {
-    return children;
+    return <>{children}</>;
   }
   
-  if (!loading) {
-    return <Navigate to="/login" replace />;
+  if (loading) {
+    return <div className="flex justify-center items-center py-12"><div className="text-gray-500">⏳ Загрузка...</div></div>;
   }
   
-  return null;
+  return <Navigate to="/login" replace />;
 };
 
 function App() {
   return (
+    <ErrorBoundary>
     <Router>
       <AuthProvider>
         <div className="min-h-screen flex flex-col bg-gray-50">
@@ -147,6 +184,7 @@ function App() {
         </div>
       </AuthProvider>
     </Router>
+    </ErrorBoundary>
   );
 }
 

@@ -1,13 +1,28 @@
 from datetime import datetime
 from typing import Optional
+import os
 
 from sqlalchemy.orm import Session
+
+from dotenv import load_dotenv
+load_dotenv()
 
 from src.infrastructure.db.models.user import User
 from src.infrastructure.db.models import Base
 from src.infrastructure.db.session import SessionLocal, engine
 from src.core.value_objects.password_hash import PasswordHash
 from src.infrastructure.db.models.asset_type_config import seed_asset_types
+
+
+# Удаляем papi.db если он был создан ошибочно
+_db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))), 'papi.db')
+if os.path.exists(_db_path):
+    try:
+        if os.getenv("DATABASE_URL", "").startswith("postgresql"):
+            os.remove(_db_path)
+            print(f"Removed erroneous papi.db (using PostgreSQL)")
+    except:
+        pass
 
 
 def get_db() -> Session:

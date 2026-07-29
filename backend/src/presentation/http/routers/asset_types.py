@@ -11,6 +11,7 @@ from src.infrastructure.db.models.maintenance_event import MaintenanceEvent
 router = APIRouter(prefix="/asset-types", tags=["asset-types"])
 
 
+@router.get("")
 @router.get("/")
 def list_asset_types(db: Session = Depends(get_db)):
     """Получить все типы активов"""

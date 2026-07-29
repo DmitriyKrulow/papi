@@ -39,10 +39,13 @@ export interface Asset {
   status: 'active' | 'maintenance' | 'reserved' | 'decommissioned' | 'lost' | 'written_off';
   purchase_price?: number;
   current_value?: number;
+  quantity?: number;
   department_code?: string;
   department_name?: string;
   responsible_person?: string;
   employee_name?: string;
+  assigned_employee_id?: number;
+  employee_id?: number;
   location_address?: string;
   manufacturer_code?: string;
   manufacturer_name?: string;
@@ -111,6 +114,17 @@ export interface DepartmentOption {
   code: string;
   location: string;
   full_name: string;
+}
+
+export interface Room {
+  id: number;
+  department_id: number;
+  name: string;
+  floor?: string;
+  building?: string;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
 // ========== Сотрудники ==========

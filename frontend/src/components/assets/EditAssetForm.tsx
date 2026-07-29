@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import type { Asset, AssetTypeConfig } from '../../types';
-import { AssetTypeNames, MaintenanceEventTypes } from '../../types';
 
 interface EditAssetFormProps {
   existingAsset: Asset;
@@ -10,37 +9,16 @@ interface EditAssetFormProps {
   onClose: () => void;
 }
 
-interface FormData {
-  inventory_number: string;
-  name: string;
-  description?: string;
-  model?: string;
-  manufacturer_code?: string;
-  manufacturer_name?: string;
-  asset_type?: string;
-  purchase_price?: number;
-  current_value?: number;
-  status: string;
-  location_address?: string;
-  responsible_person?: string;
-  department_code?: string;
-  purchase_date?: string;
-  commissioning_date?: string;
-  warranty_expiry?: string;
-  serial_number?: string;
-  capacity?: number;
-  power?: string;
-  weight?: string;
-  consumable_type?: string;
-  crypto_wallet_address?: string;
-  crypto_token_symbol?: string;
-  depreciation_years?: number;
-  next_maintenance_date?: string;
-}
-
 const EditAssetForm: React.FC<EditAssetFormProps> = ({ existingAsset, onSubmit, onClose }) => {
   const [assetTypes, setAssetTypes] = useState<AssetTypeConfig[]>([]);
   const [selectedType, setSelectedType] = useState<string>(existingAsset.asset_type || '');
+  const [deptTree, setDeptTree] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [selectedRoomId, setSelectedRoomId] = useState<number | ''>('');
+  const [selectedResponsibleId, setSelectedResponsibleId] = useState<number | ''>('');
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | ''>('');
+  const [loadingOptions, setLoadingOptions] = useState(true);
+  const [responsibleOptions, setResponsibleOptions] = useState<any[]>([]);
 
   const {
     register,
@@ -48,8 +26,7 @@ const EditAssetForm: React.FC<EditAssetFormProps> = ({ existingAsset, onSubmit, 
     watch,
     setValue,
     formState: { errors, isSubmitting },
-    reset,
-  } = useForm<FormData>({
+  } = useForm<any>({
     defaultValues: {
       inventory_number: existingAsset.inventory_number,
       name: existingAsset.name,
@@ -60,10 +37,12 @@ const EditAssetForm: React.FC<EditAssetFormProps> = ({ existingAsset, onSubmit, 
       asset_type: existingAsset.asset_type || '',
       purchase_price: existingAsset.purchase_price || 0,
       current_value: existingAsset.current_value || 0,
+      quantity: existingAsset.quantity || 1,
       status: existingAsset.status,
       location_address: existingAsset.location_address || '',
       responsible_person: existingAsset.responsible_person || '',
       department_code: existingAsset.department_code || '',
+      employee_id: existingAsset.assigned_employee_id || existingAsset.employee_id || null,
       purchase_date: existingAsset.purchase_date || '',
       commissioning_date: existingAsset.commissioning_date || '',
       warranty_expiry: existingAsset.warranty_expiry || '',
@@ -82,8 +61,23 @@ const EditAssetForm: React.FC<EditAssetFormProps> = ({ existingAsset, onSubmit, 
   const watchAssetType = watch('asset_type');
 
   useEffect(() => {
-    fetch('/api/asset-types/')
-      .then(r => r.json())
+    const token = localStorage.getItem('token');
+    fetch('/api/asset-types', {
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+    })
+      .then(async (r) => {
+        if (!r.ok) {
+          console.error('Failed to fetch asset-types:', r.status, await r.text());
+          return [];
+        }
+        const text = await r.text();
+        try {
+          return JSON.parse(text);
+        } catch {
+          console.error('Invalid JSON from asset-types:', text);
+          return [];
+        }
+      })
       .then(setAssetTypes)
       .catch(console.error);
   }, []);
@@ -91,13 +85,13 @@ const EditAssetForm: React.FC<EditAssetFormProps> = ({ existingAsset, onSubmit, 
   useEffect(() => {
     const initialType = existingAsset.asset_type || '';
     setSelectedType(initialType);
-    if (initialType) {
+    if (initialType && assetTypes.length > 0) {
       const typeConfig = assetTypes.find(t => t.code === initialType);
       if (typeConfig && typeConfig.default_depreciation_years) {
-        setValue('depreciation_years', typeConfig.default_depreciation_years);
+        try { setValue('depreciation_years', typeConfig.default_depreciation_years); } catch(e) {}
       }
     }
-  }, []);
+  }, [existingAsset, assetTypes, setValue]);
 
   useEffect(() => {
     if (watchAssetType) {
@@ -109,10 +103,118 @@ const EditAssetForm: React.FC<EditAssetFormProps> = ({ existingAsset, onSubmit, 
     }
   }, [watchAssetType, assetTypes]);
 
-  const handleSubmitForm = async (data: FormData) => {
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    Promise.all([
+      fetch('/api/admin/placements/tree', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => {
+        if (!r.ok) return [];
+        return r.json();
+      }).catch(() => []),
+      fetch('/api/admin/placement-assignments/employees', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => {
+        if (!r.ok) return [];
+        return r.json();
+      }).catch(() => []),
+      fetch('/api/admin/placement-assignments/responsible-persons', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => {
+        if (!r.ok) return [];
+        return r.json();
+      }).catch(() => []),
+    ]).then(([tree, emps, responsibleUsers]) => {
+      const safeTree = Array.isArray(tree) ? tree : [];
+      const safeEmps = Array.isArray(emps) ? emps : [];
+      const safeResponsibleUsers = Array.isArray(responsibleUsers) ? responsibleUsers : [];
+      setDeptTree(safeTree);
+      setEmployees(safeEmps);
+      setLoadingOptions(false);
+      
+      if (existingAsset.department_code || existingAsset.location_address) {
+        const rooms = flattenRooms(safeTree);
+        const matchedRoom = rooms.find(r => 
+          r.deptCode === existingAsset.department_code && r.fullName === existingAsset.location_address
+        );
+        if (matchedRoom) {
+          setSelectedRoomId(matchedRoom.roomId);
+        }
+      }
+      if (existingAsset.responsible_person) {
+        const matchedUser = safeResponsibleUsers.find((u: any) => {
+          const name = u.name || '';
+          return (existingAsset.responsible_person || '').includes(name) || name.includes((existingAsset.responsible_person || '').split(' ')[0]);
+        });
+        if (matchedUser) {
+          setSelectedResponsibleId(matchedUser.id);
+        }
+      }
+      setResponsibleOptions(safeResponsibleUsers.map((u: any) => ({
+        id: u.id,
+        name: u.name,
+        fullName: u.full_name,
+      })));
+      const empIdToUse = existingAsset.assigned_employee_id ?? existingAsset.employee_id;
+      if (empIdToUse) {
+        const matchedAssetEmp = safeEmps.find((emp: any) => emp.id === empIdToUse);
+        if (matchedAssetEmp) {
+          setSelectedEmployeeId(matchedAssetEmp.id);
+        }
+      }
+    }).catch(() => {
+      console.error('Ошибка загрузки опций');
+      setDeptTree([]);
+      setEmployees([]);
+      setResponsibleOptions([]);
+      setLoadingOptions(false);
+    });
+  }, []);
+
+  const flattenRooms = (tree: any[]) => {
+    const rooms: Array<{ id: number; deptId: number; deptName: string; deptCode: string; roomId: number; roomName: string; fullName: string }> = [];
     try {
-      await onSubmit({
-        ...existingAsset,
+      const safeTree = Array.isArray(tree) ? tree : [];
+      safeTree.forEach(dept => {
+        if (!dept || typeof dept !== 'object') return;
+        const roomsArr = Array.isArray(dept.rooms) ? dept.rooms : [];
+        roomsArr.forEach((room: any) => {
+          if (!room || typeof room !== 'object') return;
+          let loc = room.name || '';
+          if (room.floor) loc += ` - ${room.floor}`;
+          if (room.building) loc += ` (${room.building})`;
+          rooms.push({
+            id: dept.id,
+            deptId: dept.id,
+            deptName: dept.name || '',
+            deptCode: dept.code || '',
+            roomId: room.id,
+            roomName: room.name || '',
+            fullName: `${dept.name || ''} - ${loc}`,
+          });
+        });
+      });
+    } catch (e) {
+      console.error('flattenRooms error:', e);
+    }
+    return rooms;
+  };
+
+  const flattenEmployees = () => {
+    try {
+      const safeEmps = Array.isArray(employees) ? employees : [];
+      return safeEmps.map((emp: any) => ({
+        id: emp.id,
+        name: emp.full_name || `${emp.last_name || ''} ${emp.first_name || ''}`,
+        departmentName: emp.department_name || emp.department_code || '',
+        fullName: `${emp.full_name || emp.last_name || ''} ${emp.first_name || ''}${emp.department_name ? ` (${emp.department_name})` : ''}`,
+      }));
+    } catch (e) {
+      console.error('flattenEmployees error:', e);
+      return [];
+    }
+  };
+
+  const allRooms = flattenRooms(deptTree);
+  const allEmployees = flattenEmployees();
+
+  const handleSubmitForm = async (data: any) => {
+    try {
+      const payload: Record<string, unknown> = {
         inventory_number: data.inventory_number,
         name: data.name,
         description: data.description,
@@ -120,29 +222,41 @@ const EditAssetForm: React.FC<EditAssetFormProps> = ({ existingAsset, onSubmit, 
         manufacturer_code: data.manufacturer_code,
         manufacturer_name: data.manufacturer_name,
         asset_type: data.asset_type,
-        purchase_price: data.purchase_price ? Number(data.purchase_price) : undefined,
-        current_value: data.current_value ? Number(data.current_value) : undefined,
+        purchase_price: data.purchase_price ? Number(data.purchase_price) : null,
+        current_value: data.current_value ? Number(data.current_value) : null,
+        quantity: data.quantity ? Number(data.quantity) : 1,
         status: data.status as Asset['status'],
         location_address: data.location_address,
         responsible_person: data.responsible_person,
         department_code: data.department_code,
-        purchase_date: data.purchase_date,
-        commissioning_date: data.commissioning_date,
-        warranty_expiry: data.warranty_expiry,
+        purchase_date: data.purchase_date || null,
+        commissioning_date: data.commissioning_date || null,
+        warranty_expiry: data.warranty_expiry || null,
         serial_number: data.serial_number,
-        capacity: data.capacity ? Number(data.capacity) : undefined,
+        capacity: data.capacity ? Number(data.capacity) : null,
         power: data.power,
         weight: data.weight,
         consumable_type: data.consumable_type,
         crypto_wallet_address: data.crypto_wallet_address,
         crypto_token_symbol: data.crypto_token_symbol,
-        depreciation_years: data.depreciation_years ? Number(data.depreciation_years) : undefined,
-        next_maintenance_date: data.next_maintenance_date,
-      });
+        depreciation_years: data.depreciation_years ? Number(data.depreciation_years) : null,
+        next_maintenance_date: data.next_maintenance_date || null,
+        employee_id: selectedEmployeeId ? Number(selectedEmployeeId) : null,
+      };
+      await onSubmit(payload);
     } catch (error) {
       console.error('Ошибка отправки формы:', error);
     }
   };
+
+  if (loadingOptions) {
+    return (
+      <div className="flex justify-center py-8">
+        <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+        <span className="ml-3 text-gray-600">Загрузка данных...</span>
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit(handleSubmitForm)} className="space-y-4">
@@ -164,7 +278,7 @@ const EditAssetForm: React.FC<EditAssetFormProps> = ({ existingAsset, onSubmit, 
             placeholder="INV-001"
           />
           {errors.inventory_number && (
-            <p className="mt-1 text-sm text-red-600">{errors.inventory_number.message}</p>
+            <p className="mt-1 text-sm text-red-600">{String(errors.inventory_number.message)}</p>
           )}
         </div>
         <div>
@@ -184,7 +298,7 @@ const EditAssetForm: React.FC<EditAssetFormProps> = ({ existingAsset, onSubmit, 
             placeholder="Название актива"
           />
             {errors.name && (
-              <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
+              <p className="mt-1 text-sm text-red-600">{String(errors.name.message)}</p>
             )}
           </div>
         </div>
@@ -424,38 +538,52 @@ const EditAssetForm: React.FC<EditAssetFormProps> = ({ existingAsset, onSubmit, 
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Стоимость покупки (₽)
-          </label>
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            {...register('purchase_price', {
-              valueAsNumber: true,
-            })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="0.00"
-          />
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Стоимость покупки (₽)
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              {...register('purchase_price', {
+                valueAsNumber: true,
+              })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="0.00"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Текущая стоимость (₽)
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              {...register('current_value', {
+                valueAsNumber: true,
+              })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="0.00"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Количество
+            </label>
+            <input
+              type="number"
+              min="1"
+              {...register('quantity', {
+                valueAsNumber: true,
+              })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="1"
+            />
+          </div>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Текущая стоимость (₽)
-          </label>
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            {...register('current_value', {
-              valueAsNumber: true,
-            })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="0.00"
-          />
-        </div>
-      </div>
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -479,38 +607,96 @@ const EditAssetForm: React.FC<EditAssetFormProps> = ({ existingAsset, onSubmit, 
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Адрес расположения
+            Подразделение / Кабинет
           </label>
-          <input
-            type="text"
-            {...register('location_address')}
+          <select
+            value={selectedRoomId}
+            onChange={(e) => {
+              const roomId = e.target.value ? Number(e.target.value) : null;
+              setSelectedRoomId(roomId || '');
+              if (roomId) {
+                const room = allRooms.find(r => r.roomId === roomId);
+                if (room) {
+                  setValue('department_code', room.deptCode);
+                  setValue('location_address', room.fullName);
+                }
+              } else {
+                setValue('department_code', '');
+                setValue('location_address', '');
+              }
+            }}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="Адрес"
-          />
+            disabled={loadingOptions || allRooms.length === 0}
+          >
+            <option value="">Не выбрано</option>
+            {allRooms.map(room => (
+              <option key={room.roomId} value={room.roomId}>
+                {room.fullName}
+              </option>
+            ))}
+          </select>
+          {allRooms.length === 0 && !loadingOptions && (
+            <p className="mt-1 text-xs text-gray-500">Нет доступных кабинетов</p>
+          )}
         </div>
+
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Ответственное лицо
           </label>
-          <input
-            type="text"
-            {...register('responsible_person')}
+          <select
+            value={selectedResponsibleId}
+            onChange={(e) => {
+              const empId = e.target.value ? Number(e.target.value) : null;
+              setSelectedResponsibleId(empId || '');
+              if (empId) {
+                const emp = responsibleOptions.find((emp: any) => emp.id === empId);
+                if (emp) {
+                  setValue('responsible_person', emp.name);
+                }
+              } else {
+                setValue('responsible_person', '');
+              }
+            }}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="ФИО"
-          />
+            disabled={loadingOptions || responsibleOptions.length === 0}
+          >
+            <option value="">Не выбрано</option>
+            {responsibleOptions.map(emp => (
+              <option key={emp.id} value={emp.id}>
+                {emp.fullName}
+              </option>
+            ))}
+          </select>
+          {responsibleOptions.length === 0 && !loadingOptions && (
+            <p className="mt-1 text-xs text-gray-500">Нет доступных сотрудников</p>
+          )}
         </div>
-      </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Код подразделения
-        </label>
-        <input
-          type="text"
-          {...register('department_code')}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          placeholder="Деп-001"
-        />
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Сотрудник (получатель имущества)
+          </label>
+          <select
+            value={selectedEmployeeId}
+            onChange={(e) => {
+              const empId = e.target.value ? Number(e.target.value) : null;
+              setSelectedEmployeeId(empId || '');
+            }}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            disabled={loadingOptions || allEmployees.length === 0}
+          >
+            <option value="">Не выбран</option>
+            {allEmployees.map(emp => (
+              <option key={emp.id} value={emp.id}>
+                {emp.fullName}
+              </option>
+            ))}
+          </select>
+          {allEmployees.length === 0 && !loadingOptions && (
+            <p className="mt-1 text-xs text-gray-500">Нет доступных сотрудников</p>
+          )}
+        </div>
       </div>
 
       <div>

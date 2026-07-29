@@ -26,14 +26,13 @@ const AssetDetailsModal: React.FC<AssetDetailsModalProps> = ({ asset, onClose, o
     result: '',
   });
 
-  const assetTypeInfo = AssetTypeNames[asset.asset_type || ''];
   const eventTypeOptions = Object.entries(MaintenanceEventTypes);
 
   const fetchMaintenanceEvents = async () => {
     if (!asset) return;
     setLoadingEvents(true);
     try {
-      const res = await fetch(`/api/maintenance-events/asset/${asset.id}/`);
+      const res = await fetch(`/api/maintenance-events/asset/${asset.id}`);
       if (res.ok) {
         const data = await res.json();
         setMaintenanceEvents(data.items || []);
@@ -53,7 +52,7 @@ const AssetDetailsModal: React.FC<AssetDetailsModalProps> = ({ asset, onClose, o
     e.preventDefault();
     if (!asset) return;
     try {
-      const res = await fetch(`/api/maintenance-events/asset/${asset.id}/`, {
+      const res = await fetch(`/api/maintenance-events/asset/${asset.id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...newEvent, cost: newEvent.cost ? parseFloat(newEvent.cost) : undefined }),
@@ -78,6 +77,7 @@ const AssetDetailsModal: React.FC<AssetDetailsModalProps> = ({ asset, onClose, o
 
   if (!asset) return null;
 
+  const assetTypeInfo = AssetTypeNames[asset.asset_type || ''];
   const statusInfo = AssetStatusMap[asset.status];
 
   const getStatusColor = (color: string): string => {

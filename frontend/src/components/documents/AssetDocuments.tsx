@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { FileUpload } from './FileUpload';
-import { useDocuments } from '../hooks/useDocuments';
+import { useDocuments } from '../../hooks/useDocuments';
 
 interface AssetDocumentsProps {
   assetId: number;

@@ -6,8 +6,9 @@ from datetime import datetime
 
 from src.infrastructure.db.init_db import get_db
 from src.infrastructure.db.models.asset import Asset
-from src.infrastructure.db.models.department import Department
+from src.infrastructure.db.models.department import Department, Room
 from src.infrastructure.db.models.employee import Employee
+from src.infrastructure.db.models.user import User
 from src.presentation.http.dependencies.auth import get_current_admin
 
 router = APIRouter(prefix="/admin/placement-assignments", tags=["placement-assignments"])
@@ -80,6 +81,37 @@ async def get_available_departments(
     ]
 
 
+@router.get("/responsible-persons")
+async def get_responsible_persons(
+    search: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(get_current_admin),
+):
+    query = db.query(User).filter(
+        User.is_active == True,
+        User.role.in_(["admin", "responsible"])
+    )
+    
+    if search:
+        query = query.filter(
+            (User.username.contains(search)) |
+            (User.full_name.contains(search))
+        )
+    
+    users = query.order_by(User.username).all()
+    
+    return [
+        {
+            "id": u.id,
+            "name": safe_str(getattr(u, 'full_name', None)) or safe_str(getattr(u, 'username', None)),
+            "full_name": safe_str(getattr(u, 'full_name', None)) or safe_str(getattr(u, 'username', None)),
+            "username": safe_str(getattr(u, 'username', None)),
+            "role": safe_str(getattr(u, 'role', None)),
+        }
+        for u in users
+    ]
+
+
 @router.get("/employees")
 async def get_available_employees(
     search: Optional[str] = None,
@@ -88,12 +120,16 @@ async def get_available_employees(
     current_user: Any = Depends(get_current_admin),
 ):
     query = db.query(Employee).options(
-        joinedload(Employee.department)
-    ).filter(Employee.is_active == True)
-    
+        joinedload(Employee.department),
+        joinedload(Employee.user)
+    ).join(User, isouter=True).filter(
+        Employee.is_active == True,
+        (User.role.in_(["admin", "responsible"])) | (User.id.is_(None))
+    )
+
     if department_id:
         query = query.filter(Employee.department_id == department_id)
-    
+
     if search:
         query = query.filter(
             (Employee.first_name.contains(search)) |
@@ -116,6 +152,45 @@ async def get_available_employees(
             "department_code": e.department.code if e.department else "",
         }
         for e in employees
+    ]
+
+
+@router.get("/rooms")
+async def get_available_rooms(
+    search: Optional[str] = None,
+    department_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(get_current_admin),
+):
+    query = db.query(Room).options(
+        joinedload(Room.department)
+    ).filter(
+        Room.is_active == True
+    )
+
+    if department_id:
+        query = query.filter(Room.department_id == department_id)
+
+    if search:
+        query = query.filter(
+            (Room.name.contains(search)) |
+            (Room.floor.contains(search)) |
+            (Room.building.contains(search))
+        )
+
+    rooms = query.order_by(Room.name).all()
+
+    return [
+        {
+            "id": r.id,
+            "name": r.name,
+            "floor": r.floor or "",
+            "building": r.building or "",
+            "department_id": r.department_id,
+            "department_name": r.department.name if r.department else "",
+            "full_name": f"{r.department.name} - {r.name}" if r.department and r.department.name else r.name,
+        }
+        for r in rooms
     ]
 
 

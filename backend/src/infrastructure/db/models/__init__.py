@@ -23,12 +23,14 @@ from .employee import Employee
 from .asset_type import AssetType
 from .asset_photo import AssetPhoto
 from .import_job import ImportJob
+from .department import Room
 
 __all__ = [
     "Base",
     "User",
     "Asset",
     "Department",
+    "Room",
     "AssetCategory",
     "AssetTypeConfig",
     "MaintenanceEvent",

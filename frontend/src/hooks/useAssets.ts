@@ -17,6 +17,7 @@ interface Asset {
   purchase_price?: number;
   current_value?: number;
   residual_value?: number;
+  quantity?: number;
   depreciation_rate?: number;
   location?: string;
   location_address?: string;
@@ -56,6 +57,7 @@ interface AssetCreate {
   purchase_price?: number;
   current_value?: number;
   residual_value?: number;
+  quantity?: number;
   depreciation_rate?: number;
   location?: string;
   location_address?: string;
@@ -84,6 +86,7 @@ interface AssetUpdate {
   purchase_price?: number;
   current_value?: number;
   residual_value?: number;
+  quantity?: number;
   depreciation_rate?: number;
   location?: string;
   location_address?: string;
@@ -107,12 +110,14 @@ export const useAssets = () => {
   const [total, setTotal] = useState<number>(0);
   const { getToken } = useAuth();
 
-  const fetchAssets = useCallback(async () => {
+  const fetchAssets = useCallback(async (includeHidden = false) => {
     setLoading(true);
     setError(null);
     try {
       const token = await getToken();
-      const response = await axios.get<AssetListResponse>('/api/assets/', {
+      const params = includeHidden ? { include_hidden: 'true' } : {};
+      const response = await axios.get<AssetListResponse>('/api/assets', {
+        params,
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -132,7 +137,7 @@ export const useAssets = () => {
     setError(null);
     try {
       const token = await getToken();
-      const response = await axios.get<Asset>(`/api/assets/${id}/`, {
+      const response = await axios.get<Asset>(`/api/assets/${id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -152,7 +157,7 @@ export const useAssets = () => {
     setError(null);
     try {
       const token = await getToken();
-      const response = await axios.post<Asset>('/api/assets/', assetData, {
+      const response = await axios.post<Asset>('/api/assets', assetData, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -209,6 +214,27 @@ export const useAssets = () => {
     }
   }, [getToken]);
 
+  const restoreAsset = useCallback(async (id: number) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const token = await getToken();
+      const response = await axios.put<Asset>(`/api/assets/${id}/restore`, {}, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      setAssets((prev) => prev.filter((asset) => asset.id !== id));
+      return response.data;
+    } catch (err) {
+      const axiosError = err as AxiosError;
+      setError(axiosError.message || `Failed to restore asset with id ${id}`);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [getToken]);
+
   useEffect(() => {
     fetchAssets();
   }, [fetchAssets]);
@@ -223,5 +249,6 @@ export const useAssets = () => {
     createAsset,
     updateAsset,
     deleteAsset,
+    restoreAsset,
   };
 };

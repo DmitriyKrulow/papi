@@ -5,22 +5,41 @@ import { useAuth } from '../hooks/useAuth';
 import { UserRole } from '../domain/roles';
 
 const AssetList: React.FC = () => {
-  const { assets, loading, error, deleteAsset } = useAssets();
+  const { assets, loading, error, deleteAsset, restoreAsset, fetchAssets } = useAssets();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
+  const [showHidden, setShowHidden] = useState(false);
 
-  const filteredAssets = assets.filter((asset) =>
-    asset.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    asset.inventory_number.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  useEffect(() => {
+    fetchAssets();
+  }, []);
+
+  const filteredAssets = assets.filter((asset) => {
+    if (!showHidden && !asset.is_active) return false;
+    return (
+      asset.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      asset.inventory_number.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  });
 
   const handleDelete = async (id: number) => {
-    if (window.confirm('Вы уверены, что хотите удалить этот актив?')) {
-      try {
-        await deleteAsset(id);
-      } catch (err) {
-        console.error('Failed to delete asset:', err);
+    const asset = assets.find(a => a.id === id);
+    if (asset && asset.is_active) {
+      if (window.confirm('Вы уверены, что хотите скрыть этот актив?')) {
+        try {
+          await deleteAsset(id);
+        } catch (err) {
+          console.error('Failed to delete asset:', err);
+        }
+      }
+    } else if (asset && !asset.is_active) {
+      if (window.confirm('Вы уверены, что хотите восстановить этот актив?')) {
+        try {
+          await restoreAsset(id);
+        } catch (err) {
+          console.error('Failed to restore asset:', err);
+        }
       }
     }
   };
@@ -42,7 +61,7 @@ const AssetList: React.FC = () => {
         )}
       </div>
 
-      <div className="mb-4">
+      <div className="mb-4 flex gap-4">
         <input
           type="text"
           placeholder="Поиск..."
@@ -50,13 +69,23 @@ const AssetList: React.FC = () => {
           onChange={(e) => setSearchTerm(e.target.value)}
           className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
         />
+        <button
+          onClick={() => setShowHidden(!showHidden)}
+          className={`px-4 py-2 rounded-md transition whitespace-nowrap ${
+            showHidden
+              ? 'bg-amber-600 text-white hover:bg-amber-700'
+              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+          }`}
+        >
+          {showHidden ? '👁️' : '🙈'} Скрытые
+        </button>
       </div>
 
       <div className="bg-white shadow overflow-hidden sm:rounded-lg">
         {filteredAssets.length > 0 ? (
           <ul className="divide-y divide-gray-200">
             {filteredAssets.map((asset) => (
-              <li key={asset.id} className="px-4 py-4 sm:px-6 hover:bg-gray-50">
+              <li key={asset.id} className={`px-4 py-4 sm:px-6 hover:bg-gray-50 ${!asset.is_active ? 'opacity-50' : ''}`}>
                 <div className="flex items-center justify-between">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-blue-600 truncate">
@@ -70,17 +99,19 @@ const AssetList: React.FC = () => {
                       <span>{asset.department_code || 'Без подразделения'}</span>
                     </div>
                   </div>
-                  <div className="ml-2 flex-shrink-0 flex">
+                  <div className="ml-2 flex-shrink-0 flex gap-2">
                     <span
                       className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        asset.status === 'active'
+                        !asset.is_active
+                          ? 'bg-gray-100 text-gray-800'
+                          : asset.status === 'active'
                           ? 'bg-green-100 text-green-800'
                           : asset.status === 'written_off'
                           ? 'bg-red-100 text-red-800'
                           : 'bg-yellow-100 text-yellow-800'
                       }`}
                     >
-                      {asset.status}
+                      {asset.is_active ? asset.status : 'Скрыт'}
                     </span>
                   </div>
                 </div>
@@ -105,7 +136,7 @@ const AssetList: React.FC = () => {
                         onClick={() => handleDelete(asset.id)}
                         className="text-red-600 hover:text-red-900"
                       >
-                        Удалить
+                        {asset.is_active ? 'Удалить' : 'Восстановить'}
                       </button>
                     </div>
                   )}

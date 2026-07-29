@@ -2,44 +2,22 @@
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import type { Asset, AssetTypeConfig } from '../../types';
-import { AssetTypeNames, MaintenanceEventTypes } from '../../types';
 
 interface AddAssetFormProps {
   onSubmit: (data: Omit<Asset, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
   onClose: () => void;
 }
 
-interface FormData {
-  inventory_number: string;
-  name: string;
-  description?: string;
-  model?: string;
-  manufacturer_code?: string;
-  manufacturer_name?: string;
-  asset_type?: string;
-  purchase_price?: number;
-  current_value?: number;
-  status: string;
-  location_address?: string;
-  responsible_person?: string;
-  department_code?: string;
-  purchase_date?: string;
-  commissioning_date?: string;
-  warranty_expiry?: string;
-  serial_number?: string;
-  capacity?: number;
-  power?: string;
-  weight?: string;
-  consumable_type?: string;
-  crypto_wallet_address?: string;
-  crypto_token_symbol?: string;
-  depreciation_years?: number;
-  next_maintenance_date?: string;
-}
-
 const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
   const [assetTypes, setAssetTypes] = useState<AssetTypeConfig[]>([]);
   const [selectedType, setSelectedType] = useState<string>('');
+  const [deptTree, setDeptTree] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [selectedRoomId, setSelectedRoomId] = useState<number | ''>('');
+  const [selectedResponsibleId, setSelectedResponsibleId] = useState<number | ''>('');
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | ''>('');
+  const [loadingOptions, setLoadingOptions] = useState(true);
+  const [responsibleOptions, setResponsibleOptions] = useState<any[]>([]);
 
   const {
     register,
@@ -48,7 +26,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
     setValue,
     formState: { errors, isSubmitting },
     reset,
-  } = useForm<FormData>({
+  } = useForm<any>({
     defaultValues: {
       status: 'active',
     },
@@ -57,7 +35,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
   const watchAssetType = watch('asset_type');
 
   useEffect(() => {
-    fetch('/api/asset-types/')
+    fetch('/api/asset-types')
       .then(r => r.json())
       .then(setAssetTypes)
       .catch(console.error);
@@ -75,7 +53,67 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
     }
   }, [watchAssetType, assetTypes]);
 
-  const handleSubmitForm = async (data: FormData) => {
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    Promise.all([
+    fetch('/api/admin/placements/tree', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()).catch(() => []),
+    fetch('/api/admin/placement-assignments/employees', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()).catch(() => []),
+    fetch('/api/admin/placement-assignments/responsible-persons', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()).catch(() => []),
+    ]).then(([tree, emps, responsibleUsers]) => {
+      const safeTree = Array.isArray(tree) ? tree : [];
+      const safeEmps = Array.isArray(emps) ? emps : [];
+      const safeResponsibleUsers = Array.isArray(responsibleUsers) ? responsibleUsers : [];
+      setDeptTree(safeTree);
+      setEmployees(safeEmps);
+      const empList = safeEmps.map((emp: any) => ({
+        id: emp.id,
+        name: emp.full_name || `${emp.last_name} ${emp.first_name}`,
+        departmentName: emp.department_name || emp.department_code || '',
+        fullName: `${emp.full_name || emp.last_name} ${emp.first_name}${emp.department_name ? ` (${emp.department_name})` : ''}`,
+      }));
+      setResponsibleOptions(safeResponsibleUsers.map((u: any) => ({
+        id: u.id,
+        name: u.name,
+        fullName: u.full_name,
+      })));
+      setLoadingOptions(false);
+    });
+  }, []);
+
+  const getAllRooms = () => {
+    const rooms: Array<{ id: number; deptId: number; deptName: string; deptCode: string; roomId: number; roomName: string; fullName: string }> = [];
+    deptTree.forEach(dept => {
+      dept.rooms?.forEach((room: { id: number; name: string; floor?: string; building?: string }) => {
+        let loc = room.name;
+        if (room.floor) loc += ` - ${room.floor}`;
+        if (room.building) loc += ` (${room.building})`;
+        rooms.push({
+          id: dept.id,
+          deptId: dept.id,
+          deptName: dept.name,
+          deptCode: dept.code,
+          roomId: room.id,
+          roomName: room.name,
+          fullName: `${dept.name} - ${loc}`,
+        });
+      });
+    });
+    return rooms;
+  };
+
+  const getAllEmployees = () => {
+    return employees.map(emp => ({
+      id: emp.id,
+      name: emp.full_name || `${emp.last_name} ${emp.first_name}`,
+      departmentName: emp.department_name || emp.department_code || '',
+      fullName: `${emp.full_name || emp.last_name} ${emp.first_name}${emp.department_name ? ` (${emp.department_name})` : ''}`,
+    }));
+  };
+
+  const allRooms = getAllRooms();
+  const allEmployees = getAllEmployees();
+
+  const handleSubmitForm = async (data: any) => {
     try {
       await onSubmit({
         inventory_number: data.inventory_number,
@@ -87,10 +125,12 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
         asset_type: data.asset_type,
         purchase_price: data.purchase_price ? Number(data.purchase_price) : undefined,
         current_value: data.current_value ? Number(data.current_value) : undefined,
+        quantity: data.quantity ? Number(data.quantity) : 1,
         status: data.status as Asset['status'],
         location_address: data.location_address,
         responsible_person: data.responsible_person,
         department_code: data.department_code,
+        employee_id: selectedEmployeeId || undefined,
         purchase_date: data.purchase_date,
         commissioning_date: data.commissioning_date,
         warranty_expiry: data.warranty_expiry,
@@ -103,6 +143,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
         crypto_token_symbol: data.crypto_token_symbol,
         depreciation_years: data.depreciation_years ? Number(data.depreciation_years) : undefined,
         next_maintenance_date: data.next_maintenance_date,
+        is_active: true,
       });
       reset();
       setSelectedType('');
@@ -110,6 +151,15 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
       console.error('Ошибка отправки формы:', error);
     }
   };
+
+  if (loadingOptions) {
+    return (
+      <div className="flex justify-center py-8">
+        <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+        <span className="ml-3 text-gray-600">Загрузка данных...</span>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -132,7 +182,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
               placeholder="INV-001"
             />
             {errors.inventory_number && (
-              <p className="mt-1 text-sm text-red-600">{errors.inventory_number.message}</p>
+              <p className="mt-1 text-sm text-red-600">{String(errors.inventory_number.message)}</p>
             )}
           </div>
           <div>
@@ -152,7 +202,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
               placeholder="Название актива"
             />
             {errors.name && (
-              <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
+              <p className="mt-1 text-sm text-red-600">{String(errors.name.message)}</p>
             )}
           </div>
         </div>
@@ -392,7 +442,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Стоимость покупки (₽)
@@ -423,62 +473,133 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
               placeholder="0.00"
             />
           </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Статус *
-          </label>
-          <select
-            {...register('status', {
-              required: 'Обязательное поле',
-            })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="active">Активен</option>
-            <option value="maintenance">На ремонте</option>
-            <option value="reserved">В резерве</option>
-            <option value="decommissioned">Выведен</option>
-            <option value="lost">Утерян</option>
-            <option value="written_off">Списан</option>
-          </select>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Адрес расположения
+              Количество
             </label>
             <input
-              type="text"
-              {...register('location_address')}
+              type="number"
+              min="1"
+              {...register('quantity', {
+                valueAsNumber: true,
+                value: 1,
+              })}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Адрес"
+              placeholder="1"
             />
           </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Подразделение / Кабинет
+            </label>
+            <select
+              value={selectedRoomId}
+              onChange={(e) => {
+                const roomId = e.target.value ? Number(e.target.value) : null;
+                setSelectedRoomId(roomId || '');
+                if (roomId) {
+                  const room = allRooms.find(r => r.roomId === roomId);
+                  if (room) {
+                    setValue('department_code', room.deptCode);
+                    setValue('location_address', room.fullName);
+                  }
+                } else {
+                  setValue('department_code', '');
+                  setValue('location_address', '');
+                }
+              }}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              disabled={loadingOptions || allRooms.length === 0}
+            >
+              <option value="">Не выбрано</option>
+              {allRooms.map(room => (
+                <option key={room.roomId} value={room.roomId}>
+                  {room.fullName}
+                </option>
+              ))}
+            </select>
+            {allRooms.length === 0 && !loadingOptions && (
+              <p className="mt-1 text-xs text-gray-500">Нет доступных кабинетов</p>
+            )}
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Ответственное лицо
             </label>
-            <input
-              type="text"
-              {...register('responsible_person')}
+            <select
+              value={selectedResponsibleId}
+              onChange={(e) => {
+                const empId = e.target.value ? Number(e.target.value) : null;
+                setSelectedResponsibleId(empId || '');
+                if (empId) {
+                  const emp = responsibleOptions.find((emp: any) => emp.id === empId);
+                  if (emp) {
+                    setValue('responsible_person', emp.name);
+                  }
+                } else {
+                  setValue('responsible_person', '');
+                }
+              }}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="ФИО"
-            />
+              disabled={loadingOptions || responsibleOptions.length === 0}
+            >
+              <option value="">Не выбрано</option>
+              {responsibleOptions.map(emp => (
+                <option key={emp.id} value={emp.id}>
+                  {emp.fullName}
+                </option>
+              ))}
+            </select>
+            {responsibleOptions.length === 0 && !loadingOptions && (
+              <p className="mt-1 text-xs text-gray-500">Нет доступных сотрудников</p>
+            )}
           </div>
-        </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Код подразделения
-          </label>
-          <input
-            type="text"
-            {...register('department_code')}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="Деп-001"
-          />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Сотрудник (получатель имущества)
+            </label>
+            <select
+              value={selectedEmployeeId}
+              onChange={(e) => {
+                const empId = e.target.value ? Number(e.target.value) : null;
+                setSelectedEmployeeId(empId || '');
+              }}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              disabled={loadingOptions || allEmployees.length === 0}
+            >
+              <option value="">Не выбран</option>
+              {allEmployees.map(emp => (
+                <option key={emp.id} value={emp.id}>
+                  {emp.fullName}
+                </option>
+              ))}
+            </select>
+            {allEmployees.length === 0 && !loadingOptions && (
+              <p className="mt-1 text-xs text-gray-500">Нет доступных сотрудников</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Статус
+            </label>
+            <select
+              {...register('status', { required: 'Обязательное поле' })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="active">Активен</option>
+              <option value="maintenance">На ремонте</option>
+              <option value="reserved">В резерве</option>
+              <option value="decommissioned">Выведен</option>
+              <option value="lost">Утерян</option>
+              <option value="written_off">Списан</option>
+            </select>
+          </div>
         </div>
 
         <div>

@@ -3,6 +3,7 @@ from datetime import datetime, date
 from typing import Optional
 
 from sqlalchemy import (
+    Boolean,
     Column,
     Date,
     DateTime,
@@ -36,10 +37,12 @@ class Asset(Base):
     
     purchase_price = Column(Numeric(15, 2), nullable=True)
     current_value = Column(Numeric(15, 2), nullable=True)
+    quantity = Column(Integer, nullable=False, default=1)
     
     department_code = Column(String(50), nullable=True)
     responsible_person = Column(String(100), nullable=True)
     location_address = Column(String(255), nullable=True)
+    employee_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
     manufacturer_code = Column(String(100), nullable=True)
     manufacturer_name = Column(String(255), nullable=True)
     
@@ -59,12 +62,14 @@ class Asset(Base):
     
     created_at = Column(DateTime, nullable=False, default=datetime.now)
     updated_at = Column(DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
+    is_active = Column(Boolean, nullable=False, default=True)
     
     __table_args__ = (
         Index("idx_assets_inventory_number", "inventory_number"),
         Index("idx_assets_status", "status"),
         Index("idx_assets_created_at", "created_at"),
         Index("idx_assets_asset_type", "asset_type"),
+        Index("idx_assets_is_active", "is_active"),
     )
 
     repair_requests = relationship("RepairRequest", back_populates="asset")
@@ -72,6 +77,7 @@ class Asset(Base):
     movement_records = relationship("MovementRecord", back_populates="asset")
     asset_photos = relationship("AssetPhoto", back_populates="asset")
     asset_type_config = relationship("AssetTypeConfig", back_populates="assets")
+    assigned_employee = relationship("Employee")
 
     def __repr__(self) -> str:
         return f"<Asset(id={self.id}, name='{self.name}', status='{self.status}')>"

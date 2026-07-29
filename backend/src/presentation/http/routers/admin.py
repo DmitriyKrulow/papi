@@ -130,7 +130,7 @@ async def update_user(
         if "phone" in user_data:
             user.phone = user_data["phone"]
         if "role" in user_data:
-            if user_data["role"] not in ["admin", "user", "viewer"]:
+            if user_data["role"] not in ["admin", "user", "responsible"]:
                 raise HTTPException(status_code=400, detail="Invalid role")
             user.role = user_data["role"]
     
@@ -193,8 +193,8 @@ async def update_user_role(
         raise HTTPException(status_code=404, detail="User not found")
     
     new_role = role_data.get("role")
-    if new_role not in ["admin", "user", "viewer"]:
-        raise HTTPException(status_code=400, detail="Invalid role. Allowed: admin, user, viewer")
+    if new_role not in ["admin", "user", "responsible"]:
+        raise HTTPException(status_code=400, detail="Invalid role. Allowed: admin, user, responsible")
     
     user.role = new_role  # type: ignore
     db.commit()

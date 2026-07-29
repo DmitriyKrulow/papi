@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { useDocuments } from '../hooks/useDocuments';
+import { useDocuments } from '../../hooks/useDocuments';
 
 interface FileUploadProps {
   onUploadSuccess?: (document: any) => void;

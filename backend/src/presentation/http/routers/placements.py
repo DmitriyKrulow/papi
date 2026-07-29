@@ -5,7 +5,7 @@ from typing import Optional, Any
 from datetime import datetime
 
 from src.infrastructure.db.init_db import get_db
-from src.infrastructure.db.models.department import Department
+from src.infrastructure.db.models.department import Department, Room
 from src.infrastructure.db.models.employee import Employee
 from src.presentation.http.dependencies.auth import get_current_admin
 
@@ -98,6 +98,47 @@ async def get_department_options(
         }
         for d in departments
     ]
+
+
+@router.get("/tree")
+async def get_placement_tree(
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(get_current_admin),
+):
+    departments = db.query(Department).filter(
+        Department.is_active == True
+    ).order_by(Department.name).all()
+    
+    result = []
+    for dept in departments:
+        rooms = db.query(Room).filter(
+            Room.department_id == dept.id,
+            Room.is_active == True
+        ).order_by(Room.name).all()
+        
+        dept_dict = {
+            "id": dept.id,
+            "name": dept.name,
+            "code": dept.code,
+            "parent_id": dept.parent_id,
+            "head": dept.head or "",
+            "phone": dept.phone or "",
+            "email": dept.email or "",
+            "location": dept.location or "",
+            "is_active": dept.is_active,
+            "rooms": [
+                {
+                    "id": r.id,
+                    "name": r.name,
+                    "floor": r.floor or "",
+                    "building": r.building or "",
+                }
+                for r in rooms
+            ],
+        }
+        result.append(dept_dict)
+    
+    return result
 
 
 @router.get("/{department_id}")
@@ -238,3 +279,114 @@ async def get_department_employees(
         }
         for e in employees
     ]
+
+
+def room_to_dict(room):
+    return {
+        "id": getattr(room, 'id', None),
+        "department_id": getattr(room, 'department_id', None),
+        "name": safe_str(getattr(room, 'name', None)),
+        "floor": safe_str(getattr(room, 'floor', None)),
+        "building": safe_str(getattr(room, 'building', None)),
+        "is_active": getattr(room, 'is_active', True),
+        "created_at": safe_isoformat(getattr(room, 'created_at', None)),
+        "updated_at": safe_isoformat(getattr(room, 'updated_at', None)),
+    }
+
+
+@router.get("/{department_id}/rooms")
+async def get_department_rooms(
+    department_id: int,
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(get_current_admin),
+):
+    dept = db.query(Department).filter(Department.id == department_id).first()
+    if not dept:
+        raise HTTPException(status_code=404, detail="Department not found")
+    
+    rooms = db.query(Room).filter(
+        Room.department_id == department_id,
+        Room.is_active == True
+    ).order_by(Room.name).all()
+    
+    return [room_to_dict(r) for r in rooms]
+
+
+@router.post("/{department_id}/rooms")
+async def create_room(
+    department_id: int,
+    data: dict,
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(get_current_admin),
+):
+    dept = db.query(Department).filter(Department.id == department_id).first()
+    if not dept:
+        raise HTTPException(status_code=404, detail="Department not found")
+    
+    name = data.get("name")
+    if not name:
+        raise HTTPException(status_code=400, detail="Название кабинета обязательно")
+    
+    room = Room(
+        department_id=department_id,
+        name=name,
+        floor=data.get("floor"),
+        building=data.get("building"),
+        is_active=True,
+        created_at=datetime.now(),
+        updated_at=datetime.now(),
+    )
+    
+    db.add(room)
+    db.commit()
+    db.refresh(room)
+    
+    return room_to_dict(room)
+
+
+@router.put("/rooms/{room_id}")
+async def update_room(
+    room_id: int,
+    data: dict,
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(get_current_admin),
+):
+    room = db.query(Room).filter(Room.id == room_id).first()
+    if not room:
+        raise HTTPException(status_code=404, detail="Кабинет не найден")
+    
+    if "name" in data:
+        room.name = data["name"]
+    if "floor" in data:
+        room.floor = data["floor"]
+    if "building" in data:
+        room.building = data["building"]
+    if "is_active" in data:
+        room.is_active = data["is_active"]
+    if "department_id" in data:
+        dept = db.query(Department).filter(Department.id == data["department_id"]).first()
+        if not dept:
+            raise HTTPException(status_code=404, detail="Подразделение не найдено")
+        room.department_id = data["department_id"]
+    
+    room.updated_at = datetime.now()
+    db.commit()
+    db.refresh(room)
+    
+    return room_to_dict(room)
+
+
+@router.delete("/rooms/{room_id}")
+async def delete_room(
+    room_id: int,
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(get_current_admin),
+):
+    room = db.query(Room).filter(Room.id == room_id).first()
+    if not room:
+        raise HTTPException(status_code=404, detail="Кабинет не найден")
+    
+    db.delete(room)
+    db.commit()
+    
+    return {"message": "Кабинет удален"}

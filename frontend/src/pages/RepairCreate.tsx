@@ -1,29 +1,68 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useRepairs } from '../hooks/useRepairs';
-import { useAssets } from '../hooks/useAssets';
 import { useAuth } from '../hooks/useAuth';
 import RepairForm from '../components/forms/RepairForm';
+import type { Asset } from '../types';
 
 const RepairCreate: React.FC = () => {
   const { createRepair, loading } = useRepairs();
-  const { assets, loading: assetsLoading, fetchAssets } = useAssets();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [selectedAssetId, setSelectedAssetId] = useState<number | ''>('');
   const [formTemplateData, setFormTemplateData] = useState<{ title: string; description: string } | null>(null);
-  
-  const applyTemplateRef = useRef<(title: string, description: string) => void | null>(null);
-  
-  console.log('[RepairCreate] Component rendered');
+  const [allAssets, setAllAssets] = useState<Asset[]>([]);
+  const [assetsLoading, setAssetsLoading] = useState(true);
+  const [assetSearch, setAssetSearch] = useState('');
+  const [assetStatusFilter, setAssetStatusFilter] = useState('');
+  const [assetDropdownOpen, setAssetDropdownOpen] = useState(false);
+  const assetDropdownRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const fetchAllAssets = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/assets/?limit=10000', {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setAllAssets(data.items || data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch assets:', err);
+      } finally {
+        setAssetsLoading(false);
+      }
+    };
+    fetchAllAssets();
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (assetDropdownRef.current && !assetDropdownRef.current.contains(event.target as Node)) {
+        setAssetDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filteredAssets = allAssets.filter((asset) => {
+    const matchesSearch = !assetSearch ||
+      asset.name.toLowerCase().includes(assetSearch.toLowerCase()) ||
+      asset.inventory_number.toLowerCase().includes(assetSearch.toLowerCase()) ||
+      (asset.model || '').toLowerCase().includes(assetSearch.toLowerCase()) ||
+      (asset.responsible_person || '').toLowerCase().includes(assetSearch.toLowerCase());
+    const matchesStatus = !assetStatusFilter || asset.status === assetStatusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  const selectedAsset = allAssets.find((a) => a.id === selectedAssetId);
 
   const handleSubmit = async (data: any) => {
-    console.log('[RepairCreate] handleSubmit called with:', data);
-    console.log('[RepairCreate] selectedAssetId:', selectedAssetId);
-    console.log('[RepairCreate] formTemplateData:', formTemplateData);
     try {
       const assetId = selectedAssetId ? Number(selectedAssetId) : (data.asset_id || 0);
-      console.log('[RepairCreate] final assetId:', assetId);
       if (!assetId) {
         alert('Пожалуйста, выберите актив');
         return;
@@ -35,22 +74,16 @@ const RepairCreate: React.FC = () => {
         priority: data.priority || 'medium',
         created_by: user?.id || 0,
       };
-      
       if (data.desired_completion_date) {
         formData.desired_completion_date = new Date(data.desired_completion_date).toISOString();
       }
-      
       if (data.deadline) {
         formData.deadline = new Date(data.deadline).toISOString();
       }
-      
       if (data.estimated_cost && Number(data.estimated_cost) > 0) {
         formData.estimated_cost = Number(data.estimated_cost);
       }
-      
       await createRepair(formData);
-      // Обновляем активы после создания заявки
-      await fetchAssets();
       navigate('/repairs');
     } catch (error) {
       console.error('Failed to create repair:', error);
@@ -58,19 +91,13 @@ const RepairCreate: React.FC = () => {
     }
   };
 
-  const applyTemplateToForm = useCallback((template: typeof templateOptions[0]) => {
-    const asset = assets.find((a) => a.id === Number(selectedAssetId));
+  const applyTemplateToForm = useCallback((template: { title: string; description: string }) => {
+    const asset = allAssets.find((a) => a.id === Number(selectedAssetId));
     const assetInfo = asset ? `Актив: ${asset.name} (ID: ${asset.id})` : '';
-    
     const title = `${template.title}${assetInfo ? ' - ' + assetInfo : ''}`;
     const description = `${template.description}\n\n${assetInfo}\n\nДополнительная информация о проблеме:`;
-    
     setFormTemplateData({ title, description });
-  }, [assets, selectedAssetId]);
-
-  if (assetsLoading) {
-    return <div>Загрузка...</div>;
-  }
+  }, [allAssets, selectedAssetId]);
 
   const templateOptions = [
     {
@@ -94,6 +121,19 @@ const RepairCreate: React.FC = () => {
       description: 'Проблемы с сетевым подключением, маршрутизацией',
     },
   ];
+
+  const statusLabels: Record<string, string> = {
+    active: 'Активен',
+    maintenance: 'На ремонте',
+    reserved: 'В резерве',
+    decommissioned: 'Выведен',
+    lost: 'Утерян',
+    written_off: 'Списан',
+  };
+
+  if (assetsLoading) {
+    return <div className="max-w-7xl mx-auto py-8 px-4"><div className="flex justify-center py-8"><div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div><span className="ml-3 text-gray-600">Загрузка активов...</span></div></div>;
+  }
 
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
@@ -125,24 +165,96 @@ const RepairCreate: React.FC = () => {
           onSubmit={handleSubmit}
           loading={loading}
           assetId={Number(selectedAssetId) || undefined}
-          assets={assets}
+          assets={allAssets}
           defaultValue={formTemplateData || undefined}
         />
 
-        <div className="mt-6">
+        <div className="mt-6" ref={assetDropdownRef}>
           <label className="block text-sm font-medium mb-2">Выберите актив</label>
-          <select
-            value={selectedAssetId}
-            onChange={(e) => setSelectedAssetId(e.target.value ? Number(e.target.value) : '')}
-            className="w-full px-3 py-2 border rounded-md"
-          >
-            <option value="">-- Выберите актив --</option>
-            {assets.map((asset) => (
-              <option key={asset.id} value={asset.id}>
-                {asset.name} (ID: {asset.id} - {asset.inventory_number})
-              </option>
-            ))}
-          </select>
+          <div className="relative">
+            <div
+              onClick={() => setAssetDropdownOpen(!assetDropdownOpen)}
+              className="w-full px-3 py-2 border rounded-md bg-white cursor-pointer min-h-[42px] flex items-center justify-between"
+            >
+              <span className={selectedAsset ? '' : 'text-gray-400'}>
+                {selectedAsset
+                  ? `${selectedAsset.name} (ID: ${selectedAsset.id} - ${selectedAsset.inventory_number})`
+                  : '-- Выберите актив --'}
+              </span>
+              <span className="text-gray-400 text-sm">{assetDropdownOpen ? '▲' : '▼'}</span>
+            </div>
+
+            {assetDropdownOpen && (
+              <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-80 overflow-hidden">
+                <div className="p-3 border-b space-y-2">
+                  <input
+                    type="text"
+                    placeholder="Поиск по названию, инвентарному номеру, модели..."
+                    value={assetSearch}
+                    onChange={(e) => setAssetSearch(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-md text-sm"
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                  <select
+                    value={assetStatusFilter}
+                    onChange={(e) => setAssetStatusFilter(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-md text-sm"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <option value="">Все статусы</option>
+                    <option value="active">Активен</option>
+                    <option value="reserved">В резерве</option>
+                    <option value="maintenance">На ремонте</option>
+                    <option value="decommissioned">Выведен</option>
+                    <option value="lost">Утерян</option>
+                    <option value="written_off">Списан</option>
+                  </select>
+                </div>
+
+                <div className="overflow-y-auto max-h-56">
+                  {filteredAssets.length === 0 ? (
+                    <div className="px-3 py-4 text-sm text-gray-500 text-center">
+                      {allAssets.length === 0 ? 'Активы не найдены' : 'Ничего не найдено'}
+                    </div>
+                  ) : (
+                    filteredAssets.map((asset) => (
+                      <button
+                        key={asset.id}
+                        onClick={() => {
+                          setSelectedAssetId(asset.id);
+                          setAssetDropdownOpen(false);
+                          setAssetSearch('');
+                          setAssetStatusFilter('');
+                        }}
+                        className={`w-full text-left px-3 py-2 hover:bg-blue-50 text-sm border-b ${selectedAssetId === asset.id ? 'bg-blue-50' : ''}`}
+                      >
+                        <div className="font-medium">{asset.name}</div>
+                        <div className="text-xs text-gray-500">
+                          ID: {asset.id} | {asset.inventory_number}
+                          {asset.model && ` | ${asset.model}`}
+                        </div>
+                        <div className="text-xs">
+                          <span className={`px-1.5 py-0.5 rounded-full ${
+                            asset.status === 'active' ? 'bg-green-100 text-green-800' :
+                            asset.status === 'maintenance' ? 'bg-orange-100 text-orange-800' :
+                            asset.status === 'reserved' ? 'bg-blue-100 text-blue-800' :
+                            asset.status === 'decommissioned' ? 'bg-gray-100 text-gray-800' :
+                            asset.status === 'lost' ? 'bg-red-100 text-red-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {statusLabels[asset.status] || asset.status}
+                          </span>
+                          {asset.responsible_person && (
+                            <span className="ml-2 text-gray-400">| {asset.responsible_person}</span>
+                          )}
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
           <p className="mt-2 text-sm text-gray-500">
             Выбор актива поможет автоматически заполнить информацию о ремонтируемом оборудовании
           </p>

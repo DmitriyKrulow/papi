@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import AssetForm from '../components/forms/AssetForm';
 import { useAssets } from '../hooks/useAssets';
@@ -6,14 +6,55 @@ import { useAssets } from '../hooks/useAssets';
 const AssetEdit: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { assets, loading, updateAsset, error } = useAssets();
+  const { assets, loading, updateAsset, error, fetchAssetById } = useAssets();
   const [asset, setAsset] = useState<any>(null);
   const [formData, setFormData] = useState<any>(null);
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
+
+  const loadAsset = useCallback(async () => {
+    if (!id || initialLoadDone) return;
+    try {
+      const found = await fetchAssetById(parseInt(id));
+      setAsset(found);
+      setFormData({
+        inventory_number: found.inventory_number,
+        name: found.name,
+        description: found.description || '',
+        model: found.model || '',
+        manufacturer_code: found.manufacturer_code || '',
+        manufacturer_name: found.manufacturer_name || '',
+        country_of_origin: found.country_of_origin || '',
+        accounting_code: found.accounting_code || '',
+        department_code: found.department_code || '',
+        responsible_person: found.responsible_person || '',
+        purchase_price: found.purchase_price || 0,
+        current_value: found.current_value || 0,
+        residual_value: found.residual_value || 0,
+        depreciation_rate: found.depreciation_rate || 0,
+        location: found.location || '',
+        location_address: found.location_address || '',
+        responsible_phone: found.responsible_phone || '',
+        purchase_date: found.purchase_date || '',
+        commissioning_date: found.commissioning_date || '',
+        warranty_expiry: found.warranty_expiry || '',
+        last_maintenance_date: found.last_maintenance_date || '',
+        next_maintenance_date: found.next_maintenance_date || '',
+        decommissioning_date: found.decommissioning_date || '',
+        tags: found.tags || [],
+        notes: found.notes || '',
+        is_active: found.is_active,
+      });
+      setInitialLoadDone(true);
+    } catch {
+      navigate('/assets');
+    }
+  }, [id, fetchAssetById, navigate, initialLoadDone]);
 
   useEffect(() => {
-    if (!loading && assets.length > 0) {
-      const found = assets.find((a) => a.id === parseInt(id || '0'));
-      if (found) {
+    if (!id) return;
+    if (assets.length > 0) {
+      const found = assets.find((a) => a.id === parseInt(id));
+      if (found && !initialLoadDone) {
         setAsset(found);
         setFormData({
           inventory_number: found.inventory_number,
@@ -43,11 +84,12 @@ const AssetEdit: React.FC = () => {
           notes: found.notes || '',
           is_active: found.is_active,
         });
-      } else {
-        navigate('/assets');
+        setInitialLoadDone(true);
+        return;
       }
     }
-  }, [assets, loading, id, navigate]);
+    loadAsset();
+  }, [id, assets, loadAsset, initialLoadDone]);
 
   const handleSubmit = async (data: any) => {
     try {
@@ -58,8 +100,8 @@ const AssetEdit: React.FC = () => {
     }
   };
 
-  if (loading) return <div>Загрузка...</div>;
-  if (error) return <div className="text-red-500">Ошибка: {error}</div>;
+  if (loading && !asset) return <div>Загрузка...</div>;
+  if (error && !asset) return <div className="text-red-500">Ошибка: {error}</div>;
   if (!asset || !formData) return <div>Актив не найден</div>;
 
   return (

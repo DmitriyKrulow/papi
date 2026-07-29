@@ -18,7 +18,7 @@ os.makedirs("uploads/documents", exist_ok=True)
 os.makedirs("uploads/reports", exist_ok=True)
 os.makedirs("uploads/inventory", exist_ok=True)
 
-app = FastAPI(title="PAPI Backend")
+app = FastAPI(title="PAPI Backend", redirect_slashes=False)
 
 
 @app.get("/")
@@ -41,6 +41,7 @@ def db_check():
 
 def register_routers():
     from src.presentation.http.routers.assets import router as assets_router
+    from src.presentation.http.routers.assets_export import router as assets_export_router
     from src.presentation.http.routers.users import router as users_router
     from src.presentation.http.routers.auth import router as auth_router
     from src.presentation.http.routers.repairs import router as repairs_router
@@ -56,6 +57,7 @@ def register_routers():
     from src.presentation.http.routers.placement_assignments import router as placement_assignments_router
 
     app.include_router(assets_router, prefix="/api")
+    app.include_router(assets_export_router)
     app.include_router(users_router, prefix="/api")
     app.include_router(auth_router, prefix="/api")
     app.include_router(repairs_router, prefix="/api")
