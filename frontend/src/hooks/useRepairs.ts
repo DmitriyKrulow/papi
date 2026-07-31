@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AxiosError } from 'axios';
+import toast from 'react-hot-toast';
 import { apiClient } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
-import { useAssets } from '../hooks/useAssets';
 import type { RepairRequest } from '../types';
+// import { useAssets } from './useAssets';
 
 export const useRepairs = () => {
   const { user } = useAuth();
@@ -16,7 +17,7 @@ export const useRepairs = () => {
   const [total, setTotal] = useState<number>(0);
   
   // Вызываем useAssets для обновления активов при изменении статуса заявки
-  const { fetchAssets } = useAssets();
+  // const { fetchAssets } = useAssets();
 
   const repairTemplates = [
     {
@@ -121,11 +122,8 @@ export const useRepairs = () => {
     setError(null);
     try {
       const response = await apiClient.repairs.updateStatus(id, status);
-      console.log('[useRepairs] updateRepairStatus success:', response.data);
+console.log('[useRepairs] updateRepairStatus success:', response.data);
       setRepairs((prev) => prev.map((repair) => (repair.id === id ? response.data : repair)));
-      // Обновляем активы после изменения статуса заявки
-      console.log('[useRepairs] Calling fetchAssets to update asset status...');
-      fetchAssets();
       return response.data;
     } catch (err) {
       const axiosError = err as AxiosError;
@@ -137,7 +135,7 @@ export const useRepairs = () => {
     } finally {
       setLoading(false);
     }
-  }, [fetchAssets]);
+  }, []);
 
   const updateRepairPriority = useCallback(async (id: number, priority: string) => {
     setLoading(true);
@@ -155,15 +153,19 @@ export const useRepairs = () => {
     }
   }, []);
 
-  const deleteRepair = useCallback(async (id: number) => {
+const deleteRepair = useCallback(async (id: number) => {
+    if (!window.confirm('Вы уверены, что хотите удалить заявку?')) return;
     setLoading(true);
     setError(null);
     try {
       await apiClient.repairs.delete(id);
       setRepairs((prev) => prev.filter((repair) => repair.id !== id));
+      toast.success('Заявка удалена');
     } catch (err) {
-      const axiosError = err as AxiosError;
-      setError(axiosError.message || `Failed to delete repair with id ${id}`);
+      const axiosError = err as AxiosError<{detail: string}>;
+      const errorMessage = axiosError.response?.data?.detail || axiosError.message || `Ошибка удаления заявки ${id}`;
+      setError(errorMessage);
+      toast.error(errorMessage);
       throw err;
     } finally {
       setLoading(false);

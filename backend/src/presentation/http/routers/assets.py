@@ -2,12 +2,15 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import text
-from typing import Optional, Any
-from datetime import datetime, date
+from datetime import datetime
 from decimal import Decimal
+from typing import Optional, Any
 
 from src.infrastructure.db.init_db import get_db
 from src.infrastructure.db.models.asset import Asset
+from src.infrastructure.db.models.department import Department
+from src.infrastructure.db.models.user import User
+from src.presentation.http.dependencies.auth import get_current_user
 from src.infrastructure.db.models.asset_type_config import AssetTypeConfig
 from src.infrastructure.db.models.department import Department
 from src.infrastructure.db.models.employee import Employee
@@ -318,6 +321,7 @@ async def update_asset(
     asset_id: int,
     asset_data: dict,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Обновить актив.
@@ -424,9 +428,10 @@ async def update_asset(
 async def delete_asset(
     asset_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
-    Скрыть актив (soft delete).
+    Скрыть актив (soft delete). Статус меняется на 'written_off'.
     """
     try:
         asset = db.query(Asset).filter(Asset.id == asset_id).first()
@@ -434,6 +439,7 @@ async def delete_asset(
             raise HTTPException(status_code=404, detail="Asset not found")
         
         asset.is_active = False
+        asset.status = "written_off"
         asset.updated_at = datetime.now()
         db.commit()
         
@@ -446,10 +452,50 @@ async def delete_asset(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.delete("/{asset_id}/hard")
+async def hard_delete_asset(
+    asset_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Полностью удалить актив (hard delete). Только для администраторов.
+    Также удаляются связанные заявки на ремонт и события обслуживания.
+    """
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Только администратор может полностью удалять активы")
+    
+    try:
+        asset = db.query(Asset).filter(Asset.id == asset_id).first()
+        if not asset:
+            raise HTTPException(status_code=404, detail="Asset not found")
+        
+        # Удаляем связанные заявки на ремонт
+        from src.infrastructure.db.models.repair_request import RepairRequest
+        db.query(RepairRequest).filter(RepairRequest.asset_id == asset_id).delete()
+        
+        # Удаляем связанные события обслуживания
+        from src.infrastructure.db.models.maintenance_event import MaintenanceEvent
+        db.query(MaintenanceEvent).filter(MaintenanceEvent.asset_id == asset_id).delete()
+        
+        # Удаляем сам актив
+        db.delete(asset)
+        db.commit()
+        
+        return {"message": "Asset permanently deleted", "deleted_id": asset_id}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.put("/{asset_id}/restore")
 async def restore_asset(
     asset_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Восстановить скрытый актив.
@@ -460,6 +506,7 @@ async def restore_asset(
             raise HTTPException(status_code=404, detail="Asset not found")
         
         asset.is_active = True
+        asset.status = "active"
         asset.updated_at = datetime.now()
         db.commit()
         db.refresh(asset)
@@ -470,4 +517,90 @@ async def restore_asset(
         raise
     except Exception as e:
         db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{asset_id}/repair-history")
+async def get_asset_repair_history(
+    asset_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Получить историю ремонтов для актива.
+    Возвращает только одобренные, выполняемые и завершённые заявки.
+    Для скрытых (списанных) активов доступно только администраторам.
+    """
+    try:
+        asset = db.query(Asset).filter(Asset.id == asset_id).first()
+        if not asset:
+            raise HTTPException(status_code=404, detail="Asset not found")
+        
+        # Скрытые активы видны только администраторам
+        if not asset.is_active and current_user.role != "admin":
+            raise HTTPException(status_code=403, detail="Актив скрыт. Доступно только администраторам")
+        
+        from src.infrastructure.db.models.repair_request import RepairRequest
+        
+        repairs = db.query(RepairRequest).options(
+            joinedload(RepairRequest.creator),
+            joinedload(RepairRequest.assignee)
+        ).filter(
+            RepairRequest.asset_id == asset_id,
+            RepairRequest.status.in_(["approved", "in_progress", "completed"])
+        ).order_by(RepairRequest.updated_at.desc()).all()
+        
+        def safe_str(val):
+            if val is None:
+                return None
+            return str(val)
+        
+        def safe_isoformat(val):
+            if val is None:
+                return None
+            if hasattr(val, 'isoformat') and callable(getattr(val, 'isoformat')):
+                return val.isoformat()
+            return str(val)
+        
+        def safe_decimal_to_float(val, default=0.0):
+            if val is None:
+                return default
+            try:
+                return float(val)
+            except (TypeError, ValueError):
+                return default
+        
+        items = []
+        for r in repairs:
+            items.append({
+                "id": r.id,
+                "asset_id": r.asset_id,
+                "title": safe_str(r.title),
+                "description": safe_str(r.description),
+                "priority": r.priority.value if r.priority else "medium",
+                "status": r.status.value if r.status else "draft",
+                "created_by": r.created_by,
+                "creator_name": safe_str(r.creator.username) if r.creator else None,
+                "created_at": safe_isoformat(r.created_at),
+                "assigned_to": r.assigned_to,
+                "assigned_at": safe_isoformat(r.assigned_at),
+                "actual_completion_date": safe_isoformat(r.actual_completion_date),
+                "actual_cost": safe_decimal_to_float(r.actual_cost) if r.actual_cost else None,
+                "completion_notes": safe_str(r.completion_notes),
+                "rejection_reason": safe_str(r.rejection_reason),
+                "updated_at": safe_isoformat(r.updated_at),
+                "assigned_to_name": safe_str(r.assignee.username) if r.assignee else None,
+                "desired_completion_date": safe_isoformat(r.desired_completion_date),
+                "deadline": safe_isoformat(r.deadline),
+                "estimated_cost": safe_decimal_to_float(r.estimated_cost) if r.estimated_cost else None,
+            })
+        
+        return {
+            "items": items,
+            "total": len(items),
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

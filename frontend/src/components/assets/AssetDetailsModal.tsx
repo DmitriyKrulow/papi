@@ -1,6 +1,6 @@
 // frontend/src/components/assets/AssetDetailsModal.tsx
 import React, { useState, useEffect } from 'react';
-import { Calendar, DollarSign, Edit, Trash2, MapPin, User, Wrench, Plus } from 'lucide-react';
+import { Calendar, DollarSign, Edit, Trash2, MapPin, User, Wrench, Plus, RefreshCw } from 'lucide-react';
 import type { Asset, MaintenanceEvent } from '../../types';
 import { AssetStatusMap, MaintenanceEventTypes, AssetTypeNames } from '../../types';
 import { formatMoney, formatDate } from '../../utils/helpers';
@@ -11,12 +11,16 @@ interface AssetDetailsModalProps {
   onClose: () => void;
   onEdit: (asset: Asset) => void;
   onDelete: (id: number) => void;
+  onHardDelete?: (id: number) => void;
+  onRestore?: (id: number) => void;
 }
 
-const AssetDetailsModal: React.FC<AssetDetailsModalProps> = ({ asset, onClose, onEdit, onDelete }) => {
+const AssetDetailsModal: React.FC<AssetDetailsModalProps> = ({ asset, onClose, onEdit, onDelete, onHardDelete, onRestore }) => {
   const [maintenanceEvents, setMaintenanceEvents] = useState<MaintenanceEvent[]>([]);
+  const [repairHistory, setRepairHistory] = useState<any[]>([]);
   const [showAddEvent, setShowAddEvent] = useState(false);
   const [loadingEvents, setLoadingEvents] = useState(false);
+  const [loadingRepairs, setLoadingRepairs] = useState(false);
   const [newEvent, setNewEvent] = useState({
     event_type: 'repair',
     event_date: new Date().toISOString().split('T')[0],
@@ -44,9 +48,29 @@ const AssetDetailsModal: React.FC<AssetDetailsModalProps> = ({ asset, onClose, o
     }
   };
 
-  useEffect(() => {
+useEffect(() => {
     fetchMaintenanceEvents();
+    fetchRepairHistory();
   }, [asset?.id]);
+
+  const fetchRepairHistory = async () => {
+    if (!asset) return;
+    setLoadingRepairs(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/assets/${asset.id}/repair-history`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setRepairHistory(data.items || []);
+      }
+    } catch (err) {
+      console.error('Ошибка загрузки истории ремонтов:', err);
+    } finally {
+      setLoadingRepairs(false);
+    }
+  };
 
   const handleAddEvent = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,7 +104,7 @@ const AssetDetailsModal: React.FC<AssetDetailsModalProps> = ({ asset, onClose, o
   const assetTypeInfo = AssetTypeNames[asset.asset_type || ''];
   const statusInfo = AssetStatusMap[asset.status];
 
-  const getStatusColor = (color: string): string => {
+const getStatusColor = (status: string): string => {
     const colors: Record<string, string> = {
       green: 'bg-green-100 text-green-700',
       yellow: 'bg-yellow-100 text-yellow-700',
@@ -89,7 +113,16 @@ const AssetDetailsModal: React.FC<AssetDetailsModalProps> = ({ asset, onClose, o
       red: 'bg-red-100 text-red-700',
       orange: 'bg-orange-100 text-orange-700',
     };
-    return colors[color] || 'bg-gray-100 text-gray-700';
+    return colors[status] || 'bg-gray-100 text-gray-700';
+  };
+
+  const getRepairStatusBadge = (status: string): { label: string; color: string } => {
+    const map: Record<string, { label: string; color: string }> = {
+      approved: { label: 'Одобрено', color: 'bg-blue-100 text-blue-700' },
+      in_progress: { label: 'В работе', color: 'bg-yellow-100 text-yellow-700' },
+      completed: { label: 'Завершено', color: 'bg-green-100 text-green-700' },
+    };
+    return map[status] || { label: status, color: 'bg-gray-100 text-gray-700' };
   };
 
   const getAssetTypeColor = (color: string): string => {
@@ -114,7 +147,7 @@ const AssetDetailsModal: React.FC<AssetDetailsModalProps> = ({ asset, onClose, o
     </div>
   );
 
-  return (
+return (
     <div className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
@@ -123,6 +156,11 @@ const AssetDetailsModal: React.FC<AssetDetailsModalProps> = ({ asset, onClose, o
             <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(statusInfo?.color || 'gray')}`}>
               {statusInfo?.label || asset.status}
             </span>
+            {!asset.is_active && (
+              <span className="px-3 py-1 rounded-full text-sm font-medium bg-gray-200 text-gray-700">
+                Скрыт
+              </span>
+            )}
             {assetTypeInfo && (
               <span className={`px-3 py-1 rounded-full text-sm font-medium ${getAssetTypeColor(assetTypeInfo.color)}`}>
                 {assetTypeInfo.icon} {assetTypeInfo.label}
@@ -132,20 +170,45 @@ const AssetDetailsModal: React.FC<AssetDetailsModalProps> = ({ asset, onClose, o
           <p className="text-lg text-gray-600 font-mono">#{asset.inventory_number}</p>
         </div>
         <div className="flex gap-2">
-          <button
-            onClick={() => onEdit(asset)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-          >
-            <Edit className="w-4 h-4" />
-            Редактировать
-          </button>
-          <button
-            onClick={() => onDelete(asset.id)}
-            className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
-          >
-            <Trash2 className="w-4 h-4" />
-            Удалить
-          </button>
+          {asset.is_active ? (
+            <>
+              <button
+                onClick={() => onEdit(asset)}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+              >
+                <Edit className="w-4 h-4" />
+                Редактировать
+              </button>
+              <button
+                onClick={() => onDelete(asset.id)}
+                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+              >
+                <Trash2 className="w-4 h-4" />
+                Списать
+              </button>
+            </>
+          ) : (
+            <>
+              {onRestore && (
+                <button
+                  onClick={() => onRestore(asset.id)}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Восстановить
+                </button>
+              )}
+              {onHardDelete && (
+                <button
+                  onClick={() => onHardDelete(asset.id)}
+                  className="flex items-center gap-2 px-4 py-2 bg-red-800 text-white rounded-lg hover:bg-red-900 transition"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Удалить навсегда
+                </button>
+              )}
+            </>
+          )}
         </div>
       </div>
 
@@ -295,7 +358,7 @@ const AssetDetailsModal: React.FC<AssetDetailsModalProps> = ({ asset, onClose, o
           </form>
         )}
 
-        {loadingEvents ? (
+{loadingEvents ? (
           <p className="text-sm text-gray-500 text-center py-4">Загрузка...</p>
         ) : maintenanceEvents.length === 0 ? (
           <p className="text-sm text-gray-500 text-center py-4">Нет записей об обслуживании</p>
@@ -324,6 +387,50 @@ const AssetDetailsModal: React.FC<AssetDetailsModalProps> = ({ asset, onClose, o
           </div>
         )}
       </div>
+
+      {/* История ремонтов из заявок */}
+      {asset.is_active && (
+        <div className="bg-gray-50 rounded-lg p-6 space-y-4">
+          <div className="flex justify-between items-center">
+            <h4 className="text-sm font-semibold text-gray-700 uppercase tracking-wide flex items-center gap-2">
+              <Wrench className="w-4 h-4" /> История ремонтов (заявки)
+            </h4>
+          </div>
+
+          {loadingRepairs ? (
+            <p className="text-sm text-gray-500 text-center py-4">Загрузка...</p>
+          ) : repairHistory.length === 0 ? (
+            <p className="text-sm text-gray-500 text-center py-4">Нет заявок на ремонт</p>
+          ) : (
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {repairHistory.map((repair: any) => {
+                const badge = getRepairStatusBadge(repair.status);
+                return (
+                  <div key={repair.id} className="bg-white p-3 rounded-lg border text-sm">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <span className="font-medium">{repair.title}</span>
+                        <span className={`ml-2 px-2 py-0.5 rounded text-xs font-medium ${badge.color}`}>{badge.label}</span>
+                      </div>
+                      <span className="text-gray-500 text-xs">{formatDate(repair.created_at)}</span>
+                    </div>
+                    {repair.description && <p className="mt-1 text-gray-600 text-xs">{repair.description}</p>}
+                    <div className="mt-2 flex gap-3 text-xs text-gray-500">
+                      {repair.estimated_cost && <span>Оценка: {formatMoney(repair.estimated_cost)}</span>}
+                      {repair.actual_cost && <span>Факт: {formatMoney(repair.actual_cost)}</span>}
+                      {repair.assigned_to_name && <span>Исполнитель: {repair.assigned_to_name}</span>}
+                      {repair.actual_completion_date && <span>Завершено: {formatDate(repair.actual_completion_date)}</span>}
+                    </div>
+                    {repair.completion_notes && (
+                      <p className="mt-1 text-xs text-gray-500 italic">{repair.completion_notes}</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

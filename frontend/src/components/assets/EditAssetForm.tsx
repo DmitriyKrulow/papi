@@ -212,9 +212,10 @@ const EditAssetForm: React.FC<EditAssetFormProps> = ({ existingAsset, onSubmit, 
   const allRooms = flattenRooms(deptTree);
   const allEmployees = flattenEmployees();
 
-  const handleSubmitForm = async (data: any) => {
+const handleSubmitForm = async (data: any) => {
     try {
       const payload: Record<string, unknown> = {
+        id: existingAsset.id,
         inventory_number: data.inventory_number,
         name: data.name,
         description: data.description,

@@ -72,42 +72,37 @@ async def upload_inventory_file(
             error_count = 0
             processed_inventory_numbers = set()
             
-            # Структура файла (после строки заголовков):
-            # - Колонка 0: "Код строки" (порядковый номер 1, 2, 3...)
-            # - Колонка 3: "Наименование имущества" (название)
-            # - Колонка 21: "Номер (код) объекта учета (инвентарный или иной)" (инвентарный номер)
-            # - Колонка 31: "Фактическое местоположение"
-            # - Колонка 77: "Балансовая стоимость"
-            # - и т.д.
+            # Структура файла — Excel со слиянными ячейками (pandas читает иначе):
+            # Данные начинаются со строки 40 (индекс pandas, строка 41 в Excel)
+            # Колонка 0: № п/п
+            # Колонка 3: Наименование объекта нефинансового актива
+            # Колонка 10: Номер (код) объекта учета (инвентарный номер)
+            # Колонка 18: Единица измерения
+            # Колонка 26: Количество
+            # Колонка 50: Балансовая стоимость, руб.
             
-            # Индексы колонок
+            # Индексы колонок (после слиянных ячеек)
             row_num_col = df.columns[0] if len(df.columns) > 0 else None
             name_col = df.columns[3] if len(df.columns) > 3 else None
-            inventory_col = df.columns[21] if len(df.columns) > 21 else None
-            location_col = df.columns[31] if len(df.columns) > 31 else None
-            cost_col = df.columns[77] if len(df.columns) > 77 else None
+            inventory_col = df.columns[10] if len(df.columns) > 10 else None
+            location_col = df.columns[18] if len(df.columns) > 18 else None  # Единица измерения
+            cost_col = df.columns[50] if len(df.columns) > 50 else None      # Балансовая стоимость
             
             logger.info(f"[Inventory Import] Using column indices: row_num={row_num_col}, name={name_col}, inventory={inventory_col}, location={location_col}, cost={cost_col}")
-            if cost_col:
-                sample_costs = []
-                for i in range(min(5, len(df))):
-                    val = df.iloc[i].get(cost_col) if pd.notna(df.iloc[i].get(cost_col)) else 'N/A'
-                    sample_costs.append(str(val)[:50])
-                logger.info(f"[Inventory Import] Sample values from cost column: {sample_costs}")
             
-            # Ищем начало данных (строки с числовыми значениями в первом столбце)
-            data_start_row = None
-            for idx, row in df.iterrows():
-                val = row.get(inventory_col) if inventory_col else None
-                if pd.notna(val):
-                    try:
-                        num = float(str(val).strip())
-                        if num >= 1 and num <= 100:
-                            data_start_row = idx
-                            logger.info(f"[Inventory Import] Data starts at row {data_start_row}")
-                            break
-                    except (ValueError, TypeError):
-                        continue
+            # Показываем примеры значений из ключевых колонок
+            for col_idx, col_name in [(0, row_num_col), (3, name_col), (10, inventory_col), (50, cost_col)]:
+                if col_name:
+                    samples = []
+                    for i in range(40, min(44, len(df))):
+                        val = df.iloc[i].get(col_name)
+                        if pd.notna(val):
+                            samples.append(str(val).strip()[:50])
+                    logger.info(f"[Inventory Import] Column '{col_name}' (idx {col_idx}) samples: {samples}")
+            
+            # Данные начинаются со строки 40 (пропускаем шапку и заголовок таблицы)
+            data_start_row = 40
+            logger.info(f"[Inventory Import] Data starts at row {data_start_row}")
             
             if data_start_row is None:
                 logger.warning("[Inventory Import] Could not find data start row")
@@ -146,9 +141,40 @@ async def upload_inventory_file(
                             logger.info(f"[Inventory Import] Skipping summary row: {inventory_number}")
                         continue
                     
+                    # Пропускаем строки-заголовки (где name = "N/п", "Наименование" и т.д.)
+                    skip_keywords = ['n/п', 'n п', '№', 'наименование', 'код', 'единица', 'количество', 'балансовая', 'остаточная', 'инвентарный']
+                    if any(kw in name.lower() for kw in skip_keywords):
+                        logger.debug(f"[Inventory Import] Skipping header-like row: name='{name}'")
+                        continue
+                    
+                    # Пропускаем строки, где name — это просто число (признак смещения колонок)
+                    try:
+                        float(name)
+                        logger.debug(f"[Inventory Import] Skipping row with numeric name: '{name}' — likely column offset issue")
+                        continue
+                    except ValueError:
+                        pass
+                    
                     # Логируем первую строку для отладки
                     if processed_count == 0 and error_count == 0:
                         logger.info(f"[Inventory Import] Sample data: row_num={row_num}, name={name[:50]}, inventory={inventory_number[:30] if len(inventory_number) > 0 else ''}, location={location[:50] if location else ''}, cost={cost}")
+                    
+                    # Если после всех проверок name и inventory — это просто числа, вероятно колонки смещены
+                    # Пытаемся найти реальные данные — проверяем, есть ли осмысленные значения
+                    name_is_numeric = False
+                    try:
+                        float(name)
+                        name_is_numeric = True
+                    except ValueError:
+                        pass
+                    
+                    inv_is_short_number = False
+                    if inventory_number and inventory_number.isdigit() and len(inventory_number) <= 4:
+                        inv_is_short_number = True
+                    
+                    if name_is_numeric and inv_is_short_number:
+                        logger.debug(f"[Inventory Import] Skipping row — likely column offset: name='{name}', inventory='{inventory_number}'")
+                        continue
                     
                     # Парсим стоимость (формат: 256,18 -> 256.18)
                     purchase_price = None
@@ -197,6 +223,7 @@ async def upload_inventory_file(
                             purchase_price=purchase_price,
                             current_value=purchase_price,
                             status='active',
+                            is_active=True,
                         )
                         db.add(new_asset)
                         processed_count += 1
@@ -206,11 +233,16 @@ async def upload_inventory_file(
                     error_count += 1
                     logger.error(f"[Inventory Import] Error processing row {idx}: {str(row_error)}", exc_info=True)
             
-            db.commit()
-            logger.info(f"[Inventory Import] Import completed. Added: {processed_count}, Errors: {error_count}")
+            # Коммитим все изменения
+            if processed_count > 0:
+                db.flush()  # Проверка на SQL-ошибки (уникальность, not null и т.д.)
+                db.commit()
+                logger.info(f"[Inventory Import] Import completed. Added: {processed_count}, Errors: {error_count}")
+            else:
+                logger.warning("[Inventory Import] No assets were processed — nothing to commit")
             
             return {
-                "message": "File uploaded and processed successfully",
+                "message": "File uploaded and processed successfully" if processed_count > 0 else "File processed but no assets found",
                 "filename": file.filename,
                 "file_path": file_path,
                 "file_size": len(content),

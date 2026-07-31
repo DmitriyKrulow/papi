@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session, joinedload
 from typing import Optional, List, Any
 from datetime import datetime, date
 from decimal import Decimal
+import logging
 
 from src.infrastructure.db.init_db import get_db
 from src.infrastructure.db.models.repair_request import RepairRequest, RepairStatus, RepairPriority
@@ -148,14 +149,13 @@ def template_to_response(template: RepairTemplate) -> dict:
 def list_repairs(
     request: Request,
     skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
+    limit: int = Query(50, ge=1, le=1000),
     status: Optional[str] = None,
     priority: Optional[str] = None,
     asset_id: Optional[int] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    import logging
     logger = logging.getLogger(__name__)
     logger.info(f"[repairs] list_repairs called, path: {request.url.path}")
     query = db.query(RepairRequest).options(
@@ -164,20 +164,26 @@ def list_repairs(
         joinedload(RepairRequest.assignee)
     )
     
+    # Если не админ, скрываем заявки от скрытых (списанных) активов
+    if current_user.role != "admin":
+        query = query.join(RepairRequest.asset).filter(Asset.is_active == True)
+    
     if status:
         status_value = get_status_value(status)
         query = query.filter(RepairRequest.status == status_value)
+    
     if priority:
         priority_value = get_priority_value(priority)
         query = query.filter(RepairRequest.priority == priority_value)
+    
     if asset_id:
         query = query.filter(RepairRequest.asset_id == asset_id)
     
-    if current_user.role not in ("admin", "responsible"):
+    if status is None and current_user.role not in ("admin", "responsible"):
         query = query.filter(RepairRequest.created_by == current_user.id)
     
-    items = query.offset(skip).limit(limit).all()
     total = query.count()
+    items = query.offset(skip).limit(limit).all()
     
     return {
         "items": [repair_to_response(repair) for repair in items],
@@ -387,6 +393,13 @@ def delete_repair(repair_id: int, db: Session = Depends(get_db), current_user: U
     
     if current_user.role not in ("admin", "responsible") and db_repair.created_by != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    
+    # Запрещаем удаление одобренных или взятых в работу заявок
+    if db_repair.status in ("approved", "in_progress", "completed"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Нельзя удалить одобренную, выполняемую или завершённую заявку. Сначала отмените её."
+        )
     
     db.delete(db_repair)
     db.commit()

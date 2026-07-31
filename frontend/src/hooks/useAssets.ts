@@ -178,7 +178,7 @@ export const useAssets = () => {
     setError(null);
     try {
       const token = await getToken();
-      const response = await axios.put<Asset>(`/api/assets/${id}/`, assetData, {
+      const response = await axios.put<Asset>(`/api/assets/${id}`, assetData, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -199,7 +199,7 @@ export const useAssets = () => {
     setError(null);
     try {
       const token = await getToken();
-      await axios.delete(`/api/assets/${id}/`, {
+      await axios.delete(`/api/assets/${id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -224,7 +224,7 @@ export const useAssets = () => {
           Authorization: `Bearer ${token}`,
         },
       });
-      setAssets((prev) => prev.filter((asset) => asset.id !== id));
+      setAssets((prev) => prev.map((asset) => (asset.id === id ? response.data : asset)));
       return response.data;
     } catch (err) {
       const axiosError = err as AxiosError;

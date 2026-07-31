@@ -6,6 +6,7 @@ import { AssetTypeNames } from '../types';
 import type { Asset, AssetTypeConfig } from '../types';
 import { formatMoney } from '../utils/helpers';
 import toast from 'react-hot-toast';
+import { UserRole } from '../domain/roles';
 import AssetModal from '../components/assets/AssetModal';
 import AddAssetForm from '../components/assets/AddAssetForm';
 import EditAssetForm from '../components/assets/EditAssetForm';
@@ -15,7 +16,7 @@ import {
   Package, Search, Eye, Plus, Upload, Edit, Trash2, Download,
   Filter, ChevronDown, ChevronUp, X,
   ArrowUpDown, ArrowUp, ArrowDown,
-  MoreHorizontal
+  MoreHorizontal, RefreshCw
 } from 'lucide-react';
 
 interface PaginatedResponse {
@@ -119,7 +120,21 @@ const Assets: React.FC = () => {
     return count;
   }, [totalAssets, assets, filterStatus, filterAssetType, filterDepartment]);
 
-  const getToken = async () => localStorage.getItem('token') || '';
+const getToken = async () => localStorage.getItem('token') || '';
+  
+  const getUserRole = () => {
+    const token = localStorage.getItem('token');
+    if (!token) return '';
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return payload.role || '';
+    } catch {
+      return '';
+    }
+  };
+const isAdmin = getUserRole() === UserRole.ADMIN;
+  const [showHidden, setShowHidden] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const fetchData = useCallback(async () => {
     const token = await getToken();
@@ -127,17 +142,17 @@ const Assets: React.FC = () => {
       'Authorization': token ? `Bearer ${token}` : '',
     };
 
-    fetch('/api/asset-types/', { headers })
-      .then(r => r.ok ? r.json().then(setAssetTypeConfigs) : () => {})
+fetch('/api/asset-types/', { headers })
+      .then(r => { if (r.ok) return r.json().then(setAssetTypeConfigs); })
       .catch(e => console.error('Failed to load asset types:', e));
     fetch('/api/admin/placement-assignments/departments', { headers })
-      .then(r => r.ok ? r.json().then(setDepartments) : () => {})
+      .then(r => { if (r.ok) return r.json().then(setDepartments); })
       .catch(e => console.error('Failed to load departments:', e));
     fetch('/api/admin/placement-assignments/employees', { headers })
-      .then(r => r.ok ? r.json().then(setEmployees) : () => {})
+      .then(r => { if (r.ok) return r.json().then(setEmployees); })
       .catch(e => console.error('Failed to load employees:', e));
     fetch('/api/admin/placement-assignments/rooms', { headers })
-      .then(r => r.ok ? r.json().then((data: any[]) => setRooms(
+      .then(r => { if (r.ok) return r.json().then((data: any[]) => setRooms(
         data.map((room: any) => ({
           id: room.id,
           name: room.name,
@@ -147,7 +162,7 @@ const Assets: React.FC = () => {
           department_name: room.department_name || '',
           full_name: room.department_name ? `${room.department_name} - ${room.name}` : room.name,
         }))
-      )) : () => {})
+      )); })
       .catch(e => console.error('Failed to load rooms:', e));
   }, []);
 
@@ -156,7 +171,7 @@ const Assets: React.FC = () => {
   const handleExport = async () => {
     try {
       const token = await getToken();
-      const response = await fetch('/api/export/assets/excel', {
+      const response = await fetch('/api/export/assets', {
         headers: { 'Authorization': token ? `Bearer ${token}` : '' },
       });
       if (response.ok) {
@@ -175,6 +190,37 @@ const Assets: React.FC = () => {
       }
     } catch {
       toast.error('Ошибка соединения с сервером');
+    }
+  };
+
+  const handleRestoreFromExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    if (!window.confirm('ВНИМАНИЕ! Все текущие активы будут удалены и заменены данными из файла. Продолжить?')) {
+      return;
+    }
+    
+    try {
+      const token = await getToken();
+      const response = await fetch('/api/admin/assets/restore-from-excel', {
+        method: 'POST',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
+        body: file,
+      });
+      
+if (response.ok) {
+        const result = await response.json();
+        toast.success(`База восстановлена: удалено ${result.deleted}, создано ${result.created}`);
+        fetchData(); // Перезагрузить вспомогательные данные
+        setRefreshKey(k => k + 1); // Принудительно перезагрузить список активов
+      }
+    } catch (err: any) {
+      toast.error('Ошибка соединения с сервером');
+    } finally {
+      e.target.value = ''; // Сбросить input
     }
   };
 
@@ -207,7 +253,7 @@ const Assets: React.FC = () => {
   const handleEditAsset = async (asset: Asset) => {
     try {
       const token = await getToken();
-      const response = await fetch(`/api/assets/${asset.id}/`, {
+      const response = await fetch(`/api/assets/${asset.id}`, {
         method: 'PUT',
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
@@ -233,11 +279,11 @@ const Assets: React.FC = () => {
     }
   };
 
-  const handleDeleteAsset = async (id: number) => {
-    if (!window.confirm('Вы уверены, что хотите удалить этот актив?')) return;
+const handleDeleteAsset = async (id: number) => {
+    if (!window.confirm('Вы уверены, что хотите списать этот актив? Он будет скрыт из общего списка.')) return;
     try {
       const token = await getToken();
-      const response = await fetch(`/api/assets/${id}/`, {
+      const response = await fetch(`/api/assets/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
@@ -246,7 +292,8 @@ const Assets: React.FC = () => {
       
       if (response.ok) {
         setAssets((prev) => prev.filter((a) => a.id !== id));
-        toast.success('Актив удален');
+        setTotalAssets((prev) => Math.max(0, prev - 1));
+        toast.success('Актив списан');
       } else {
         const errorData = await response.json();
         toast.error(errorData.detail || 'Ошибка удаления актива');
@@ -256,13 +303,65 @@ const Assets: React.FC = () => {
     }
   };
 
+  const handleRestoreAsset = async (id: number) => {
+    try {
+      const token = await getToken();
+      const response = await fetch(`/api/assets/${id}/restore`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
+      });
+      
+      if (response.ok) {
+        const updatedAsset = await response.json();
+        setAssets((prev) => prev.map((a) => (a.id === id ? updatedAsset : a)));
+        toast.success('Актив восстановлен');
+        setIsDetailsModalOpen(false);
+        setCurrentAsset(null);
+      } else {
+        const errorData = await response.json();
+        toast.error(errorData.detail || 'Ошибка восстановления');
+      }
+    } catch (err: any) {
+      toast.error('Ошибка соединения с сервером');
+    }
+  };
+
+  const handleHardDeleteAsset = async (id: number) => {
+    if (!window.confirm('ВНИМАНИЕ! Актив будет удален НАВСЕГДА вместе со всеми связанными заявками на ремонт. Это действие необратимо. Продолжить?')) return;
+    try {
+      const token = await getToken();
+      const response = await fetch(`/api/assets/${id}/hard`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
+      });
+      
+      if (response.ok) {
+        setAssets((prev) => prev.filter((a) => a.id !== id));
+        setTotalAssets((prev) => Math.max(0, prev - 1));
+        toast.success('Актив удален навсегда');
+        setIsDetailsModalOpen(false);
+        setCurrentAsset(null);
+      } else {
+        const errorData = await response.json();
+        toast.error(errorData.detail || 'Ошибка удаления');
+      }
+    } catch (err: any) {
+      toast.error('Ошибка соединения с сервером');
+    }
+  };
+
   const handleViewDetails = (asset: Asset) => {
     setCurrentAsset(asset);
     setIsDetailsModalOpen(true);
   };
 
-  const handleEditClick = (asset: Asset) => {
+const handleEditClick = (asset: Asset) => {
     setCurrentAsset(asset);
+    setIsDetailsModalOpen(false);
     setIsEditModalOpen(true);
   };
 
@@ -292,8 +391,9 @@ const Assets: React.FC = () => {
           limit: String(pageSize),
         });
         if (searchTerm) params.set('search', searchTerm);
-        if (filterStatus) params.set('status', filterStatus);
+if (filterStatus) params.set('status', filterStatus);
         if (filterDepartment) params.set('department', filterDepartment);
+        if (showHidden) params.set('include_hidden', 'true');
 
         const token = await getToken();
         const response = await fetch(`/api/assets/?${params}`, {
@@ -316,8 +416,8 @@ const Assets: React.FC = () => {
         setLoading(false);
       }
     };
-    loadAssets();
-  }, [currentPage, pageSize, searchTerm, filterStatus, filterDepartment]);
+loadAssets();
+  }, [currentPage, pageSize, searchTerm, filterStatus, filterDepartment, showHidden, refreshKey]);
 
   const handleSort = (column: SortColumn) => {
     setSortConfig(prev => ({
@@ -390,6 +490,24 @@ const Assets: React.FC = () => {
             <Download className="w-4 h-4" />
             Экспорт
           </button>
+          {isAdmin && (
+            <>
+              <input
+                type="file"
+                id="restore-file"
+                accept=".xlsx,.xls"
+                onChange={handleRestoreFromExcel}
+                className="hidden"
+              />
+              <button
+                onClick={() => document.getElementById('restore-file')?.click()}
+                className="bg-amber-600 text-white px-4 py-2 rounded-lg hover:bg-amber-700 transition flex items-center gap-2 whitespace-nowrap shadow-sm"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Восстановить из файла
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -402,8 +520,20 @@ const Assets: React.FC = () => {
             placeholder="Поиск по названию, инв. номеру..."
             value={searchTerm}
             onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
           />
+          {isAdmin && (
+            <button
+              onClick={() => { setShowHidden(!showHidden); setCurrentPage(1); }}
+              className={`px-3 py-2 rounded-lg transition flex items-center gap-1.5 whitespace-nowrap text-sm border ${
+                showHidden
+                  ? 'bg-amber-100 text-amber-700 border-amber-300'
+                  : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              {showHidden ? '👁️' : '🙈'} Скрытые
+            </button>
+          )}
           <button
             onClick={() => setFiltersExpanded(!filtersExpanded)}
             className={`px-3 py-2 rounded-lg transition flex items-center gap-1.5 whitespace-nowrap text-sm border ${
@@ -873,7 +1003,7 @@ const Assets: React.FC = () => {
       <ImportAssetsModal
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
-        onSuccess={() => { setCurrentPage(1); }}
+        onSuccess={() => { setCurrentPage(1); setRefreshKey(k => k + 1); }}
       />
 
       {currentAsset && (
@@ -901,11 +1031,13 @@ const Assets: React.FC = () => {
             onClose={() => setIsDetailsModalOpen(false)}
             title={`Детали: ${currentAsset.inventory_number}`}
           >
-            <AssetDetailsModal
+<AssetDetailsModal
               asset={currentAsset}
               onClose={() => setIsDetailsModalOpen(false)}
               onEdit={handleEditClick}
               onDelete={handleDeleteAsset}
+              onHardDelete={isAdmin ? handleHardDeleteAsset : undefined}
+              onRestore={isAdmin ? handleRestoreAsset : undefined}
             />
           </AssetModal>
         </>

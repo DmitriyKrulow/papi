@@ -50,7 +50,68 @@ my_project/
 └── .env                           # Переменные окружения
 
 
-Совет: если порт по умолчанию уже используется, остановите отладчик и откройте палитру команд (Shift+cmd+P), найдите Debug: Add Configuration, выберите Python Debugger, а затем FastAPI. Это создаст пользовательский файл конфигурации в .vscode/launch.json, который вы сможете редактировать. Добавьте в "args":[] следующее, чтобы задать собственный порт: "--port=5000". Сохраните файл и перезапустите отладчик с помощью (F5).
+## Запуск проекта
+
+### Требования
+
+- Python 3.12+
+- Node.js 18+
+- PostgreSQL (локально или Docker)
+
+### Бэкенд
+
+1. Перейдите в директорию `backend/`:
+   ```bash
+   cd backend
+   ```
+
+2. Установите зависимости:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. Настройте переменные окружения (создайте `.env` на основе `.env.example`):
+
+4. Запустите сервер:
+   ```bash
+   python -m src.infrastructure.main
+   ```
+   или
+   ```bash
+   python main.py
+   ```
+
+   Сервер запустится на `http://127.0.0.1:8888`.
+
+   > **Примечание:** При использовании `python main.py` включён `reload=True` для автоматической перезагрузки при изменении файлов.
+
+### Фронтенд
+
+1. Перейдите в директорию `frontend/`:
+   ```bash
+   cd frontend
+   ```
+
+2. Установите зависимости:
+   ```bash
+   npm install
+   ```
+
+3. Запустите dev-сервер:
+   ```bash
+   npm run dev
+   ```
+
+   Фронтенд запустится на `http://localhost:5173`.
+
+---
+
+## Известные предупреждения
+
+- **FastAPI `on_event`** — в `main.py` используется устаревший декоратор `@app.on_event()`. Рекомендуется перейти на lifespan-хендлеры: [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+- **npm audit (react-router)** — уязвимость `GHSA-qwww-vcr4-c8h2` затронуто версии `>=7.12.0, <8.3.0`. Текущая версия `7.11.0` **не уязвима**. Когда появится версия `8.3.0`, обновитесь через `npm install react-router-dom@latest`.
+
+---
 
 # pip install -r requirements.txt
 # python.exe -m pip install --upgrade pip

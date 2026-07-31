@@ -246,10 +246,10 @@ async def get_inventory_report(db: Session = Depends(get_db)):
     try:
         from src.infrastructure.db.models.asset import Asset
         
-        total_assets = db.query(Asset).count()
-        active_assets = db.query(Asset).filter(Asset.status == "active").count()
-        maintenance_assets = db.query(Asset).filter(Asset.status == "maintenance").count()
-        written_off_assets = db.query(Asset).filter(Asset.status == "written_off").count()
+        total_assets = db.query(Asset).filter(Asset.is_active == True).count()
+        active_assets = db.query(Asset).filter(Asset.is_active == True, Asset.status == "active").count()
+        maintenance_assets = db.query(Asset).filter(Asset.is_active == True, Asset.status == "maintenance").count()
+        written_off_assets = db.query(Asset).filter(Asset.is_active == True, Asset.status == "written_off").count()
         
         return JSONResponse(content={
             "title": "Инвентаризационный отчет",

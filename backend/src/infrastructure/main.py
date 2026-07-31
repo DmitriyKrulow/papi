@@ -30,11 +30,16 @@ def root():
 def db_check():
     try:
         from sqlalchemy import text
-        from src.infrastructure.db.session import SessionLocal
+        from src.infrastructure.db.session import SessionLocal, engine
         db = SessionLocal()
-        db.execute(text("SELECT 1"))
+        result = db.execute(text("SELECT current_database(), current_user, version()")).fetchone()
         db.close()
-        return {"status": "connected", "database": "sqlite"}
+        return {
+            "status": "connected",
+            "database": result[0] if result else "unknown",
+            "user": result[1] if result else "unknown",
+            "version": str(result[2])[:60] if result else "unknown",
+        }
     except Exception as e:
         return {"status": "disconnected", "error": str(e)}
 
@@ -42,6 +47,7 @@ def db_check():
 def register_routers():
     from src.presentation.http.routers.assets import router as assets_router
     from src.presentation.http.routers.assets_export import router as assets_export_router
+    from src.presentation.http.routers.assets_restore import router as assets_restore_router
     from src.presentation.http.routers.users import router as users_router
     from src.presentation.http.routers.auth import router as auth_router
     from src.presentation.http.routers.repairs import router as repairs_router
@@ -58,6 +64,7 @@ def register_routers():
 
     app.include_router(assets_router, prefix="/api")
     app.include_router(assets_export_router)
+    app.include_router(assets_restore_router)
     app.include_router(users_router, prefix="/api")
     app.include_router(auth_router, prefix="/api")
     app.include_router(repairs_router, prefix="/api")
@@ -119,9 +126,10 @@ async def add_trailing_slash(request: Request, call_next):
         response.headers['Access-Control-Expose-Headers'] = 'Authorization'
         return response
     
-    # Добавляем trailing slash, если его нет (кроме корня и статических путей)
+# Добавляем trailing slash, если его нет (кроме корня и статических путей)
     # Исключаем API пути из редиректа, чтобы избежать проблем с CORS
-    if not request.url.path.endswith("/") and request.url.path != "/" and "." not in request.url.path.split("/")[-1] and not request.url.path.startswith("/api"):
+    # Также исключаем /docs, /openapi.json, /redoc — у них redirect_slashes=False ломает маршруты
+    if not request.url.path.endswith("/") and request.url.path != "/" and "." not in request.url.path.split("/")[-1] and not request.url.path.startswith("/api") and request.url.path not in ("/docs", "/openapi.json", "/redoc"):
         from fastapi.responses import RedirectResponse
         redirect_url = request.url.path + "/"
         if request.url.query:
@@ -129,6 +137,15 @@ async def add_trailing_slash(request: Request, call_next):
         response = RedirectResponse(url=redirect_url, status_code=308)
         response.headers['Access-Control-Allow-Credentials'] = 'true'
         response.headers['Access-Control-Expose-Headers'] = 'Authorization'
+        return response
+    
+    # Редирект /docs/ → /docs (и /redoc/ → /redoc), т.к. redirect_slashes=False
+    if request.url.path in ("/docs/", "/redoc/"):
+        from fastapi.responses import RedirectResponse
+        redirect_url = request.url.path.rstrip("/")
+        if request.url.query:
+            redirect_url += "?" + request.url.query
+        response = RedirectResponse(url=redirect_url, status_code=307)
         return response
     
     logger.info(f"[Request] {request.method} {request.url.path}")

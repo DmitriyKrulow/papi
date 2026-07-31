@@ -93,7 +93,11 @@ const AssetEdit: React.FC = () => {
 
   const handleSubmit = async (data: any) => {
     try {
-      await updateAsset(parseInt(id || '0'), data);
+      if (!id) {
+        console.error('Asset ID is missing');
+        return;
+      }
+      await updateAsset(parseInt(id), data);
       navigate(`/assets/${id}`);
     } catch (err) {
       console.error('Failed to update asset:', err);

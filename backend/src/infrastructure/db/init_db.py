@@ -4,9 +4,6 @@ import os
 
 from sqlalchemy.orm import Session
 
-from dotenv import load_dotenv
-load_dotenv()
-
 from src.infrastructure.db.models.user import User
 from src.infrastructure.db.models import Base
 from src.infrastructure.db.session import SessionLocal, engine

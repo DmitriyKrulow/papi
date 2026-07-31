@@ -19,7 +19,17 @@ export default defineConfig({
           });
         },
       },
-      "/docs": {
+"/docs": {
+        target: "http://localhost:8888",
+        changeOrigin: true,
+        secure: false,
+      },
+      "/openapi.json": {
+        target: "http://localhost:8888",
+        changeOrigin: true,
+        secure: false,
+      },
+      "/oauth2-redirect": {
         target: "http://localhost:8888",
         changeOrigin: true,
         secure: false,
