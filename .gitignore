@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Uploaded and generated files (should not be tracked)
+backend/uploads/
+
+# Test Excel files in project root
+test_*.xlsx
+test_*.csv
+
+# Test scripts
+create_test_data.py
+
+# Environment files
+.env
+*.env.local
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
