@@ -10,7 +10,7 @@
             "request": "launch",
             "module": "uvicorn",
             "args": [
-                "backend.main:app",
+                "src.infrastructure.main:app",
                 "--reload",
                 "--port=8888"
             ],
