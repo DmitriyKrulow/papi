@@ -43,8 +43,3 @@ class MaintenanceEvent(Base):
 
     def __repr__(self) -> str:
         return f"<MaintenanceEvent(id={self.id}, asset_id={self.asset_id}, type='{self.event_type}', date={self.event_date})>"
-
-
-# Добавляем связь Asset.maintenance_events
-from .asset import Asset
-Asset.maintenance_events = relationship("MaintenanceEvent", back_populates="asset")

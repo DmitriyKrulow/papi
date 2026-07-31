@@ -12,4 +12,6 @@ python-multipart
 sqlalchemy
 openpyxl
 pydantic
+pydantic[email]
 pydantic-settings
+reportlab

@@ -74,6 +74,7 @@ class Asset(Base):
 
     repair_requests = relationship("RepairRequest", back_populates="asset")
     maintenance_records = relationship("MaintenanceRecord", back_populates="asset")
+    maintenance_events = relationship("MaintenanceEvent", back_populates="asset")
     movement_records = relationship("MovementRecord", back_populates="asset")
     asset_photos = relationship("AssetPhoto", back_populates="asset")
     asset_type_config = relationship("AssetTypeConfig", back_populates="assets")
