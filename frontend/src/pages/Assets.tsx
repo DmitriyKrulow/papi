@@ -512,23 +512,23 @@ loadAssets();
       </div>
 
       {/* Search & Filters */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
         <div className="flex items-center gap-2 mb-3">
-          <Search className="w-4 h-4 text-gray-400" />
+          <Search className="w-4 h-4 text-gray-400 dark:text-gray-500" />
           <input
             type="text"
             placeholder="Поиск по названию, инв. номеру..."
             value={searchTerm}
             onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+            className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
           />
           {isAdmin && (
             <button
               onClick={() => { setShowHidden(!showHidden); setCurrentPage(1); }}
               className={`px-3 py-2 rounded-lg transition flex items-center gap-1.5 whitespace-nowrap text-sm border ${
                 showHidden
-                  ? 'bg-amber-100 text-amber-700 border-amber-300'
-                  : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                  ? 'bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900 dark:text-amber-300 dark:border-amber-700'
+                  : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-600'
               }`}
             >
               {showHidden ? '👁️' : '🙈'} Скрытые
@@ -538,8 +538,8 @@ className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus
             onClick={() => setFiltersExpanded(!filtersExpanded)}
             className={`px-3 py-2 rounded-lg transition flex items-center gap-1.5 whitespace-nowrap text-sm border ${
               filtersExpanded || activeFilterCount > 0
-                ? 'bg-blue-50 text-blue-700 border-blue-200'
-                : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-700'
+                : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-600'
             }`}
           >
             <Filter className="w-4 h-4" />
@@ -554,7 +554,7 @@ className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus
           {activeFilterCount > 0 && (
             <button
               onClick={() => { setFilterStatus(''); setFilterAssetType(''); setFilterDepartment(''); setFilterLocation(''); setFilterEmployee(''); setCurrentPage(1); }}
-              className="px-3 py-2 text-sm text-blue-600 hover:text-blue-800 border border-blue-200 rounded-lg hover:bg-blue-50 transition whitespace-nowrap"
+              className="px-3 py-2 text-sm text-blue-600 hover:text-blue-800 border border-blue-200 rounded-lg hover:bg-blue-50 transition whitespace-nowrap dark:text-blue-400 dark:hover:text-blue-300 dark:border-blue-700 dark:hover:bg-blue-900"
             >
               Сбросить
             </button>
@@ -562,11 +562,11 @@ className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus
         </div>
 
         {filtersExpanded && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-3 border-t border-gray-100">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-3 border-t border-gray-100 dark:border-gray-700">
             <select
               value={filterStatus}
               onChange={(e) => { setFilterStatus(e.target.value); setCurrentPage(1); }}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
             >
               <option value="">Все статусы</option>
               {Object.entries(AssetStatusMap).map(([code, info]) => (
@@ -576,7 +576,7 @@ className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus
             <select
               value={filterAssetType}
               onChange={(e) => { setFilterAssetType(e.target.value); setCurrentPage(1); }}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
             >
               <option value="">Все типы</option>
               {assetTypeConfigs.map(config => (
@@ -589,7 +589,7 @@ className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus
                 <button
                   type="button"
                   onClick={() => { setDeptDropdownOpen(!deptDropdownOpen); setRoomDropdownOpen(false); setEmployeeDropdownOpen(false); }}
-                  className="w-full pl-7 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-left bg-white hover:bg-gray-50 transition"
+                  className="w-full pl-7 pr-8 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-left bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-600 transition"
                 >
                   {filterDepartment
                     ? departments.find(d => d.code === filterDepartment)?.full_name
@@ -598,7 +598,7 @@ className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus
                 {filterDepartment && (
                   <button
                     onClick={(e) => { e.stopPropagation(); setFilterDepartment(''); setCurrentPage(1); }}
-                    className="absolute right-2 top-1.5 text-gray-400 hover:text-gray-600"
+                    className="absolute right-7 top-1.5 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -608,8 +608,8 @@ className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus
               {deptDropdownOpen && (
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setDeptDropdownOpen(false)} />
-                  <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-hidden" style={{ top: '100%' }}>
-                    <div className="p-2 border-b border-gray-100">
+                  <div className="absolute z-20 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-hidden" style={{ top: '100%' }}>
+                    <div className="p-2 border-b border-gray-100 dark:border-gray-700">
                       <div className="relative">
                         <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
                         <input
@@ -617,7 +617,7 @@ className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus
                           placeholder="Поиск..."
                           value={departmentSearch}
                           onChange={(e) => setDepartmentSearch(e.target.value)}
-                          className="w-full pl-7 pr-2 py-1.5 border border-gray-200 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="w-full pl-7 pr-2 py-1.5 border border-gray-200 dark:border-gray-600 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                         />
                       </div>
                     </div>
@@ -633,10 +633,10 @@ className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus
                           <button
                             key={dept.id}
                             onClick={() => { setFilterDepartment(dept.code); setCurrentPage(1); setDeptDropdownOpen(false); setDepartmentSearch(''); }}
-                            className={`w-full px-3 py-2 text-left text-sm hover:bg-blue-50 transition ${filterDepartment === dept.code ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'}`}
+                            className={`w-full px-3 py-2 text-left text-sm hover:bg-blue-50 dark:hover:bg-gray-700 transition ${filterDepartment === dept.code ? 'bg-blue-50 text-blue-700 font-medium dark:bg-blue-900 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'}`}
                           >
                             <div className="truncate">{dept.full_name}</div>
-                            <div className="text-xs text-gray-400 truncate">{dept.code}</div>
+                            <div className="text-xs text-gray-400 truncate dark:text-gray-500">{dept.code}</div>
                           </button>
                         ))}
                       {departments.filter(dept =>
@@ -645,7 +645,7 @@ className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus
                         dept.code.toLowerCase().includes(departmentSearch.toLowerCase()) ||
                         dept.name.toLowerCase().includes(departmentSearch.toLowerCase())
                       ).length === 0 && (
-                        <div className="px-3 py-4 text-sm text-gray-400 text-center">Ничего не найдено</div>
+                        <div className="px-3 py-4 text-sm text-gray-400 text-center dark:text-gray-500">Ничего не найдено</div>
                       )}
                     </div>
                   </div>
@@ -658,7 +658,7 @@ className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus
                 <button
                   type="button"
                   onClick={() => { setRoomDropdownOpen(!roomDropdownOpen); setDeptDropdownOpen(false); setEmployeeDropdownOpen(false); }}
-                  className="w-full pl-7 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-left bg-white hover:bg-gray-50 transition"
+                  className="w-full pl-7 pr-8 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-left bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-600 transition"
                 >
                   {filterLocation
                     ? rooms.find(r => r.name === filterLocation)?.full_name
@@ -667,7 +667,7 @@ className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus
                 {filterLocation && (
                   <button
                     onClick={(e) => { e.stopPropagation(); setFilterLocation(''); setCurrentPage(1); }}
-                    className="absolute right-2 top-1.5 text-gray-400 hover:text-gray-600"
+                    className="absolute right-7 top-1.5 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -677,8 +677,8 @@ className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus
               {roomDropdownOpen && (
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setRoomDropdownOpen(false)} />
-                  <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-hidden" style={{ top: '100%' }}>
-                    <div className="p-2 border-b border-gray-100">
+                  <div className="absolute z-20 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-hidden" style={{ top: '100%' }}>
+                    <div className="p-2 border-b border-gray-100 dark:border-gray-700">
                       <div className="relative">
                         <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
                         <input
@@ -686,7 +686,7 @@ className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus
                           placeholder="Поиск..."
                           value={roomSearch}
                           onChange={(e) => setRoomSearch(e.target.value)}
-                          className="w-full pl-7 pr-2 py-1.5 border border-gray-200 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="w-full pl-7 pr-2 py-1.5 border border-gray-200 dark:border-gray-600 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                         />
                       </div>
                     </div>
@@ -702,11 +702,11 @@ className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus
                           <button
                             key={room.id}
                             onClick={() => { setFilterLocation(room.name); setCurrentPage(1); setRoomDropdownOpen(false); setRoomSearch(''); }}
-                            className={`w-full px-3 py-2 text-left text-sm hover:bg-blue-50 transition ${filterLocation === room.name ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'}`}
+                            className={`w-full px-3 py-2 text-left text-sm hover:bg-blue-50 dark:hover:bg-gray-700 transition ${filterLocation === room.name ? 'bg-blue-50 text-blue-700 font-medium dark:bg-blue-900 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'}`}
                           >
                             <div className="truncate">{room.full_name}</div>
                             {(room.floor || room.building) && (
-                              <div className="text-xs text-gray-400 truncate">
+                              <div className="text-xs text-gray-400 truncate dark:text-gray-500">
                                 {room.floor ? `Этаж: ${room.floor}` : ''} {room.building ? `Корпус: ${room.building}` : ''}
                               </div>
                             )}
@@ -718,7 +718,7 @@ className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus
                         room.name.toLowerCase().includes(roomSearch.toLowerCase()) ||
                         (room.department_name || '').toLowerCase().includes(roomSearch.toLowerCase())
                       ).length === 0 && (
-                        <div className="px-3 py-4 text-sm text-gray-400 text-center">Ничего не найдено</div>
+                        <div className="px-3 py-4 text-sm text-gray-400 text-center dark:text-gray-500">Ничего не найдено</div>
                       )}
                     </div>
                   </div>
@@ -731,7 +731,7 @@ className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus
                 <button
                   type="button"
                   onClick={() => { setEmployeeDropdownOpen(!employeeDropdownOpen); setDeptDropdownOpen(false); setRoomDropdownOpen(false); }}
-                  className="w-full pl-7 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-left bg-white hover:bg-gray-50 transition"
+                  className="w-full pl-7 pr-8 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-left bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-600 transition"
                 >
                   {filterEmployee
                     ? employees.find(e => e.full_name === filterEmployee)?.full_name
@@ -740,7 +740,7 @@ className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus
                 {filterEmployee && (
                   <button
                     onClick={(e) => { e.stopPropagation(); setFilterEmployee(''); setCurrentPage(1); }}
-                    className="absolute right-2 top-1.5 text-gray-400 hover:text-gray-600"
+                    className="absolute right-7 top-1.5 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -750,8 +750,8 @@ className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus
               {employeeDropdownOpen && (
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setEmployeeDropdownOpen(false)} />
-                  <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-hidden" style={{ top: '100%' }}>
-                    <div className="p-2 border-b border-gray-100">
+                  <div className="absolute z-20 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-hidden" style={{ top: '100%' }}>
+                    <div className="p-2 border-b border-gray-100 dark:border-gray-700">
                       <div className="relative">
                         <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
                         <input
@@ -759,7 +759,7 @@ className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus
                           placeholder="Поиск..."
                           value={employeeSearch}
                           onChange={(e) => setEmployeeSearch(e.target.value)}
-                          className="w-full pl-7 pr-2 py-1.5 border border-gray-200 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="w-full pl-7 pr-2 py-1.5 border border-gray-200 dark:border-gray-600 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                         />
                       </div>
                     </div>
@@ -775,11 +775,11 @@ className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus
                           <button
                             key={emp.id}
                             onClick={() => { setFilterEmployee(emp.full_name); setCurrentPage(1); setEmployeeDropdownOpen(false); setEmployeeSearch(''); }}
-                            className={`w-full px-3 py-2 text-left text-sm hover:bg-blue-50 transition ${filterEmployee === emp.full_name ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'}`}
+                            className={`w-full px-3 py-2 text-left text-sm hover:bg-blue-50 dark:hover:bg-gray-700 transition ${filterEmployee === emp.full_name ? 'bg-blue-50 text-blue-700 font-medium dark:bg-blue-900 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'}`}
                           >
                             <div className="truncate">{emp.full_name}</div>
                             {emp.position && (
-                              <div className="text-xs text-gray-400 truncate">{emp.position}</div>
+                              <div className="text-xs text-gray-400 truncate dark:text-gray-500">{emp.position}</div>
                             )}
                           </button>
                         ))}
@@ -789,7 +789,7 @@ className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus
                         (emp.position || '').toLowerCase().includes(employeeSearch.toLowerCase()) ||
                         (emp.department_name || '').toLowerCase().includes(employeeSearch.toLowerCase())
                       ).length === 0 && (
-                        <div className="px-3 py-4 text-sm text-gray-400 text-center">Ничего не найдено</div>
+                        <div className="px-3 py-4 text-sm text-gray-400 text-center dark:text-gray-500">Ничего не найдено</div>
                       )}
                     </div>
                   </div>
@@ -800,12 +800,12 @@ className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus
         )}
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      {/* Table / Mobile Cards */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
         {getSortedAndFilteredAssets.length === 0 ? (
           <div className="text-center py-12">
             <div className="text-4xl mb-4">📭</div>
-            <p className="text-gray-500">
+            <p className="text-gray-500 dark:text-gray-400">
               {searchTerm || filterStatus || filterAssetType || filterDepartment || filterLocation || filterEmployee
                 ? 'Ничего не найдено по заданным параметрам'
                 : 'Нет активов для отображения'}
@@ -813,7 +813,7 @@ className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus
             {(searchTerm || filterStatus || filterAssetType || filterDepartment || filterLocation || filterEmployee) && (
               <button
                 onClick={() => { setSearchTerm(''); setFilterStatus(''); setFilterAssetType(''); setFilterDepartment(''); setFilterLocation(''); setFilterEmployee(''); setCurrentPage(1); }}
-                className="mt-3 text-sm text-blue-600 hover:text-blue-800"
+                className="mt-3 text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
               >
                 Сбросить фильтры
               </button>
@@ -821,91 +821,92 @@ className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
+            {/* Desktop Table (>=768px) */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50 border-b">
+                <thead className="bg-gray-50 dark:bg-gray-700 border-b">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider border-r border-gray-100">
-                      <button onClick={() => handleSort('inventory_number')} className="flex items-center hover:text-gray-700 transition">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-r border-gray-100 dark:border-gray-600">
+                      <button onClick={() => handleSort('inventory_number')} className="flex items-center hover:text-gray-700 dark:hover:text-gray-300 transition">
                         Инв. номер <SortIcon column="inventory_number" />
                       </button>
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider border-r border-gray-100">
-                      <button onClick={() => handleSort('name')} className="flex items-center hover:text-gray-700 transition">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-r border-gray-100 dark:border-gray-600">
+                      <button onClick={() => handleSort('name')} className="flex items-center hover:text-gray-700 dark:hover:text-gray-300 transition">
                         Название <SortIcon column="name" />
                       </button>
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider border-r border-gray-100">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-r border-gray-100 dark:border-gray-600">
                       Тип
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider border-r border-gray-100">
-                      <button onClick={() => handleSort('current_value')} className="flex items-center hover:text-gray-700 transition">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-r border-gray-100 dark:border-gray-600">
+                      <button onClick={() => handleSort('current_value')} className="flex items-center hover:text-gray-700 dark:hover:text-gray-300 transition">
                         Стоимость <SortIcon column="current_value" />
                       </button>
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider border-r border-gray-100">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-r border-gray-100 dark:border-gray-600">
                       Статус
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider border-r border-gray-100">
-                      <button onClick={() => handleSort('department_name')} className="flex items-center hover:text-gray-700 transition">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-r border-gray-100 dark:border-gray-600">
+                      <button onClick={() => handleSort('department_name')} className="flex items-center hover:text-gray-700 dark:hover:text-gray-300 transition">
                         Подразделение <SortIcon column="department_name" />
                       </button>
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider border-r border-gray-100">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-r border-gray-100 dark:border-gray-600">
                       Сотрудник
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider border-r border-gray-100">
-                      <button onClick={() => handleSort('location_address')} className="flex items-center hover:text-gray-700 transition">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-r border-gray-100 dark:border-gray-600">
+                      <button onClick={() => handleSort('location_address')} className="flex items-center hover:text-gray-700 dark:hover:text-gray-300 transition">
                         Местоположение <SortIcon column="location_address" />
                       </button>
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      <button onClick={() => handleSort('responsible_person')} className="flex items-center hover:text-gray-700 transition">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      <button onClick={() => handleSort('responsible_person')} className="flex items-center hover:text-gray-700 dark:hover:text-gray-300 transition">
                         Ответственный <SortIcon column="responsible_person" />
                       </button>
                     </th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider w-24">
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-24">
                       Действия
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                   {getSortedAndFilteredAssets.map((asset) => {
                     const typeInfo = getAssetTypeLabel(asset.asset_type);
                     return (
-                      <tr key={asset.id} className="hover:bg-gray-50 transition">
-                        <td className="px-4 py-3 text-sm font-mono text-gray-900 border-r border-gray-50">
+                      <tr key={asset.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+                        <td className="px-4 py-3 text-sm font-mono text-gray-900 dark:text-gray-100 border-r border-gray-50 dark:border-gray-700">
                           {asset.inventory_number}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-900 font-medium border-r border-gray-50">
+                        <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100 font-medium border-r border-gray-50 dark:border-gray-700">
                           {asset.name}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-600 border-r border-gray-50">
+                        <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400 border-r border-gray-50 dark:border-gray-700">
                           {typeInfo.icon} {typeInfo.name}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-900 border-r border-gray-50">
+                        <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100 border-r border-gray-50 dark:border-gray-700">
                           {formatMoney(asset.current_value)}
                         </td>
-                        <td className="px-4 py-3 border-r border-gray-50">
+                        <td className="px-4 py-3 border-r border-gray-50 dark:border-gray-700">
                           {getStatusBadge(asset.status)}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-50">
+                        <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 border-r border-gray-50 dark:border-gray-700">
                           {asset.department_name || asset.department_code || '—'}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-600 border-r border-gray-50">
+                        <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400 border-r border-gray-50 dark:border-gray-700">
                           {asset.employee_name || '—'}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-50">
+                        <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 border-r border-gray-50 dark:border-gray-700">
                           {asset.location_address || '—'}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-600">
+                        <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
                           {asset.responsible_person || '—'}
                         </td>
                         <td className="px-4 py-3 text-center">
                           <div className="flex items-center justify-center gap-1">
                             <button
                               onClick={() => { setCurrentAsset(asset); setIsDetailsModalOpen(true); }}
-                              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition dark:hover:bg-gray-700"
                               title="Просмотреть"
                               aria-label="Просмотреть"
                             >
@@ -913,7 +914,7 @@ className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus
                             </button>
                             <button
                               onClick={() => { setCurrentAsset(asset); setIsEditModalOpen(true); }}
-                              className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition"
+                              className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition dark:hover:bg-gray-700"
                               title="Редактировать"
                               aria-label="Редактировать"
                             >
@@ -921,7 +922,7 @@ className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus
                             </button>
                             <button
                               onClick={() => handleDeleteAsset(asset.id)}
-                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition dark:hover:bg-gray-700"
                               title="Скрыть актив"
                               aria-label="Скрыть актив"
                             >
@@ -936,14 +937,80 @@ className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus
               </table>
             </div>
 
+            {/* Mobile Cards (<768px) */}
+            <div className="md:hidden divide-y divide-gray-200 dark:divide-gray-700">
+              {getSortedAndFilteredAssets.map((asset) => {
+                const typeInfo = getAssetTypeLabel(asset.asset_type);
+                return (
+                  <div 
+                    key={asset.id} 
+                    className="p-4 space-y-2 active:bg-gray-50 dark:active:bg-gray-700 transition cursor-pointer"
+                    onClick={() => { setCurrentAsset(asset); setIsDetailsModalOpen(true); }}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-mono font-semibold text-gray-900 dark:text-gray-100 truncate">
+                          {asset.inventory_number}
+                        </div>
+                        <div className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
+                          {asset.name}
+                        </div>
+                      </div>
+                      {getStatusBadge(asset.status)}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="text-gray-600 dark:text-gray-400">
+                        {typeInfo.icon} {typeInfo.name}
+                      </div>
+                      <div className="text-gray-900 dark:text-gray-100 font-medium">
+                        {formatMoney(asset.current_value)}
+                      </div>
+                      <div className="text-gray-600 dark:text-gray-400 col-span-2 truncate">
+                        🏢 {asset.department_name || asset.department_code || '—'}
+                      </div>
+                      <div className="text-gray-600 dark:text-gray-400 truncate">
+                        👤 {asset.employee_name || '—'}
+                      </div>
+                      <div className="text-gray-600 dark:text-gray-400 truncate">
+                        📍 {asset.location_address || '—'}
+                      </div>
+                      <div className="text-gray-600 dark:text-gray-400 col-span-2 truncate">
+                        🎯 {asset.responsible_person || '—'}
+                      </div>
+                    </div>
+                    <div className="flex gap-2 pt-2 border-t border-gray-200 dark:border-gray-700" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => { setCurrentAsset(asset); setIsDetailsModalOpen(true); }}
+                        className="flex-1 px-3 py-2 text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 transition font-medium"
+                      >
+                        👁️ Просмотр
+                      </button>
+                      <button
+                        onClick={() => { setCurrentAsset(asset); setIsEditModalOpen(true); }}
+                        className="flex-1 px-3 py-2 text-xs bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/50 transition font-medium"
+                      >
+                        ✏️ Изменить
+                      </button>
+                      <button
+                        onClick={() => handleDeleteAsset(asset.id)}
+                        className="px-3 py-2 text-xs bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/50 transition"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
             {/* Pagination */}
-            <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm text-gray-600">
+            <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                 <span>Показано:</span>
                 <select
                   value={pageSize}
                   onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
-                  className="px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                 >
                   {PAGE_SIZES.map(size => (
                     <option key={size} value={size}>{size}</option>
@@ -955,31 +1022,31 @@ className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus
                 <button
                   onClick={() => setCurrentPage(1)}
                   disabled={currentPage === 1}
-                  className="px-2 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed text-gray-700 dark:text-gray-300"
                 >
                   ‹‹
                 </button>
                 <button
                   onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
-                  className="px-2 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed text-gray-700 dark:text-gray-300"
                 >
                   ‹
                 </button>
-                <span className="px-3 py-1 text-sm text-gray-700">
+                <span className="px-3 py-1 text-sm text-gray-700 dark:text-gray-300">
                   Стр. {currentPage}
                 </span>
                 <button
                   onClick={() => setCurrentPage(p => p + 1)}
                   disabled={currentPage * pageSize >= totalFiltered}
-                  className="px-2 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed text-gray-700 dark:text-gray-300"
                 >
                   ›
                 </button>
                 <button
                   onClick={() => setCurrentPage(p => p + 1)}
                   disabled={currentPage * pageSize >= totalFiltered}
-                  className="px-2 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed text-gray-700 dark:text-gray-300"
                 >
                   ››
                 </button>

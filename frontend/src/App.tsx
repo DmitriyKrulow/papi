@@ -2,6 +2,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { ThemeProvider } from './hooks/useTheme';
 import { useAuth } from './hooks/useAuth';
 import Navbar from './components/common/Navbar';
 import Footer from './components/common/Footer';
@@ -101,87 +102,89 @@ function App() {
     <ErrorBoundary>
     <Router>
       <AuthProvider>
-        <div className="min-h-screen flex flex-col bg-gray-50">
-          <Navbar />
-          <main className="flex-grow container mx-auto px-4 py-8">
-            <Routes>
-              {/* Публичные маршруты (доступны без авторизации) */}
-              <Route path="/" element={<Home />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              
-              {/* Защищенные маршруты (требуется авторизация) */}
-              <Route path="/dashboard" element={
-                <PrivateRoute>
-                  <Dashboard />
-                </PrivateRoute>
-              } />
-              <Route path="/assets" element={
-                <PrivateRoute>
-                  <Assets />
-                </PrivateRoute>
-              } />
-              <Route path="/assets/create" element={
-                <PrivateRoute>
-                  <AssetCreate />
-                </PrivateRoute>
-              } />
-              <Route path="/assets/:id" element={
-                <PrivateRoute>
-                  <AssetDetail />
-                </PrivateRoute>
-              } />
-              <Route path="/assets/:id/edit" element={
-                <PrivateRoute>
-                  <AssetEdit />
-                </PrivateRoute>
-              } />
-              <Route path="/reports" element={
-                <PrivateRoute>
-                  <Reports />
-                </PrivateRoute>
-              } />
-              
-              {/* Маршруты для заявок на ремонт */}
-              <Route path="/repairs" element={
-                <PrivateRoute>
-                  <RepairList />
-                </PrivateRoute>
-              } />
-              <Route path="/repairs/create" element={
-                <PrivateRoute>
-                  <RepairCreate />
-                </PrivateRoute>
-              } />
-              <Route path="/repairs/:id" element={
-                <PrivateRoute>
-                  <RepairEdit />
-                </PrivateRoute>
-              } />
-              <Route path="/repairs/:id/edit" element={
-                <PrivateRoute>
-                  <RepairEdit />
-                </PrivateRoute>
-              } />
-              <Route path="/profile" element={
-                <PrivateRoute>
-                  <Profile />
-                </PrivateRoute>
-              } />
-              
-              {/* Админ-маршрут (требуется роль admin) */}
-              <Route path="/admin" element={
-                <AdminRoute>
-                  <AdminPanel />
-                </AdminRoute>
-              } />
-              
-              {/* 404 - перенаправление на главную */}
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </main>
-          <Footer />
-        </div>
+        <ThemeProvider>
+          <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900">
+            <Navbar />
+            <main className="flex-grow container mx-auto px-4 py-8">
+              <Routes>
+                {/* Публичные маршруты (доступны без авторизации) */}
+                <Route path="/" element={<Home />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+                
+                {/* Защищенные маршруты (требуется авторизация) */}
+                <Route path="/dashboard" element={
+                  <PrivateRoute>
+                    <Dashboard />
+                  </PrivateRoute>
+                } />
+                <Route path="/assets" element={
+                  <PrivateRoute>
+                    <Assets />
+                  </PrivateRoute>
+                } />
+                <Route path="/assets/create" element={
+                  <PrivateRoute>
+                    <AssetCreate />
+                  </PrivateRoute>
+                } />
+                <Route path="/assets/:id" element={
+                  <PrivateRoute>
+                    <AssetDetail />
+                  </PrivateRoute>
+                } />
+                <Route path="/assets/:id/edit" element={
+                  <PrivateRoute>
+                    <AssetEdit />
+                  </PrivateRoute>
+                } />
+                <Route path="/reports" element={
+                  <PrivateRoute>
+                    <Reports />
+                  </PrivateRoute>
+                } />
+                
+                {/* Маршруты для заявок на ремонт */}
+                <Route path="/repairs" element={
+                  <PrivateRoute>
+                    <RepairList />
+                  </PrivateRoute>
+                } />
+                <Route path="/repairs/create" element={
+                  <PrivateRoute>
+                    <RepairCreate />
+                  </PrivateRoute>
+                } />
+                <Route path="/repairs/:id" element={
+                  <PrivateRoute>
+                    <RepairEdit />
+                  </PrivateRoute>
+                } />
+                <Route path="/repairs/:id/edit" element={
+                  <PrivateRoute>
+                    <RepairEdit />
+                  </PrivateRoute>
+                } />
+                <Route path="/profile" element={
+                  <PrivateRoute>
+                    <Profile />
+                  </PrivateRoute>
+                } />
+                
+                {/* Админ-маршрут (требуется роль admin) */}
+                <Route path="/admin" element={
+                  <AdminRoute>
+                    <AdminPanel />
+                  </AdminRoute>
+                } />
+                
+                {/* 404 - перенаправление на главную */}
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </main>
+            <Footer />
+          </div>
+        </ThemeProvider>
       </AuthProvider>
     </Router>
     </ErrorBoundary>
