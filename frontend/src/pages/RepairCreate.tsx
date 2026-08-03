@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { useRepairs } from '../hooks/useRepairs';
 import { useAuth } from '../hooks/useAuth';
 import RepairForm from '../components/forms/RepairForm';
@@ -64,7 +65,7 @@ const RepairCreate: React.FC = () => {
     try {
       const assetId = selectedAssetId ? Number(selectedAssetId) : (data.asset_id || 0);
       if (!assetId) {
-        alert('Пожалуйста, выберите актив');
+        toast.error('Пожалуйста, выберите актив');
         return;
       }
       const formData: any = {
@@ -84,10 +85,10 @@ const RepairCreate: React.FC = () => {
         formData.estimated_cost = Number(data.estimated_cost);
       }
       await createRepair(formData);
+      toast.success('Заявка на ремонт создана');
       navigate('/repairs');
     } catch (error) {
-      console.error('Failed to create repair:', error);
-      alert('Ошибка при создании заявки. Проверьте консоль для подробной информации.');
+      toast.error('Ошибка при создании заявки');
     }
   };
 

@@ -1,5 +1,6 @@
 // frontend/src/pages/Dashboard.tsx
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
 interface Stats {
@@ -10,6 +11,7 @@ interface Stats {
 }
 
 const Dashboard: React.FC = () => {
+  const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const [dbStatus, setDbStatus] = useState<string>('checking...');
   const [dbDetails, setDbDetails] = useState<string>('');
@@ -28,7 +30,6 @@ const Dashboard: React.FC = () => {
         setLoading(true);
         setError(null);
         
-        console.log('📡 Запрос к /api/db-check...');
         const dbResponse = await fetch('/api/db-check');
         
         if (dbResponse.ok) {
@@ -44,8 +45,6 @@ const Dashboard: React.FC = () => {
           setDbStatus('disconnected');
           setDbDetails('Ошибка подключения');
         }
-        
-console.log('📡 Запрос к /api/reports/inventory-report...');
         const statsResponse = await fetch('/api/reports/inventory-report', {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -55,8 +54,6 @@ console.log('📡 Запрос к /api/reports/inventory-report...');
         
         if (statsResponse.ok) {
           const statsData = await statsResponse.json();
-          console.log('📥 Статистика:', statsData);
-          
           if (statsData.summary) {
             setStats({
               total: statsData.summary.total_count || 0,
@@ -66,12 +63,11 @@ console.log('📡 Запрос к /api/reports/inventory-report...');
             });
           }
         } else {
-          console.warn('Не удалось загрузить статистику:', statsResponse.status);
+          // Статистика не загружена — используем пустые значения
         }
         
         setLoading(false);
       } catch (err: any) {
-        console.error('❌ Ошибка:', err);
         setDbStatus('disconnected');
         setDbDetails(err.message || 'Ошибка соединения');
         setLoading(false);
@@ -213,19 +209,19 @@ console.log('📡 Запрос к /api/reports/inventory-report...');
                 <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">🔍 Быстрый доступ</h3>
                 <div className="space-y-3">
                   <button
-                    onClick={() => window.location.href = '/assets'}
+                    onClick={() => navigate('/assets')}
                     className="w-full text-left px-4 py-3 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 transition active:scale-95 transition-transform"
                   >
                     📦 Перейти к активам
                   </button>
                   <button
-                    onClick={() => window.location.href = '/repairs'}
+                    onClick={() => navigate('/repairs')}
                     className="w-full text-left px-4 py-3 bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-lg hover:bg-orange-100 dark:hover:bg-orange-900/50 transition active:scale-95 transition-transform"
                   >
                     🔧 Заявки на ремонт
                   </button>
                   <button
-                    onClick={() => window.location.href = '/reports'}
+                    onClick={() => navigate('/reports')}
                     className="w-full text-left px-4 py-3 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/50 transition active:scale-95 transition-transform"
                   >
                     📊 Перейти к отчетам

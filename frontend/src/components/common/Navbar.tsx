@@ -16,11 +16,11 @@ const Navbar: React.FC = () => {
   const isActive = (path: string) => location.pathname === path;
 
   const navItems = [
-    { path: '/', label: '🏠 Главная' },
     { path: '/dashboard', label: '📊 Дашборд' },
     { path: '/assets', label: '📦 Активы' },
     { path: '/inventory', label: '📋 Инвентаризация' },
     { path: '/marking', label: '🏷️ Маркировка' },
+    { path: '/reports', label: '📈 Отчеты' },
     { path: '/repairs', label: '🔧 Ремонты' },
   ];
 
@@ -45,7 +45,7 @@ const Navbar: React.FC = () => {
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
-          <Link to="/" className="text-xl font-bold flex-shrink-0" onClick={closeMobileMenu}>
+          <Link to={isAuthenticated ? '/dashboard' : '/'} className="text-xl font-bold flex-shrink-0" onClick={closeMobileMenu}>
             🏗️ PAPI
           </Link>
 

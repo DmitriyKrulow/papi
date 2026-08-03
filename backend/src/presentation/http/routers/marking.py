@@ -1,8 +1,11 @@
 # backend/src/presentation/http/routers/marking.py
 """Маркировка имущества — генерация бирок для печати"""
+import os
+import uuid
 from datetime import date
 from typing import Optional, List
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, Query, HTTPException, UploadFile, File, Form
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import distinct
 
@@ -10,6 +13,26 @@ from src.infrastructure.db.init_db import get_db
 from src.infrastructure.db.models.asset import Asset
 from src.infrastructure.db.models.user import User
 from src.presentation.http.dependencies.auth import get_current_user
+
+router = APIRouter(prefix="/marking", tags=["marking"])
+
+# Directory for storing logos
+LOGO_DIR = os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', 'frontend', 'public', 'marking-logos')
+os.makedirs(LOGO_DIR, exist_ok=True)
+
+# Default settings
+DEFAULT_SETTINGS = {
+    "company_name": "ООО «ПАО»",
+    "company_short": "ПАО",
+    "label_width": 105,
+    "label_height": 37,
+    "labels_per_row": 3,
+    "labels_per_page": 21,
+    "logo_url": None,
+}
+
+# In-memory settings storage (replace with DB in production)
+_marking_settings: dict = dict(DEFAULT_SETTINGS)
 
 router = APIRouter(prefix="/marking", tags=["marking"])
 
@@ -97,16 +120,7 @@ async def get_marking_settings(
     current_user: User = Depends(get_current_user),
 ):
     """Получить настройки маркировки"""
-    # Проверим, есть ли настройки в таблице assets как специальные записи
-    # Или используем дефолтные значения
-    return {
-        "company_name": "ООО «ПАО»",  # Дефолтное название фирмы
-        "company_short": "ПАО",  # Сокращённое
-        "label_width": 105,  # мм
-        "label_height": 37,  # мм
-        "labels_per_row": 3,
-        "labels_per_page": 21,
-    }
+    return _marking_settings
 
 
 @router.post("/settings")
@@ -116,11 +130,72 @@ async def save_marking_settings(
     current_user: User = Depends(get_current_user),
 ):
     """Сохранить настройки маркировки"""
+    global _marking_settings
+    _marking_settings.update({
+        "company_name": settings.get("company_name", _marking_settings["company_name"]),
+        "company_short": settings.get("company_short", _marking_settings["company_short"]),
+        "label_width": settings.get("label_width", _marking_settings["label_width"]),
+        "label_height": settings.get("label_height", _marking_settings["label_height"]),
+        "labels_per_row": settings.get("labels_per_row", _marking_settings["labels_per_row"]),
+        "labels_per_page": settings.get("labels_per_page", _marking_settings["labels_per_page"]),
+    })
     return {
         "message": "Настройки сохранены",
-        "company_name": settings.get("company_name", "ООО «ПАО»"),
-        "company_short": settings.get("company_short", "ПАО"),
+        **_marking_settings,
     }
+
+
+@router.post("/logo-upload")
+async def upload_logo(
+    file: UploadFile = File(...),
+    type: str = Form("logo"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Загрузить логотип для маркировки"""
+    if not file.content_type or not file.content_type.startswith('image/'):
+        raise HTTPException(status_code=400, detail="Можно загружать только изображения")
+    
+    # Generate unique filename
+    ext = os.path.splitext(file.filename)[1] if file.filename else '.png'
+    filename = f"logo_{uuid.uuid4().hex[:8]}{ext}"
+    filepath = os.path.join(LOGO_DIR, filename)
+    
+    # Read and save file
+    contents = await file.read()
+    with open(filepath, 'wb') as f:
+        f.write(contents)
+    
+    # Update settings
+    _marking_settings["logo_url"] = f"/api/marking/logos/{filename}"
+    
+    return {"message": "Логотип загружен", "url": f"/api/marking/logos/{filename}"}
+
+
+@router.delete("/logo-upload")
+async def delete_logo(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Удалить логотип"""
+    if _marking_settings.get("logo_url"):
+        # Extract filename from URL
+        filename = _marking_settings["logo_url"].split('/')[-1]
+        filepath = os.path.join(LOGO_DIR, filename)
+        if os.path.exists(filepath):
+            os.remove(filepath)
+    
+    _marking_settings["logo_url"] = None
+    return {"message": "Логотип удалён"}
+
+
+@router.get("/logos/{filename}")
+async def serve_logo(filename: str):
+    """Serve uploaded logo file"""
+    filepath = os.path.join(LOGO_DIR, filename)
+    if not os.path.exists(filepath):
+        raise HTTPException(status_code=404, detail="Файл не найден")
+    return FileResponse(filepath, media_type='image/*')
 
 
 @router.get("/label-html/{asset_id}")
@@ -134,8 +209,12 @@ async def get_label_html(
     if not asset:
         raise HTTPException(status_code=404, detail="Актив не найден")
     
-    company_name = "ООО «ПАО»"
-    company_short = "ПАО"
+    # Используем настройки из _marking_settings
+    company_name = _marking_settings.get("company_name", "ООО «ПАО»")
+    company_short = _marking_settings.get("company_short", "ПАО")
+    label_width = _marking_settings.get("label_width", 105)
+    label_height = _marking_settings.get("label_height", 37)
+    logo_url = _marking_settings.get("logo_url")
     
     responsible = safe_str(asset.responsible_person)
     initials = get_initials(responsible)
@@ -143,11 +222,18 @@ async def get_label_html(
     
     purchase_date = safe_date(asset.purchase_date) or "—"
     
+    # Logo HTML if exists
+    logo_html = ""
+    if logo_url:
+        logo_html = f'''<div style="text-align: center; margin-bottom: 2mm;">
+            <img src="{logo_url}" style="max-height: 12mm; max-width: 60mm; object-fit: contain;" />
+        </div>'''
+    
     # Генерируем HTML-бирку
     html = f"""
     <div class="label" style="
-        width: {105}mm;
-        height: {37}mm;
+        width: {label_width}mm;
+        height: {label_height}mm;
         border: 1px solid #000;
         padding: 3mm;
         box-sizing: border-box;
@@ -157,27 +243,28 @@ async def get_label_html(
         flex-direction: column;
         justify-content: space-between;
     ">
-        <div style="font-size: 10pt; font-weight: bold; text-align: center; border-bottom: 1px solid #000; padding-bottom: 2mm;">
+        {logo_html}
+        <div style="font-size: 9pt; font-weight: bold; text-align: center; border-bottom: 1px solid #000; padding-bottom: 2mm;">
             {company_name}
         </div>
         <div style="display: flex; justify-content: space-between; align-items: flex-start;">
             <div style="flex: 1;">
-                <div style="font-size: 11pt; font-weight: bold; margin-bottom: 1mm;">
+                <div style="font-size: 10pt; font-weight: bold; margin-bottom: 1mm;">
                     {safe_str(asset.name)}
                 </div>
-                <div style="font-size: 8pt; color: #333;">
+                <div style="font-size: 7pt; color: #333;">
                     Инв. №: <strong>{safe_str(asset.inventory_number)}</strong>
                 </div>
-                <div style="font-size: 8pt; color: #333;">
+                <div style="font-size: 7pt; color: #333;">
                     Отв: {formatted}
                 </div>
             </div>
-            <div style="text-align: right; font-size: 8pt;">
+            <div style="text-align: right; font-size: 7pt;">
                 <div>Пост. на учёт:</div>
-                <div style="font-weight: bold; font-size: 10pt;">{purchase_date}</div>
+                <div style="font-weight: bold; font-size: 9pt;">{purchase_date}</div>
             </div>
         </div>
-        <div style="font-size: 7pt; color: #666; text-align: right;">
+        <div style="font-size: 6pt; color: #666; text-align: right;">
             {company_short}
         </div>
     </div>
@@ -199,8 +286,19 @@ async def get_batch_labels(
     if not assets:
         raise HTTPException(status_code=404, detail="Активы не найдены")
     
-    company_name = "ООО «ПАО»"
-    company_short = "ПАО"
+    # Используем настройки
+    company_name = _marking_settings.get("company_name", "ООО «ПАО»")
+    company_short = _marking_settings.get("company_short", "ПАО")
+    label_width = _marking_settings.get("label_width", 105)
+    label_height = _marking_settings.get("label_height", 37)
+    logo_url = _marking_settings.get("logo_url")
+    
+    # Logo HTML if exists
+    logo_html = ""
+    if logo_url:
+        logo_html = f'''<div style="text-align: center; margin-bottom: 1mm;">
+            <img src="{logo_url}" style="max-height: 10mm; max-width: 50mm; object-fit: contain;" />
+        </div>'''
     
     labels_html = []
     for asset in assets:
@@ -210,33 +308,34 @@ async def get_batch_labels(
         
         label = f"""
         <div class="label" style="
-            width: 105mm; height: 37mm; border: 1px solid #000; padding: 3mm;
+            width: {label_width}mm; height: {label_height}mm; border: 1px solid #000; padding: 2mm;
             box-sizing: border-box; font-family: Arial, sans-serif;
             page-break-inside: avoid; display: inline-block;
-            vertical-align: top; margin: 2mm;
+            vertical-align: top; margin: 1mm;
             flex-direction: column; justify-content: space-between;
         ">
-            <div style="font-size: 10pt; font-weight: bold; text-align: center; border-bottom: 1px solid #000; padding-bottom: 2mm;">
+            {logo_html}
+            <div style="font-size: 8pt; font-weight: bold; text-align: center; border-bottom: 1px solid #000; padding-bottom: 1mm;">
                 {company_name}
             </div>
             <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                 <div style="flex: 1;">
-                    <div style="font-size: 11pt; font-weight: bold; margin-bottom: 1mm;">
+                    <div style="font-size: 9pt; font-weight: bold; margin-bottom: 1mm;">
                         {safe_str(asset.name)}
                     </div>
-                    <div style="font-size: 8pt; color: #333;">
+                    <div style="font-size: 6pt; color: #333;">
                         Инв. №: <strong>{safe_str(asset.inventory_number)}</strong>
                     </div>
-                    <div style="font-size: 8pt; color: #333;">
+                    <div style="font-size: 6pt; color: #333;">
                         Отв: {formatted}
                     </div>
                 </div>
-                <div style="text-align: right; font-size: 8pt;">
+                <div style="text-align: right; font-size: 6pt;">
                     <div>Пост. на учёт:</div>
-                    <div style="font-weight: bold; font-size: 10pt;">{purchase_date}</div>
+                    <div style="font-weight: bold; font-size: 8pt;">{purchase_date}</div>
                 </div>
             </div>
-            <div style="font-size: 7pt; color: #666; text-align: right;">
+            <div style="font-size: 5pt; color: #666; text-align: right;">
                 {company_short}
             </div>
         </div>

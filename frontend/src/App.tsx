@@ -20,6 +20,7 @@ import RepairCreate from './pages/RepairCreate';
 import RepairEdit from './pages/RepairEdit';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import PasswordReset from './pages/PasswordReset';
 import Profile from './pages/Profile';
 import AdminPanel from './pages/AdminPanel';
 import './index.css';
@@ -34,25 +35,42 @@ class ErrorBoundary extends React.Component<
   }
 
   static getDerivedStateFromError(error: Error) {
+    // Логгируем ошибку в консоль для разработчиков, но не показываем stack trace пользователю
+    console.error('[ErrorBoundary] Application error:', error);
     return { hasError: true, error };
   }
 
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-red-50">
-          <div className="text-center p-8">
-            <h1 className="text-2xl font-bold text-red-600 mb-4">Ошибка приложения</h1>
-            <p className="text-gray-700 mb-4">{this.state.error?.message}</p>
-            <pre className="bg-white p-4 rounded text-left text-sm overflow-auto max-w-2xl">
-              {this.state.error?.stack}
-            </pre>
-            <button
-              onClick={() => window.location.reload()}
-              className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              Перезагрузить
-            </button>
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+          <div className="text-center p-8 max-w-md">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+              <svg className="w-8 h-8 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">Что-то пошло не так</h1>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
+              Приложение столкнулось с непредвиденной ошибкой. Попробуйте перезагрузить страницу.
+            </p>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={() => window.location.reload()}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+              >
+                Перезагрузить страницу
+              </button>
+            </div>
+            {/* Скрываем детальную информацию для безопасности */}
+            <details className="mt-6 text-left text-xs text-gray-400 dark:text-gray-600">
+              <summary className="cursor-pointer hover:text-gray-600 dark:hover:text-gray-400">
+                Для разработчиков
+              </summary>
+              <pre className="mt-2 p-3 bg-gray-100 dark:bg-gray-800 rounded overflow-auto max-h-32">
+                {this.state.error?.message}
+              </pre>
+            </details>
           </div>
         </div>
       );
@@ -113,6 +131,7 @@ function App() {
                 <Route path="/" element={<Home />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
+                <Route path="/password-reset" element={<PasswordReset />} />
                 
                 {/* Защищенные маршруты (требуется авторизация) */}
                 <Route path="/dashboard" element={

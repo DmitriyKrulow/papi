@@ -691,7 +691,10 @@ const CreateCheckModal: React.FC<CreateCheckModalProps> = ({ onClose, onCreated 
   useEffect(() => {
     if (checkType !== 'full') {
       setLoadingScope(true);
-      fetch(`/api/inventory-checks/scope-options?check_type=${checkType}`)
+      const token = localStorage.getItem('token');
+      fetch(`/api/inventory-checks/scope-options?check_type=${checkType}`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+      })
         .then(res => res.json())
         .then(data => {
           setScopeOptions(Array.isArray(data) ? data : []);

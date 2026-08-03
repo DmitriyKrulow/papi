@@ -1,102 +1,47 @@
 // frontend/src/pages/Home.tsx
-import { Link } from 'react-router-dom';
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
 const Home: React.FC = () => {
+  const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
 
+  // Редирект авторизованных пользователей на дашборд
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
+
   // Неавторизованный пользователь видит только общее описание
-  if (!isAuthenticated) {
-    return (
-      <div className="flex flex-col items-center justify-center text-center py-16 max-w-2xl mx-auto">
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[80vh] text-center py-16 max-w-2xl mx-auto">
+      <div className="mb-8">
+        <div className="text-6xl mb-4">🏗️</div>
         <h1 className="text-4xl font-bold text-gray-800 dark:text-gray-100 mb-4">
-          🏗️ PAPI — Управление активами
+          PAPI — Управление активами
         </h1>
-        <p className="text-xl text-gray-600 dark:text-gray-400 mb-6">
+        <p className="text-xl text-gray-600 dark:text-gray-400 mb-3">
           Система для управления основными средствами и активами предприятия
         </p>
-        <p className="text-base text-gray-500 dark:text-gray-500 mb-8">
+        <p className="text-base text-gray-500 dark:text-gray-500">
           Для доступа к функционалу системы, пожалуйста, авторизуйтесь или зарегистрируйтесь.
         </p>
-        <div className="flex flex-col sm:flex-row gap-4">
-          <Link
-            to="/login"
-            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition inline-block"
-          >
-            🔑 Войти
-          </Link>
-          <Link
-            to="/register"
-            className="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-100 px-6 py-3 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition inline-block"
-          >
-            📝 Зарегистрироваться
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="text-center py-12">
-      <h1 className="text-4xl font-bold text-gray-800 dark:text-gray-100 mb-4">
-        🏗️ PAPI - Управление активами
-      </h1>
-      <p className="text-xl text-gray-600 dark:text-gray-400 mb-8 max-w-2xl mx-auto">
-        Система для управления основными средствами и активами предприятия
-      </p>
-      
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/30 p-6 hover:shadow-xl transition card-hover border border-gray-100 dark:border-gray-700">
-          <div className="text-4xl mb-3">📦</div>
-          <h3 className="text-lg font-semibold mb-2 text-gray-800 dark:text-gray-100">Активы</h3>
-          <p className="text-gray-600 dark:text-gray-400 text-sm mb-3">
-            Управление основными средствами
-          </p>
-          <Link
-            to="/assets"
-            className="inline-block text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium"
-          >
-            Перейти →
-          </Link>
-        </div>
-        
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/30 p-6 hover:shadow-xl transition card-hover border border-gray-100 dark:border-gray-700">
-          <div className="text-4xl mb-3">🔧</div>
-          <h3 className="text-lg font-semibold mb-2 text-gray-800 dark:text-gray-100">Ремонты</h3>
-          <p className="text-gray-600 dark:text-gray-400 text-sm mb-3">
-            Заявки и обслуживание
-          </p>
-          <Link
-            to="/repairs"
-            className="inline-block text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium"
-          >
-            Перейти →
-          </Link>
-        </div>
-        
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/30 p-6 hover:shadow-xl transition card-hover border border-gray-100 dark:border-gray-700">
-          <div className="text-4xl mb-3">📊</div>
-          <h3 className="text-lg font-semibold mb-2 text-gray-800 dark:text-gray-100">Отчеты</h3>
-          <p className="text-gray-600 dark:text-gray-400 text-sm mb-3">
-            Аналитика и отчетность
-          </p>
-          <Link
-            to="/reports"
-            className="inline-block text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium"
-          >
-            Перейти →
-          </Link>
-        </div>
       </div>
       
-      <div className="mt-8">
+      <div className="flex flex-col sm:flex-row gap-4">
         <a
-          href="/docs"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition inline-block"
+          href="/login"
+          className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition inline-block font-medium"
         >
-          📚 Документация API
+          🔑 Войти
+        </a>
+        <a
+          href="/register"
+          className="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-100 px-8 py-3 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition inline-block font-medium"
+        >
+          📝 Зарегистрироваться
         </a>
       </div>
     </div>

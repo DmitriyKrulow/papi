@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { useAuth } from '../hooks/useAuth';
 import ProfileForm from '../components/forms/ProfileForm';
 import ChangePasswordForm from '../components/forms/ChangePasswordForm';
@@ -11,18 +12,18 @@ const Profile: React.FC = () => {
   const handleProfileSubmit = async (data: any) => {
     try {
       await updateProfile(data);
-      alert('Профиль успешно обновлен');
+      toast.success('Профиль успешно обновлен');
     } catch (err) {
-      console.error('Profile update failed:', err);
+      toast.error('Ошибка обновления профиля');
     }
   };
 
   const handleChangePassword = async (data: any) => {
     try {
       await changePassword(data.oldPassword, data.newPassword);
-      alert('Пароль успешно изменен');
+      toast.success('Пароль успешно изменен');
     } catch (err) {
-      console.error('Password change failed:', err);
+      toast.error('Ошибка смены пароля');
     }
   };
 

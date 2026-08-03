@@ -1,5 +1,6 @@
 ﻿// frontend/src/pages/AdminPanel.tsx
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import type { Department, Employee } from '../types';
 
@@ -44,6 +45,18 @@ interface UserFormData {
   is_active: boolean;
 }
 
+interface PasswordResetRequest {
+  id: number;
+  user_id: number;
+  username: string;
+  email: string;
+  full_name?: string;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
+  created_at: string;
+  admin_comment?: string;
+}
+
 interface PasswordResetData {
   password: string;
   confirmPassword: string;
@@ -77,7 +90,8 @@ interface RoomFormData {
 }
 
 const AdminPanel: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'users' | 'placements' | 'employees'>('users');
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<'users' | 'placements' | 'employees' | 'password-requests'>('users');
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -123,6 +137,11 @@ const AdminPanel: React.FC = () => {
   });
   const [roomDeptId, setRoomDeptId] = useState<number | null>(null);
 
+  // Password reset requests state
+  const [passwordRequests, setPasswordRequests] = useState<PasswordResetRequest[]>([]);
+  const [requestsLoading, setRequestsLoading] = useState(false);
+  const [requestsFilter, setRequestsFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+
   useEffect(() => {
     fetchUsers();
   }, []);
@@ -135,6 +154,9 @@ const AdminPanel: React.FC = () => {
     if (activeTab === 'employees') {
       fetchEmployees();
       fetchEmpOptions();
+    }
+    if (activeTab === 'password-requests') {
+      fetchPasswordRequests();
     }
   }, [activeTab]);
 
@@ -375,6 +397,43 @@ const AdminPanel: React.FC = () => {
       toast.error('Ошибка сброса пароля');
     } finally {
       setResettingPassword(null);
+    }
+  };
+
+  // Password reset request handlers
+  const fetchPasswordRequests = async () => {
+    try {
+      setRequestsLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/admin/password-reset/requests', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setPasswordRequests(Array.isArray(data) ? data : data.items || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch password requests:', err);
+    } finally {
+      setRequestsLoading(false);
+    }
+  };
+
+  const handlePasswordRequestAction = async (requestId: number, action: 'approve' | 'reject') => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/admin/password-reset/requests/${requestId}/${action}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (response.ok) {
+        toast.success(action === 'approve' ? 'Заявка одобрена, пароль отправлен пользователю' : 'Заявка отклонена');
+        fetchPasswordRequests();
+      } else {
+        toast.error('Ошибка обработки заявки');
+      }
+    } catch (err) {
+      toast.error('Ошибка обработки заявки');
     }
   };
 
@@ -633,7 +692,7 @@ const AdminPanel: React.FC = () => {
                 <div className="flex justify-between items-center mb-4">
                   <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">👑 Админ-панель</h1>
                     <button
-                      onClick={() => window.location.href = '/dashboard'}
+                      onClick={() => navigate('/dashboard')}
                     className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition"
                   >
                     ← Назад в дашборд
@@ -659,6 +718,17 @@ const AdminPanel: React.FC = () => {
                     className={`px-4 py-2 font-medium text-sm rounded-t-lg transition ${activeTab === 'employees' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
                   >
                     👤 Сотрудники
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('password-requests')}
+                    className={`px-4 py-2 font-medium text-sm rounded-t-lg transition ${activeTab === 'password-requests' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
+                  >
+                    🔑 Заявки на сброс пароля
+                    {passwordRequests.filter(r => r.status === 'pending').length > 0 && (
+                      <span className="ml-2 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+                        {passwordRequests.filter(r => r.status === 'pending').length}
+                      </span>
+                    )}
                   </button>
                 </div>
                 
@@ -1120,6 +1190,113 @@ const AdminPanel: React.FC = () => {
                   <h3 className="text-sm font-medium text-green-900 dark:text-green-300 mb-2">👤 Сотрудники и активы</h3>
                   <p className="text-xs text-green-700 dark:text-green-400">Сотрудники могут быть назначены ответственными за активы. При назначении актива сотруднику его ФИО автоматически подтягивается из списка сотрудников подразделения.</p>
                 </div>
+              </>
+            )}
+
+            {activeTab === 'password-requests' && (
+              <>
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">🔑 Заявки на сброс пароля</h2>
+                  <button
+                    onClick={fetchPasswordRequests}
+                    disabled={requestsLoading}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm disabled:opacity-50"
+                  >
+                    {requestsLoading ? 'Загрузка...' : '🔄 Обновить'}
+                  </button>
+                </div>
+
+                {/* Filter buttons */}
+                <div className="flex gap-2 mb-4">
+                  {(['all', 'pending', 'approved', 'rejected'] as const).map((filter) => {
+                    const labels = { all: 'Все', pending: 'Ожидают', approved: 'Одобреные', rejected: 'Отклонённые' };
+                    const counts = {
+                      all: passwordRequests.length,
+                      pending: passwordRequests.filter(r => r.status === 'pending').length,
+                      approved: passwordRequests.filter(r => r.status === 'approved').length,
+                      rejected: passwordRequests.filter(r => r.status === 'rejected').length,
+                    };
+                    return (
+                      <button
+                        key={filter}
+                        onClick={() => setRequestsFilter(filter)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                          requestsFilter === filter
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+                        }`}
+                      >
+                        {labels[filter]} ({counts[filter]})
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {requestsLoading ? (
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">Загрузка заявок...</div>
+                ) : passwordRequests.filter(r => requestsFilter === 'all' || r.status === requestsFilter).length === 0 ? (
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                    {requestsFilter === 'all' ? 'Заявок пока нет' : 'Нет заявок с таким статусом'}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {passwordRequests
+                      .filter(r => requestsFilter === 'all' || r.status === requestsFilter)
+                      .sort((a, b) => {
+                        const order = { pending: 0, approved: 1, rejected: 2 };
+                        return order[a.status] - order[b.status];
+                      })
+                      .map((req) => {
+                        const statusMap = {
+                          pending: { text: 'Ожидает', class: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300' },
+                          approved: { text: 'Одобрен', class: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' },
+                          rejected: { text: 'Отклонён', class: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300' },
+                        };
+                        const status = statusMap[req.status];
+                        return (
+                          <div key={req.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition">
+                            <div className="flex justify-between items-start mb-2">
+                              <div>
+                                <h3 className="font-medium text-gray-900 dark:text-gray-100">{req.username}</h3>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                  {req.full_name && <span>{req.full_name} | </span>}
+                                  {req.email && <span>{req.email} | </span>}
+                                  {new Date(req.created_at).toLocaleString('ru-RU')}
+                                </p>
+                              </div>
+                              <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${status.class}`}>
+                                {status.text}
+                              </span>
+                            </div>
+                            <div className="bg-gray-50 dark:bg-gray-700 rounded p-2 mb-3">
+                              <p className="text-sm text-gray-700 dark:text-gray-300">{req.reason}</p>
+                            </div>
+                            {req.status === 'pending' && (
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => handlePasswordRequestAction(req.id, 'approve')}
+                                  className="bg-green-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-green-700 transition"
+                                >
+                                  ✅ Одобрить
+                                </button>
+                                <button
+                                  onClick={() => handlePasswordRequestAction(req.id, 'reject')}
+                                  className="bg-red-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-red-700 transition"
+                                >
+                                  ❌ Отклонить
+                                </button>
+                              </div>
+                            )}
+                            {req.admin_comment && (
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                                💬 {req.admin_comment}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
               </>
             )}
 
