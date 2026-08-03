@@ -64,6 +64,10 @@ export interface Asset {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  // Поля инвентаризации
+  last_inventory_date?: string;
+  last_inventory_by_id?: number;
+  last_inventory_confirmed?: boolean;
 }
 
 // ========== Пользователи ==========

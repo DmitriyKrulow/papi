@@ -1,6 +1,6 @@
 // frontend/src/components/assets/AssetDetailsModal.tsx
 import React, { useState, useEffect } from 'react';
-import { Calendar, DollarSign, Edit, Trash2, MapPin, User, Wrench, Plus, RefreshCw, Image } from 'lucide-react';
+import { Calendar, DollarSign, Edit, Trash2, MapPin, User, Wrench, Plus, RefreshCw, Image, ClipboardCheck, CheckCircle2, Clock } from 'lucide-react';
 import type { Asset, MaintenanceEvent } from '../../types';
 import { AssetStatusMap, MaintenanceEventTypes, AssetTypeNames } from '../../types';
 import { formatMoney, formatDate } from '../../utils/helpers';
@@ -280,6 +280,71 @@ return (
             <User className="w-4 h-4" /> Ответственность
           </h4>
           <DetailRow label="Ответственное лицо" value={asset.responsible_person} />
+        </div>
+      </div>
+
+      {/* Блок проверки наличия */}
+      <div className="bg-gray-50 rounded-lg p-6 space-y-4">
+        <h4 className="text-sm font-semibold text-gray-700 uppercase tracking-wide flex items-center gap-2">
+          <ClipboardCheck className="w-4 h-4 text-blue-500" /> Проверка наличия
+        </h4>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* Статус подтверждения */}
+          <div className={`p-3 rounded-lg border ${
+            asset.last_inventory_confirmed
+              ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800'
+              : asset.last_inventory_date
+              ? 'bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800'
+              : 'bg-gray-50 border-gray-200 dark:bg-gray-700/50 dark:border-gray-600'
+          }`}>
+            <div className="flex items-center gap-2">
+              {asset.last_inventory_confirmed ? (
+                <CheckCircle2 className="w-5 h-5 text-green-500" />
+              ) : asset.last_inventory_date ? (
+                <Clock className="w-5 h-5 text-amber-500" />
+              ) : (
+                <ClipboardCheck className="w-5 h-5 text-gray-400" />
+              )}
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Статус</p>
+                <p className={`text-sm font-medium ${
+                  asset.last_inventory_confirmed
+                    ? 'text-green-700 dark:text-green-300'
+                    : asset.last_inventory_date
+                    ? 'text-amber-700 dark:text-amber-300'
+                    : 'text-gray-500 dark:text-gray-400'
+                }`}>
+                  {asset.last_inventory_confirmed ? 'Подтверждён' : asset.last_inventory_date ? 'Ожидает' : 'Не проверен'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Дата проверки */}
+          <div className="p-3 rounded-lg border border-gray-200 dark:border-gray-600">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-gray-400" />
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Дата проверки</p>
+                <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                  {asset.last_inventory_date ? formatDate(asset.last_inventory_date) : '—'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Кто проверял */}
+          <div className="p-3 rounded-lg border border-gray-200 dark:border-gray-600">
+            <div className="flex items-center gap-2">
+              <User className="w-5 h-5 text-gray-400" />
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Проверял</p>
+                <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                  {asset.last_inventory_by_id ? `ID: ${asset.last_inventory_by_id}` : '—'}
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

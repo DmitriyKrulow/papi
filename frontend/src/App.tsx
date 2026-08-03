@@ -13,6 +13,8 @@ import AssetCreate from './pages/AssetCreate';
 import AssetDetail from './pages/AssetDetail';
 import AssetEdit from './pages/AssetEdit';
 import Reports from './pages/Reports';
+import Inventory from './pages/Inventory';
+import Marking from './pages/Marking';
 import RepairList from './pages/RepairList';
 import RepairCreate from './pages/RepairCreate';
 import RepairEdit from './pages/RepairEdit';
@@ -138,9 +140,19 @@ function App() {
                     <AssetEdit />
                   </PrivateRoute>
                 } />
-                <Route path="/reports" element={
+<Route path="/reports" element={
                   <PrivateRoute>
                     <Reports />
+                  </PrivateRoute>
+                } />
+                <Route path="/inventory" element={
+                  <PrivateRoute>
+                    <Inventory />
+                  </PrivateRoute>
+                } />
+                <Route path="/marking" element={
+                  <PrivateRoute>
+                    <Marking />
                   </PrivateRoute>
                 } />
                 

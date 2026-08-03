@@ -63,6 +63,8 @@ def register_routers():
     from src.presentation.http.routers.employees import router as employees_router
     from src.presentation.http.routers.placement_assignments import router as placement_assignments_router
     from src.presentation.http.routers.asset_documents import router as asset_documents_router
+    from src.presentation.http.routers.inventory_checks import router as inventory_checks_router
+    from src.presentation.http.routers.marking import router as marking_router
 
     app.include_router(assets_router, prefix="/api")
     app.include_router(assets_export_router)
@@ -81,6 +83,8 @@ def register_routers():
     app.include_router(employees_router, prefix="/api")
     app.include_router(placement_assignments_router, prefix="/api")
     app.include_router(asset_documents_router, prefix="/api")
+    app.include_router(inventory_checks_router, prefix="/api")
+    app.include_router(marking_router, prefix="/api")
 
 
 @app.on_event("startup")

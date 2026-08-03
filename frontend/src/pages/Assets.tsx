@@ -16,7 +16,7 @@ import {
   Package, Search, Eye, Plus, Upload, Edit, Trash2, Download,
   Filter, ChevronDown, ChevronUp, X,
   ArrowUpDown, ArrowUp, ArrowDown,
-  MoreHorizontal, RefreshCw
+  MoreHorizontal, RefreshCw, ClipboardCheck, CheckCircle2, XCircle, Clock
 } from 'lucide-react';
 
 interface PaginatedResponse {
@@ -860,10 +860,13 @@ loadAssets();
                         Местоположение <SortIcon column="location_address" />
                       </button>
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-r border-gray-100 dark:border-gray-600">
                       <button onClick={() => handleSort('responsible_person')} className="flex items-center hover:text-gray-700 dark:hover:text-gray-300 transition">
                         Ответственный <SortIcon column="responsible_person" />
                       </button>
+                    </th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-r border-gray-100 dark:border-gray-600 w-28">
+                      Проверка
                     </th>
                     <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-24">
                       Действия
@@ -901,6 +904,28 @@ loadAssets();
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
                           {asset.responsible_person || '—'}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {asset.last_inventory_confirmed ? (
+                            <div className="flex flex-col items-center gap-0.5">
+                              <CheckCircle2 className="w-4 h-4 text-green-500" />
+                              <span className="text-[10px] text-gray-400 truncate max-w-[80px]" title={asset.last_inventory_date}>
+                                {asset.last_inventory_date ? new Date(asset.last_inventory_date).toLocaleDateString('ru-RU') : '—'}
+                              </span>
+                            </div>
+                          ) : asset.last_inventory_date ? (
+                            <div className="flex flex-col items-center gap-0.5">
+                              <Clock className="w-4 h-4 text-amber-500" />
+                              <span className="text-[10px] text-gray-400 truncate max-w-[80px]" title={asset.last_inventory_date}>
+                                {new Date(asset.last_inventory_date).toLocaleDateString('ru-RU')}
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center gap-0.5">
+                              <ClipboardCheck className="w-4 h-4 text-gray-300 dark:text-gray-600" />
+                              <span className="text-[10px] text-gray-400">—</span>
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-center">
                           <div className="flex items-center justify-center gap-1">
@@ -976,6 +1001,19 @@ loadAssets();
                       </div>
                       <div className="text-gray-600 dark:text-gray-400 col-span-2 truncate">
                         🎯 {asset.responsible_person || '—'}
+                      </div>
+                      {/* Строка проверки наличия */}
+                      <div className="col-span-2 flex items-center gap-2 text-xs pt-1">
+                        {asset.last_inventory_confirmed ? (
+                          <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
+                        ) : asset.last_inventory_date ? (
+                          <Clock className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                        ) : (
+                          <ClipboardCheck className="w-4 h-4 text-gray-300 dark:text-gray-600 flex-shrink-0" />
+                        )}
+                        <span className="text-gray-500 dark:text-gray-400 truncate">
+                          {asset.last_inventory_confirmed ? 'Подтверждён' : asset.last_inventory_date ? `Проверен ${new Date(asset.last_inventory_date).toLocaleDateString('ru-RU')}` : 'Не проверен'}
+                        </span>
                       </div>
                     </div>
                     <div className="flex gap-2 pt-2 border-t border-gray-200 dark:border-gray-700" onClick={(e) => e.stopPropagation()}>

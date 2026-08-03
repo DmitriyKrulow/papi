@@ -19,6 +19,8 @@ const Navbar: React.FC = () => {
     { path: '/', label: '🏠 Главная' },
     { path: '/dashboard', label: '📊 Дашборд' },
     { path: '/assets', label: '📦 Активы' },
+    { path: '/inventory', label: '📋 Инвентаризация' },
+    { path: '/marking', label: '🏷️ Маркировка' },
     { path: '/repairs', label: '🔧 Ремонты' },
   ];
 

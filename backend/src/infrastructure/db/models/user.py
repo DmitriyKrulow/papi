@@ -46,7 +46,8 @@ class User(Base):
 
     created_repairs = relationship("RepairRequest", foreign_keys="RepairRequest.created_by", back_populates="creator")
     assigned_repairs = relationship("RepairRequest", foreign_keys="RepairRequest.assigned_to", back_populates="assignee")
-    inventory_checks = relationship("InventoryCheck", back_populates="responsible")
+    inventory_checks = relationship("InventoryCheck", foreign_keys="[InventoryCheck.responsible_id]", back_populates="responsible")
+    created_inventory_checks = relationship("InventoryCheck", foreign_keys="[InventoryCheck.created_by]", back_populates="creator")
     employees = relationship("Employee", back_populates="user")
     asset_photos = relationship("AssetPhoto", back_populates="uploaded_by_user")
     documents = relationship("Document", foreign_keys="Document.uploaded_by", back_populates="uploader")

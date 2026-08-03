@@ -45,7 +45,7 @@ const Dashboard: React.FC = () => {
           setDbDetails('Ошибка подключения');
         }
         
-        console.log('📡 Запрос к /api/reports/inventory-report...');
+console.log('📡 Запрос к /api/reports/inventory-report...');
         const statsResponse = await fetch('/api/reports/inventory-report', {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -57,12 +57,12 @@ const Dashboard: React.FC = () => {
           const statsData = await statsResponse.json();
           console.log('📥 Статистика:', statsData);
           
-          if (statsData.stats) {
+          if (statsData.summary) {
             setStats({
-              total: statsData.stats.total || 0,
-              active: statsData.stats.active || 0,
-              maintenance: statsData.stats.maintenance || 0,
-              written_off: statsData.stats.written_off || 0,
+              total: statsData.summary.total_count || 0,
+              active: (statsData.status_breakdown?.find((s: any) => s.status === 'active')?.count) || 0,
+              maintenance: statsData.summary.needs_repair_count || 0,
+              written_off: (statsData.status_breakdown?.find((s: any) => s.status === 'written_off')?.count) || 0,
             });
           }
         } else {

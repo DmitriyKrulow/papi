@@ -19,6 +19,7 @@ from .repair_template import RepairTemplate
 from .maintenance_record import MaintenanceRecord
 from .movement_record import MovementRecord
 from .inventory_check import InventoryCheck
+from .inventory_check_item import InventoryCheckItem
 from .employee import Employee
 from .asset_type import AssetType
 from .asset_photo import AssetPhoto
@@ -44,6 +45,7 @@ __all__ = [
     "MaintenanceRecord",
     "MovementRecord",
     "InventoryCheck",
+    "InventoryCheckItem",
     "Employee",
     "AssetType",
     "AssetPhoto",

@@ -63,7 +63,12 @@ class Asset(Base):
     created_at = Column(DateTime, nullable=False, default=datetime.now)
     updated_at = Column(DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
     is_active = Column(Boolean, nullable=False, default=True)
-    
+
+    # Инвентаризация — дата последней проверки, кто проверял, статус подтверждения
+    last_inventory_date = Column(DateTime, nullable=True)
+    last_inventory_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    last_inventory_confirmed = Column(Boolean, nullable=False, default=False)
+
     __table_args__ = (
         Index("idx_assets_inventory_number", "inventory_number"),
         Index("idx_assets_status", "status"),
@@ -80,6 +85,8 @@ class Asset(Base):
     asset_type_config = relationship("AssetTypeConfig", back_populates="assets")
     assigned_employee = relationship("Employee")
     document_links = relationship("DocumentLink", back_populates="asset", cascade="all, delete-orphan")
+    last_inventory_by = relationship("User", foreign_keys=[last_inventory_by_id])
+    inventory_check_items = relationship("InventoryCheckItem", back_populates="asset", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<Asset(id={self.id}, name='{self.name}', status='{self.status}')>"
