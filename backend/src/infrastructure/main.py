@@ -17,6 +17,7 @@ import os
 os.makedirs("uploads/documents", exist_ok=True)
 os.makedirs("uploads/reports", exist_ok=True)
 os.makedirs("uploads/inventory", exist_ok=True)
+os.makedirs("uploads/asset_photos", exist_ok=True)
 
 app = FastAPI(title="PAPI Backend", redirect_slashes=False)
 
@@ -61,6 +62,7 @@ def register_routers():
     from src.presentation.http.routers.placements import router as placements_router
     from src.presentation.http.routers.employees import router as employees_router
     from src.presentation.http.routers.placement_assignments import router as placement_assignments_router
+    from src.presentation.http.routers.asset_documents import router as asset_documents_router
 
     app.include_router(assets_router, prefix="/api")
     app.include_router(assets_export_router)
@@ -78,6 +80,7 @@ def register_routers():
     app.include_router(placements_router, prefix="/api")
     app.include_router(employees_router, prefix="/api")
     app.include_router(placement_assignments_router, prefix="/api")
+    app.include_router(asset_documents_router, prefix="/api")
 
 
 @app.on_event("startup")

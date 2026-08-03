@@ -7,6 +7,7 @@ export interface AssetPhoto {
   document_id: number;
   uploaded_by: number;
   stage: string;
+  photo_category?: string;
   description?: string;
   taken_at?: string;
   taken_by?: number;
@@ -59,7 +60,7 @@ export const useAssetPhotos = (assetId: number) => {
     }
   }, []);
 
-  const uploadPhoto = useCallback(async (file: File, data?: any) => {
+const uploadPhoto = useCallback(async (file: File, data?: any) => {
     setLoading(true);
     setError(null);
     try {
@@ -68,6 +69,7 @@ export const useAssetPhotos = (assetId: number) => {
       
       if (data) {
         if (data.stage) formData.append('stage', data.stage);
+        if (data.photo_category) formData.append('photo_category', data.photo_category);
         if (data.description) formData.append('description', data.description);
         if (data.taken_at) formData.append('taken_at', data.taken_at);
         if (data.taken_by !== undefined && data.taken_by !== null) {
@@ -86,7 +88,7 @@ export const useAssetPhotos = (assetId: number) => {
         }
       }
       
-      const response = await axios.post<AssetPhoto>(`/asset-photos/${assetId}/upload`, formData, {
+      const response = await axios.post<AssetPhoto>(`/api/asset-photos/${assetId}/upload`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },

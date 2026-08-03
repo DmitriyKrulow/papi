@@ -1,4 +1,5 @@
 # backend/src/presentation/http/routers/assets.py
+import os
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import text
@@ -8,6 +9,8 @@ from typing import Optional, Any
 
 from src.infrastructure.db.init_db import get_db
 from src.infrastructure.db.models.asset import Asset
+from src.infrastructure.db.models.asset_photo import AssetPhoto as AssetPhotoModel
+from src.infrastructure.db.models.document import Document
 from src.infrastructure.db.models.department import Department
 from src.infrastructure.db.models.user import User
 from src.presentation.http.dependencies.auth import get_current_user
@@ -470,6 +473,16 @@ async def hard_delete_asset(
         if not asset:
             raise HTTPException(status_code=404, detail="Asset not found")
         
+        # Удаляем фотографии и связанные документы
+        photos = db.query(AssetPhotoModel).filter(AssetPhotoModel.asset_id == asset_id).all()
+        for photo in photos:
+            doc = db.query(Document).filter(Document.id == photo.document_id).first()
+            if doc:
+                if os.path.exists(doc.file_path):
+                    os.remove(doc.file_path)
+                db.delete(doc)
+            db.delete(photo)
+        
         # Удаляем связанные заявки на ремонт
         from src.infrastructure.db.models.repair_request import RepairRequest
         db.query(RepairRequest).filter(RepairRequest.asset_id == asset_id).delete()
@@ -599,6 +612,52 @@ async def get_asset_repair_history(
             "items": items,
             "total": len(items),
         }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{asset_id}/photos")
+async def get_asset_photos(
+    asset_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Получить все фотографии актива.
+    """
+    try:
+        asset = db.query(Asset).filter(Asset.id == asset_id).first()
+        if not asset:
+            raise HTTPException(status_code=404, detail="Asset not found")
+        
+        photos = db.query(AssetPhotoModel).filter(
+            AssetPhotoModel.asset_id == asset_id
+        ).order_by(AssetPhotoModel.sort_order, AssetPhotoModel.uploaded_at.desc()).all()
+        
+        items = []
+        for photo in photos:
+            doc = db.query(Document).filter(Document.id == photo.document_id).first() if photo.document_id else None
+            items.append({
+                "id": photo.id,
+                "asset_id": photo.asset_id,
+                "document_id": photo.document_id,
+                "uploaded_by": photo.uploaded_by,
+                "stage": photo.stage,
+                "photo_category": photo.photo_category,
+                "description": photo.description,
+                "is_before": photo.is_before,
+                "is_after": photo.is_after,
+                "sort_order": photo.sort_order,
+                "uploaded_at": photo.uploaded_at.isoformat() if photo.uploaded_at else None,
+                "filename": doc.filename if doc else None,
+                "file_size": doc.file_size if doc else None,
+                "mime_type": doc.mime_type if doc else None,
+            })
+        
+        return {"items": items, "total": len(items)}
         
     except HTTPException:
         raise

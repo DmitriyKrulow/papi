@@ -1,10 +1,12 @@
 // frontend/src/components/assets/AssetDetailsModal.tsx
 import React, { useState, useEffect } from 'react';
-import { Calendar, DollarSign, Edit, Trash2, MapPin, User, Wrench, Plus, RefreshCw } from 'lucide-react';
+import { Calendar, DollarSign, Edit, Trash2, MapPin, User, Wrench, Plus, RefreshCw, Image } from 'lucide-react';
 import type { Asset, MaintenanceEvent } from '../../types';
 import { AssetStatusMap, MaintenanceEventTypes, AssetTypeNames } from '../../types';
 import { formatMoney, formatDate } from '../../utils/helpers';
 import toast from 'react-hot-toast';
+import AssetPhotoGallery from './AssetPhotoGallery';
+import AssetDocuments from './AssetDocuments';
 
 interface AssetDetailsModalProps {
   asset: Asset | null;
@@ -21,6 +23,7 @@ const AssetDetailsModal: React.FC<AssetDetailsModalProps> = ({ asset, onClose, o
   const [showAddEvent, setShowAddEvent] = useState(false);
   const [loadingEvents, setLoadingEvents] = useState(false);
   const [loadingRepairs, setLoadingRepairs] = useState(false);
+  const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const [newEvent, setNewEvent] = useState({
     event_type: 'repair',
     event_date: new Date().toISOString().split('T')[0],
@@ -149,7 +152,7 @@ const getStatusColor = (status: string): string => {
 
 return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-2 flex-wrap">
             <h3 className="text-2xl font-bold text-gray-800">{asset.name}</h3>
@@ -169,22 +172,32 @@ return (
           </div>
           <p className="text-lg text-gray-600 font-mono">#{asset.inventory_number}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={() => setIsGalleryOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 transition whitespace-nowrap"
+          >
+            <Image className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Фотографии</span>
+            <span className="sm:hidden">📷</span>
+          </button>
           {asset.is_active ? (
             <>
               <button
                 onClick={() => onEdit(asset)}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition whitespace-nowrap"
               >
-                <Edit className="w-4 h-4" />
-                Редактировать
+                <Edit className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Редактировать</span>
+                <span className="sm:hidden">✏️</span>
               </button>
               <button
                 onClick={() => onDelete(asset.id)}
-                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition whitespace-nowrap"
               >
-                <Trash2 className="w-4 h-4" />
-                Списать
+                <Trash2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Списать</span>
+                <span className="sm:hidden">🗑️</span>
               </button>
             </>
           ) : (
@@ -192,19 +205,21 @@ return (
               {onRestore && (
                 <button
                   onClick={() => onRestore(asset.id)}
-                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition whitespace-nowrap"
                 >
-                  <RefreshCw className="w-4 h-4" />
-                  Восстановить
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Восстановить</span>
+                  <span className="sm:hidden">🔄</span>
                 </button>
               )}
               {onHardDelete && (
                 <button
                   onClick={() => onHardDelete(asset.id)}
-                  className="flex items-center gap-2 px-4 py-2 bg-red-800 text-white rounded-lg hover:bg-red-900 transition"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-800 text-white text-sm rounded-lg hover:bg-red-900 transition whitespace-nowrap"
                 >
-                  <Trash2 className="w-4 h-4" />
-                  Удалить навсегда
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Удалить навсегда</span>
+                  <span className="sm:hidden">💀</span>
                 </button>
               )}
             </>
@@ -429,8 +444,21 @@ return (
               })}
             </div>
           )}
-        </div>
+</div>
       )}
+
+      {/* Documents */}
+      <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-6">
+        <AssetDocuments assetId={asset.id} assetName={asset.name} />
+      </div>
+
+      {/* Photo Gallery Modal */}
+      <AssetPhotoGallery
+        assetId={asset.id}
+        assetName={asset.name}
+        isOpen={isGalleryOpen}
+        onClose={() => setIsGalleryOpen(false)}
+      />
     </div>
   );
 };

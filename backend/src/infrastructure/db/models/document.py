@@ -54,6 +54,7 @@ class Document(Base):
 
     uploader = relationship("User", foreign_keys=[uploaded_by], back_populates="documents")
     asset_photos = relationship("AssetPhoto", back_populates="document")
+    asset_links = relationship("DocumentLink", back_populates="document", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<Document(id={self.id}, filename='{self.filename}', type='{self.document_type}')>"

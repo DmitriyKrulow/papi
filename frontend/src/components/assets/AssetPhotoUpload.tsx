@@ -5,6 +5,7 @@ import { useAssetPhotos } from '../../hooks/useAssetPhotos';
 interface AssetPhotoUploadProps {
   assetId: number;
   stage?: string;
+  photoCategory?: string;
   onUploadSuccess?: (photo: any) => void;
   allowedExtensions?: string[];
   maxSizeMB?: number;
@@ -14,6 +15,7 @@ interface AssetPhotoUploadProps {
 export const AssetPhotoUpload = ({
   assetId,
   stage = 'other',
+  photoCategory,
   onUploadSuccess,
   allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'],
   maxSizeMB = 5,
@@ -75,13 +77,14 @@ export const AssetPhotoUpload = ({
     e.target.value = '';
   };
 
-  const handleUpload = async (file: File) => {
+const handleUpload = async (file: File) => {
     setIsUploading(true);
     setUploadError(null);
 
     try {
       const photo = await uploadPhoto(file, {
         stage,
+        photo_category: photoCategory,
         description: `Загружено: ${file.name}`,
         taken_at: new Date().toISOString(),
       });

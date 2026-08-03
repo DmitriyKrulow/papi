@@ -16,7 +16,7 @@ from . import Base
 
 
 class AssetPhoto(Base):
-    """?????? ?????????? ??????"""
+    """Модель фотографии актива"""
     __tablename__ = "asset_photos"
 
     id = Column(Integer, primary_key=True)
@@ -25,6 +25,7 @@ class AssetPhoto(Base):
     uploaded_by = Column(Integer, ForeignKey("users.id"), nullable=False)
 
     stage = Column(String(50), nullable=False, default="other")
+    photo_category = Column(String(50), nullable=True, default=None)
 
     description = Column(Text, nullable=True)
     taken_at = Column(DateTime, nullable=True)
@@ -43,6 +44,7 @@ class AssetPhoto(Base):
         Index("idx_asset_photos_document_id", "document_id"),
         Index("idx_asset_photos_uploaded_by", "uploaded_by"),
         Index("idx_asset_photos_uploaded_at", "uploaded_at"),
+        Index("idx_asset_photos_photo_category", "photo_category"),
     )
 
     asset = relationship("Asset", back_populates="asset_photos")

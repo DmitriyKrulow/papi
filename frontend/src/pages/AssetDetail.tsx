@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAssets } from '../hooks/useAssets';
+import { Image } from 'lucide-react';
+import AssetPhotoGallery from '../components/assets/AssetPhotoGallery';
 
 const AssetDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { assets, loading, error } = useAssets();
   const [asset, setAsset] = useState<any>(null);
+  const [isGalleryOpen, setIsGalleryOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && assets.length > 0) {
@@ -43,7 +46,14 @@ const AssetDetail: React.FC = () => {
                 Инвентарный номер: {asset.inventory_number}
               </p>
             </div>
-            <div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setIsGalleryOpen(true)}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition"
+              >
+                <Image className="w-4 h-4" />
+                Фотографии
+              </button>
               <span
                 className={`inline-flex items-center px-3 py-0.5 rounded-full text-sm font-medium ${
                   asset.status === 'active'
@@ -184,6 +194,14 @@ const AssetDetail: React.FC = () => {
           </dl>
         </div>
       </div>
+
+      {/* Photo Gallery Modal */}
+      <AssetPhotoGallery
+        assetId={parseInt(id || '0')}
+        assetName={asset.name}
+        isOpen={isGalleryOpen}
+        onClose={() => setIsGalleryOpen(false)}
+      />
     </div>
   );
 };

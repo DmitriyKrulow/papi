@@ -11,7 +11,7 @@ export const AssetPhotoList = ({ assetId, assetName }: AssetPhotoListProps) => {
   const { photos, loading, deletePhoto, error } = useAssetPhotos(assetId);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
-  const getStageLabel = (stage: string) => {
+const getStageLabel = (stage: string) => {
     const labels: Record<string, string> = {
       receiving: 'При поступлении',
       inventory: 'При инвентаризации',
@@ -22,6 +22,19 @@ export const AssetPhotoList = ({ assetId, assetName }: AssetPhotoListProps) => {
       other: 'Другое',
     };
     return labels[stage] || stage;
+  };
+
+  const getCategoryLabel = (category: string | undefined) => {
+    const labels: Record<string, string> = {
+      general_view: 'Общий вид',
+      placement: 'Место размещения',
+      inventory_number: 'Инвентарный номер',
+      current_location: 'Текущее местоположение',
+      condition: 'Состояние',
+      malfunction: 'Неисправность',
+      general_condition: 'Общее состояние',
+    };
+    return category ? labels[category] || category : '';
   };
 
   const handleDelete = async (photoId: number) => {
@@ -59,8 +72,8 @@ export const AssetPhotoList = ({ assetId, assetName }: AssetPhotoListProps) => {
           {photos.map((photo) => (
             <div key={photo.id} className="photo-card">
               <div className="photo-image">
-                <img
-                  src={`/uploads/assets/${photo.id}`}
+<img
+                  src={`/api/asset-photos/${photo.id}/download`}
                   alt={`Фото актива ${photo.id}`}
                   onError={(e) => {
                     (e.target as HTMLImageElement).src = '/placeholder-image.png';
@@ -76,10 +89,11 @@ export const AssetPhotoList = ({ assetId, assetName }: AssetPhotoListProps) => {
                   </button>
                 </div>
               </div>
-              <div className="photo-info">
-                <div className="photo-meta">
-                  <span className="stage">{getStageLabel(photo.stage)}</span>
-                  {photo.description && <span className="description">{photo.description}</span>}
+<div className="photo-info">
+                  <div className="photo-meta">
+                    <span className="stage">{getStageLabel(photo.stage)}</span>
+                    {photo.photo_category && <span className="category">{getCategoryLabel(photo.photo_category)}</span>}
+                    {photo.description && <span className="description">{photo.description}</span>}
                   {photo.is_before && <span className="badge badge-before">До</span>}
                   {photo.is_after && <span className="badge badge-after">После</span>}
                   {photo.inventory_check_id && (

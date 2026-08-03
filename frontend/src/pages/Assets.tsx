@@ -1093,10 +1093,11 @@ loadAssets();
             />
           </AssetModal>
 
-          <AssetModal
+<AssetModal
             isOpen={isDetailsModalOpen}
             onClose={() => setIsDetailsModalOpen(false)}
             title={`Детали: ${currentAsset.inventory_number}`}
+            className="max-w-4xl"
           >
 <AssetDetailsModal
               asset={currentAsset}

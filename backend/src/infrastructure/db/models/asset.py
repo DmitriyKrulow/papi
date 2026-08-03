@@ -79,6 +79,7 @@ class Asset(Base):
     asset_photos = relationship("AssetPhoto", back_populates="asset")
     asset_type_config = relationship("AssetTypeConfig", back_populates="assets")
     assigned_employee = relationship("Employee")
+    document_links = relationship("DocumentLink", back_populates="asset", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<Asset(id={self.id}, name='{self.name}', status='{self.status}')>"

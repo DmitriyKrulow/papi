@@ -6,26 +6,28 @@ from pydantic import BaseModel, Field, ConfigDict
 
 
 class AssetPhotoBase(BaseModel):
-    description: Optional[str] = Field(None, max_length=1000, description="???????? ????")
-    taken_at: Optional[datetime] = Field(None, description="????? ??????")
-    taken_by: Optional[int] = Field(None, description="??? ?????? ????")
-    sort_order: Optional[int] = Field(0, ge=0, description="??????? ??????????")
+    description: Optional[str] = Field(None, max_length=1000, description="Описание фото")
+    taken_at: Optional[datetime] = Field(None, description="Дата съемки")
+    taken_by: Optional[int] = Field(None, description="ID того, кто сделал фото")
+    sort_order: Optional[int] = Field(0, ge=0, description="Порядок сортировки")
 
 
 class AssetPhotoCreate(AssetPhotoBase):
-    stage: str = Field("other", description="???? ?????????? ????? (receiving, inventory, write_off, repair, maintenance, movement)")
-    is_before: Optional[bool] = Field(False, description="???? ?? ?????????")
-    is_after: Optional[bool] = Field(False, description="???? ????? ?????????")
-    inventory_check_id: Optional[int] = Field(None, description="ID ??????????????")
-    repair_request_id: Optional[int] = Field(None, description="ID ?????? ?? ??????")
+    stage: str = Field("other", description="Этап жизненного цикла (receiving, inventory, write_off, repair, maintenance, movement)")
+    photo_category: Optional[str] = Field(None, description="Категория фото (general_view, placement, inventory_number, current_location, condition, malfunction, general_condition)")
+    is_before: Optional[bool] = Field(False, description="Фото до воздействия")
+    is_after: Optional[bool] = Field(False, description="Фото после воздействия")
+    inventory_check_id: Optional[int] = Field(None, description="ID инвентаризации")
+    repair_request_id: Optional[int] = Field(None, description="ID заявки на ремонт")
 
 
 class AssetPhotoResponse(AssetPhotoBase):
-    id: int = Field(..., description="ID ????")
+    id: int = Field(..., description="ID фото")
     asset_id: int
     document_id: int
     uploaded_by: int
     stage: str
+    photo_category: Optional[str] = None
     inventory_check_id: Optional[int]
     repair_request_id: Optional[int]
     is_before: bool

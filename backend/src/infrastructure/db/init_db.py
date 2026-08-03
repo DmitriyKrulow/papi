@@ -32,6 +32,37 @@ def get_db() -> Session:
 
 def init_db():
     Base.metadata.create_all(bind=engine)
+    _ensure_photo_category_column()
+    _ensure_document_links_table()
+
+
+def _ensure_photo_category_column():
+    """Добавляет колонку photo_category в asset_photos, если её нет"""
+    from sqlalchemy import text, inspect
+    try:
+        inspector = inspect(engine)
+        columns = [c['name'] for c in inspector.get_columns('asset_photos')]
+        if 'photo_category' not in columns:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE asset_photos ADD COLUMN photo_category VARCHAR(50)"))
+                conn.commit()
+            print("Added photo_category column to asset_photos table")
+    except Exception as e:
+        print(f"Could not check/add photo_category column: {e}")
+
+
+def _ensure_document_links_table():
+    """Создаёт таблицу document_links, если её нет"""
+    from sqlalchemy import text, inspect
+    try:
+        inspector = inspect(engine)
+        table_names = inspector.get_table_names()
+        if 'document_links' not in table_names:
+            from src.infrastructure.db.models.document_link import DocumentLink
+            DocumentLink.__table__.create(engine)
+            print("Created document_links table")
+    except Exception as e:
+        print(f"Could not create document_links table: {e}")
 
 
 def get_or_create_admin() -> Optional[User]:

@@ -22,6 +22,7 @@ from .inventory_check import InventoryCheck
 from .employee import Employee
 from .asset_type import AssetType
 from .asset_photo import AssetPhoto
+from .document_link import DocumentLink
 from .import_job import ImportJob
 from .department import Room
 
@@ -35,6 +36,7 @@ __all__ = [
     "AssetTypeConfig",
     "MaintenanceEvent",
     "Document",
+    "DocumentLink",
     "Report",
     "DepreciationRecord",
     "RepairRequest",
