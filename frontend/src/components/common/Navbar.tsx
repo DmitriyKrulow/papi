@@ -47,35 +47,37 @@ const Navbar: React.FC = () => {
             🏗️ PAPI
           </Link>
 
-          {/* Desktop Navigation */}
-          <div className="hidden lg:flex items-center space-x-2">
-            {navItems.map((item) => (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`px-3 py-2 rounded-lg transition text-sm ${
-                  isActive(item.path)
-                    ? 'bg-blue-700 dark:bg-gray-700 text-white'
-                    : 'hover:bg-blue-500 dark:hover:bg-gray-700'
-                }`}
-              >
-                {item.label}
-              </Link>
-            ))}
-            {isAdmin && adminItems.map((item) => (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`px-3 py-2 rounded-lg transition text-sm ${
-                  isActive(item.path)
-                    ? 'bg-blue-700 dark:bg-gray-700 text-white'
-                    : 'hover:bg-blue-500 dark:hover:bg-gray-700'
-                }`}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </div>
+{/* Desktop Navigation — только для авторизованных */}
+          {isAuthenticated && (
+            <div className="hidden lg:flex items-center space-x-2">
+              {navItems.map((item) => (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={`px-3 py-2 rounded-lg transition text-sm ${
+                    isActive(item.path)
+                      ? 'bg-blue-700 dark:bg-gray-700 text-white'
+                      : 'hover:bg-blue-500 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              ))}
+              {isAdmin && adminItems.map((item) => (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={`px-3 py-2 rounded-lg transition text-sm ${
+                    isActive(item.path)
+                      ? 'bg-blue-700 dark:bg-gray-700 text-white'
+                      : 'hover:bg-blue-500 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </div>
+          )}
 
           {/* Desktop Right Side */}
           <div className="hidden lg:flex items-center space-x-3">
@@ -91,15 +93,17 @@ const Navbar: React.FC = () => {
               )}
             </button>
             
-            <a
-              href="/docs"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:bg-blue-500 dark:hover:bg-gray-700 px-2 py-2 rounded-lg transition"
-              title="📚 API"
-            >
-              📚
-            </a>
+            {isAuthenticated && (
+              <a
+                href="/docs"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:bg-blue-500 dark:hover:bg-gray-700 px-2 py-2 rounded-lg transition"
+                title="📚 API"
+              >
+                📚
+              </a>
+            )}
 
             {isAuthenticated && user ? (
               <>
@@ -154,38 +158,42 @@ const Navbar: React.FC = () => {
           </div>
         </div>
 
-        {/* Mobile Menu */}
+{/* Mobile Menu */}
         {mobileMenuOpen && (
           <div className="lg:hidden border-t border-blue-500 dark:border-gray-700 pb-4">
             <div className="flex flex-col space-y-1 pt-3">
-              {navItems.map((item) => (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  onClick={closeMobileMenu}
-                  className={`px-3 py-3 rounded-lg transition text-sm ${
-                    isActive(item.path)
-                      ? 'bg-blue-700 dark:bg-gray-700 text-white'
-                      : 'hover:bg-blue-500 dark:hover:bg-gray-700'
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              ))}
-              {isAdmin && adminItems.map((item) => (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  onClick={closeMobileMenu}
-                  className={`px-3 py-3 rounded-lg transition text-sm ${
-                    isActive(item.path)
-                      ? 'bg-blue-700 dark:bg-gray-700 text-white'
-                      : 'hover:bg-blue-500 dark:hover:bg-gray-700'
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              ))}
+              {isAuthenticated && (
+                <>
+                  {navItems.map((item) => (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      onClick={closeMobileMenu}
+                      className={`px-3 py-3 rounded-lg transition text-sm ${
+                        isActive(item.path)
+                          ? 'bg-blue-700 dark:bg-gray-700 text-white'
+                          : 'hover:bg-blue-500 dark:hover:bg-gray-700'
+                      }`}
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
+                  {isAdmin && adminItems.map((item) => (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      onClick={closeMobileMenu}
+                      className={`px-3 py-3 rounded-lg transition text-sm ${
+                        isActive(item.path)
+                          ? 'bg-blue-700 dark:bg-gray-700 text-white'
+                          : 'hover:bg-blue-500 dark:hover:bg-gray-700'
+                      }`}
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
+                </>
+              )}
               
               <div className="border-t border-blue-500 dark:border-gray-700 my-2 pt-2">
                 {isAuthenticated && user ? (
@@ -240,14 +248,6 @@ const Navbar: React.FC = () => {
                     >
                       📝 Регистрация
                     </Link>
-                    <a
-                      href="/docs"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block px-3 py-3 rounded-lg hover:bg-blue-500 dark:hover:bg-gray-700 transition text-sm"
-                    >
-                      📚 API документация
-                    </a>
                   </>
                 )}
               </div>

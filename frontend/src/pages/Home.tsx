@@ -1,7 +1,41 @@
 // frontend/src/pages/Home.tsx
 import { Link } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
 
 const Home: React.FC = () => {
+  const { isAuthenticated } = useAuth();
+
+  // Неавторизованный пользователь видит только общее описание
+  if (!isAuthenticated) {
+    return (
+      <div className="flex flex-col items-center justify-center text-center py-16 max-w-2xl mx-auto">
+        <h1 className="text-4xl font-bold text-gray-800 dark:text-gray-100 mb-4">
+          🏗️ PAPI — Управление активами
+        </h1>
+        <p className="text-xl text-gray-600 dark:text-gray-400 mb-6">
+          Система для управления основными средствами и активами предприятия
+        </p>
+        <p className="text-base text-gray-500 dark:text-gray-500 mb-8">
+          Для доступа к функционалу системы, пожалуйста, авторизуйтесь или зарегистрируйтесь.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-4">
+          <Link
+            to="/login"
+            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition inline-block"
+          >
+            🔑 Войти
+          </Link>
+          <Link
+            to="/register"
+            className="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-100 px-6 py-3 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition inline-block"
+          >
+            📝 Зарегистрироваться
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="text-center py-12">
       <h1 className="text-4xl font-bold text-gray-800 dark:text-gray-100 mb-4">
