@@ -62,8 +62,7 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSubmit, loading = false }
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (validate()) {
-      const { confirmPassword, ...data } = formData;
-      onSubmit(data);
+      onSubmit(formData);
     }
   };
 

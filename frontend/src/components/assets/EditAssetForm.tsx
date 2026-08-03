@@ -214,7 +214,7 @@ const EditAssetForm: React.FC<EditAssetFormProps> = ({ existingAsset, onSubmit, 
 
 const handleSubmitForm = async (data: any) => {
     try {
-      const payload: Record<string, unknown> = {
+      const payload: Asset = {
         id: existingAsset.id,
         inventory_number: data.inventory_number,
         name: data.name,
@@ -223,26 +223,29 @@ const handleSubmitForm = async (data: any) => {
         manufacturer_code: data.manufacturer_code,
         manufacturer_name: data.manufacturer_name,
         asset_type: data.asset_type,
-        purchase_price: data.purchase_price ? Number(data.purchase_price) : null,
-        current_value: data.current_value ? Number(data.current_value) : null,
+        purchase_price: data.purchase_price ? Number(data.purchase_price) : undefined,
+        current_value: data.current_value ? Number(data.current_value) : undefined,
         quantity: data.quantity ? Number(data.quantity) : 1,
         status: data.status as Asset['status'],
         location_address: data.location_address,
         responsible_person: data.responsible_person,
         department_code: data.department_code,
-        purchase_date: data.purchase_date || null,
-        commissioning_date: data.commissioning_date || null,
-        warranty_expiry: data.warranty_expiry || null,
+        purchase_date: data.purchase_date || undefined,
+        commissioning_date: data.commissioning_date || undefined,
+        warranty_expiry: data.warranty_expiry || undefined,
         serial_number: data.serial_number,
-        capacity: data.capacity ? Number(data.capacity) : null,
+        capacity: data.capacity ? Number(data.capacity) : undefined,
         power: data.power,
         weight: data.weight,
         consumable_type: data.consumable_type,
         crypto_wallet_address: data.crypto_wallet_address,
         crypto_token_symbol: data.crypto_token_symbol,
-        depreciation_years: data.depreciation_years ? Number(data.depreciation_years) : null,
-        next_maintenance_date: data.next_maintenance_date || null,
-        employee_id: selectedEmployeeId ? Number(selectedEmployeeId) : null,
+        depreciation_years: data.depreciation_years ? Number(data.depreciation_years) : undefined,
+        next_maintenance_date: data.next_maintenance_date || undefined,
+        employee_id: selectedEmployeeId ? Number(selectedEmployeeId) : undefined,
+        is_active: existingAsset.is_active,
+        created_at: existingAsset.created_at,
+        updated_at: new Date().toISOString(),
       };
       await onSubmit(payload);
     } catch (error) {

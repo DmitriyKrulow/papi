@@ -95,6 +95,10 @@ export interface RepairRequest {
   assigned_to?: number;
   estimated_cost?: number;
   actual_cost?: number;
+  desired_completion_date?: string;
+  deadline?: string;
+  completion_notes?: string;
+  rejection_reason?: string;
 }
 
 // ========== Подразделения (размещения) ==========

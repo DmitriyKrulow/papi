@@ -20,8 +20,8 @@ const employeeSchema = z.object({
   position: z.string().max(255, 'Максимум 255 символов').optional(),
   position_code: z.string().max(50, 'Максимум 50 символов').optional(),
   employee_number: z.string().max(50, 'Максимум 50 символов').optional(),
-  hire_date: z.coerce.date().optional(),
-  termination_date: z.coerce.date().optional(),
+  hire_date: z.union([z.string(), z.date()]).optional(),
+  termination_date: z.union([z.string(), z.date()]).optional(),
   is_active: z.boolean().optional(),
 });
 
@@ -33,10 +33,13 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, defaultValue, loa
     register,
     handleSubmit,
     formState: { errors },
+    watch,
+    setValue,
   } = useForm<EmployeeFormData>({
     resolver: zodResolver(employeeSchema),
-    defaultValues: defaultValue || {
-      is_active: true,
+    defaultValues: {
+      ...defaultValue,
+      is_active: defaultValue?.is_active ?? true,
     },
   });
 
@@ -133,7 +136,13 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, defaultValue, loa
             name="hire_date"
             control={control}
             render={({ field }) => (
-              <input {...field} type="date" className="w-full px-3 py-2 border rounded-md" />
+              <input 
+                {...field} 
+                type="date" 
+                value={field.value instanceof Date ? field.value.toISOString().split('T')[0] : (field.value || '')}
+                onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : null)}
+                className="w-full px-3 py-2 border rounded-md" 
+              />
             )}
           />
         </div>
@@ -144,7 +153,13 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, defaultValue, loa
             name="termination_date"
             control={control}
             render={({ field }) => (
-              <input {...field} type="date" className="w-full px-3 py-2 border rounded-md" />
+              <input 
+                {...field} 
+                type="date" 
+                value={field.value instanceof Date ? field.value.toISOString().split('T')[0] : (field.value || '')}
+                onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : null)}
+                className="w-full px-3 py-2 border rounded-md" 
+              />
             )}
           />
         </div>
@@ -152,18 +167,11 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, defaultValue, loa
 
       <div className="flex items-center space-x-4">
         <label className="flex items-center">
-          <Controller
-            name="is_active"
-            control={control}
-            render={({ field }) => (
-              <input
-                type="checkbox"
-                {...field}
-                checked={field.value}
-                onChange={field.onChange}
-                className="mr-2"
-              />
-            )}
+          <input
+            type="checkbox"
+            checked={!!watch('is_active')}
+            onChange={(e) => setValue('is_active', e.target.checked)}
+            className="mr-2"
           />
           Активен
         </label>

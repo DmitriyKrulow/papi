@@ -17,7 +17,7 @@ const ErrorMessage: React.FC<MessageProps> = ({
   onClose,
   className = '',
 }) => {
-  const styles: Record<MessageType, { bg: string; border: string; text: string; icon: React.FC }> = {
+  const styles: Record<MessageType, { bg: string; border: string; text: string; icon: React.ComponentType<{ className?: string }> }> = {
     error: {
       bg: 'bg-red-50 dark:bg-red-900/20',
       border: 'border-red-200 dark:border-red-800',

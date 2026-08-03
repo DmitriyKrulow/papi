@@ -11,7 +11,7 @@ interface Asset {
 
 interface RepairFormProps {
   onSubmit: (data: RepairFormData) => void;
-  defaultValue?: RepairFormData;
+  defaultValue?: Partial<RepairFormData>;
   loading?: boolean;
   assetId?: number;
   assets?: Asset[];

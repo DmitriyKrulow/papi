@@ -18,6 +18,7 @@ const departmentSchema = z.object({
   phone: z.string().max(50, 'Максимум 50 символов').optional(),
   email: z.string().email('Некорректный email').optional(),
   location: z.string().max(255, 'Максимум 255 символов').optional(),
+  description: z.string().optional(),
   is_active: z.boolean().optional(),
 });
 
@@ -33,10 +34,13 @@ const DepartmentForm: React.FC<DepartmentFormProps> = ({
     register,
     handleSubmit,
     formState: { errors },
+    watch,
+    setValue,
   } = useForm<DepartmentFormData>({
     resolver: zodResolver(departmentSchema),
-    defaultValues: defaultValue || {
-      is_active: true,
+    defaultValues: {
+      ...defaultValue,
+      is_active: defaultValue?.is_active ?? true,
     },
   });
 
@@ -124,24 +128,17 @@ const DepartmentForm: React.FC<DepartmentFormProps> = ({
         />
       </div>
 
-      <div className="flex items-center space-x-4">
-        <label className="flex items-center">
-          <Controller
-            name="is_active"
-            control={control}
-            render={({ field }) => (
-              <input
-                type="checkbox"
-                {...field}
-                checked={field.value}
-                onChange={field.onChange}
-                className="mr-2"
-              />
-            )}
-          />
-          Активно
-        </label>
-      </div>
+        <div className="flex items-center space-x-4">
+          <label className="flex items-center">
+            <input
+              type="checkbox"
+              checked={!!watch('is_active')}
+              onChange={(e) => setValue('is_active', e.target.checked)}
+              className="mr-2"
+            />
+            Активно
+          </label>
+        </div>
 
       <button
         type="submit"
