@@ -1,5 +1,5 @@
 // frontend/src/pages/Assets.tsx
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, useLayoutEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AssetStatusMap } from '../types';
 import { AssetTypeNames } from '../types';
@@ -68,6 +68,36 @@ const Assets: React.FC = () => {
   const [employeeDropdownOpen, setEmployeeDropdownOpen] = useState(false);
   const [departmentSearch, setDepartmentSearch] = useState('');
   const [deptDropdownOpen, setDeptDropdownOpen] = useState(false);
+
+  // Debounce для поиска — API вызывается только через 300мс после последнего ввода
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchTerm(value);
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => {
+      setDebouncedSearchTerm(value);
+      setCurrentPage(1);
+    }, 300);
+  }, []);
+
+  // Сохраняем фокус при ререндере (используем useLayoutEffect для синхронности)
+  useLayoutEffect(() => {
+    if (searchInputRef.current && document.activeElement !== searchInputRef.current) {
+      requestAnimationFrame(() => {
+        searchInputRef.current?.focus();
+      });
+    }
+  });
+
+  // Очистка таймера при размонтировании
+  useEffect(() => {
+    return () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    };
+  }, []);
 
   const getAssetTypeLabel = (assetType: string | undefined): { icon: string; name: string } => {
     if (!assetType) return { icon: '📦', name: '—' };
@@ -390,8 +420,8 @@ const handleEditClick = (asset: Asset) => {
           skip: String(skip),
           limit: String(pageSize),
         });
-        if (searchTerm) params.set('search', searchTerm);
-if (filterStatus) params.set('status', filterStatus);
+        if (debouncedSearchTerm) params.set('search', debouncedSearchTerm);
+ if (filterStatus) params.set('status', filterStatus);
         if (filterDepartment) params.set('department', filterDepartment);
         if (showHidden) params.set('include_hidden', 'true');
 
@@ -417,7 +447,7 @@ if (filterStatus) params.set('status', filterStatus);
       }
     };
 loadAssets();
-  }, [currentPage, pageSize, searchTerm, filterStatus, filterDepartment, showHidden, refreshKey]);
+  }, [currentPage, pageSize, debouncedSearchTerm, filterStatus, filterDepartment, showHidden, refreshKey]);
 
   const handleSort = (column: SortColumn) => {
     setSortConfig(prev => ({
@@ -516,10 +546,11 @@ loadAssets();
         <div className="flex items-center gap-2 mb-3">
           <Search className="w-4 h-4 text-gray-400 dark:text-gray-500" />
           <input
+            ref={searchInputRef}
             type="text"
             placeholder="Поиск по названию, инв. номеру..."
             value={searchTerm}
-            onChange={(e) => { setSearchTerm(e.target.value); if (currentPage !== 1) setCurrentPage(1); }}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
           />
           {isAdmin && (
@@ -802,27 +833,8 @@ loadAssets();
 
       {/* Table / Mobile Cards */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-        {getSortedAndFilteredAssets.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="text-4xl mb-4">📭</div>
-            <p className="text-gray-500 dark:text-gray-400">
-              {searchTerm || filterStatus || filterAssetType || filterDepartment || filterLocation || filterEmployee
-                ? 'Ничего не найдено по заданным параметрам'
-                : 'Нет активов для отображения'}
-            </p>
-            {(searchTerm || filterStatus || filterAssetType || filterDepartment || filterLocation || filterEmployee) && (
-              <button
-                onClick={() => { setSearchTerm(''); setFilterStatus(''); setFilterAssetType(''); setFilterDepartment(''); setFilterLocation(''); setFilterEmployee(''); setCurrentPage(1); }}
-                className="mt-3 text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-              >
-                Сбросить фильтры
-              </button>
-            )}
-          </div>
-        ) : (
-          <>
-            {/* Desktop Table (>=768px) */}
-            <div className="hidden md:block overflow-x-auto">
+        {/* Desktop Table (>=768px) */}
+        <div className="hidden md:block overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50 dark:bg-gray-700 border-b">
                   <tr>
@@ -1090,8 +1102,6 @@ loadAssets();
                 </button>
               </div>
             </div>
-          </>
-        )}
       </div>
 
       <AssetModal
