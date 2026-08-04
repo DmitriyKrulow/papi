@@ -56,19 +56,20 @@ async def export_assets_excel(
         if status:
             query = query.filter(Asset.status == status)
         if search:
+            search_pattern = f"%{search}%"
             query = query.filter(
-                (Asset.name.contains(search)) |
-                (Asset.inventory_number.contains(search)) |
-                (Asset.responsible_person.contains(search))
+                (Asset.name.ilike(search_pattern)) |
+                (Asset.inventory_number.ilike(search_pattern)) |
+                (Asset.responsible_person.ilike(search_pattern))
             )
         if location:
-            query = query.filter(Asset.location_address.contains(location))
+            query = query.filter(Asset.location_address.ilike(f"%{location}%"))
         if department:
-            query = query.filter(Asset.department_code.contains(department))
+            query = query.filter(Asset.department_code.ilike(f"%{department}%"))
         if responsible:
-            query = query.filter(Asset.responsible_person.contains(responsible))
+            query = query.filter(Asset.responsible_person.ilike(f"%{responsible}%"))
         if employee:
-            query = query.filter(Asset.responsible_person.contains(employee))
+            query = query.filter(Asset.responsible_person.ilike(f"%{employee}%"))
 
         assets = query.all()
 

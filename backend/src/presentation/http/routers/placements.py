@@ -60,9 +60,10 @@ async def list_departments(
     query = db.query(Department)
     
     if search:
+        search_pattern = f"%{search}%"
         query = query.filter(
-            (Department.name.contains(search)) | 
-            (Department.code.contains(search))
+            (Department.name.ilike(search_pattern)) | 
+            (Department.code.ilike(search_pattern))
         )
     
     if is_active is not None:

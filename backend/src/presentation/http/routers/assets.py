@@ -154,38 +154,39 @@ async def list_assets(
             query = query.filter(Asset.status == status)
         
         if search:
+            search_pattern = f"%{search}%"
             query = query.filter(
-                (Asset.name.contains(search)) | 
-                (Asset.inventory_number.contains(search)) |
-                (Asset.responsible_person.contains(search))
+                (Asset.name.ilike(search_pattern)) | 
+                (Asset.inventory_number.ilike(search_pattern)) |
+                (Asset.responsible_person.ilike(search_pattern))
             )
         
         if location:
-            query = query.filter(Asset.location_address.contains(location))
+            query = query.filter(Asset.location_address.ilike(f"%{location}%"))
         
         if department:
             dept_match = db.query(Department.id).filter(
-                (Department.code.contains(department)) | 
-                (Department.name.contains(department)),
+                (Department.code.ilike(f"%{department}%")) | 
+                (Department.name.ilike(f"%{department}%")),
                 Department.is_active == True
             ).first()
             if dept_match:
-                query = query.filter(Asset.department_code == Department.code if False else Asset.department_code.contains(department))
+                query = query.filter(Asset.department_code == Department.code if False else Asset.department_code.ilike(f"%{department}%"))
             else:
-                query = query.filter(Asset.department_code.contains(department))
+                query = query.filter(Asset.department_code.ilike(f"%{department}%"))
         
         if responsible:
-            query = query.filter(Asset.responsible_person.contains(responsible))
+            query = query.filter(Asset.responsible_person.ilike(f"%{responsible}%"))
         
         if employee:
             emp_match = db.query(Employee).filter(
-                (Employee.first_name.contains(employee)) |
-                (Employee.last_name.contains(employee))
+                (Employee.first_name.ilike(f"%{employee}%")) |
+                (Employee.last_name.ilike(f"%{employee}%"))
             ).first()
             if emp_match:
                 query = query.filter(
-                    (Asset.responsible_person.contains(emp_match.last_name)) |
-                    (Asset.responsible_person.contains(emp_match.first_name))
+                    (Asset.responsible_person.ilike(f"%{emp_match.last_name}%")) |
+                    (Asset.responsible_person.ilike(f"%{emp_match.first_name}%"))
                 )
             else:
                 query = query.filter(text("0=1"))

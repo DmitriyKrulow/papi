@@ -61,9 +61,10 @@ async def get_available_departments(
     query = db.query(Department).filter(Department.is_active == True)
     
     if search:
+        search_pattern = f"%{search}%"
         query = query.filter(
-            (Department.name.contains(search)) | 
-            (Department.code.contains(search))
+            (Department.name.ilike(search_pattern)) | 
+            (Department.code.ilike(search_pattern))
         )
     
     departments = query.order_by(Department.name).all()
@@ -93,9 +94,10 @@ async def get_responsible_persons(
     )
     
     if search:
+        search_pattern = f"%{search}%"
         query = query.filter(
-            (User.username.contains(search)) |
-            (User.full_name.contains(search))
+            (User.username.ilike(search_pattern)) |
+            (User.full_name.ilike(search_pattern))
         )
     
     users = query.order_by(User.username).all()
@@ -131,10 +133,11 @@ async def get_available_employees(
         query = query.filter(Employee.department_id == department_id)
 
     if search:
+        search_pattern = f"%{search}%"
         query = query.filter(
-            (Employee.first_name.contains(search)) |
-            (Employee.last_name.contains(search)) |
-            (Employee.middle_name.contains(search))
+            (Employee.first_name.ilike(search_pattern)) |
+            (Employee.last_name.ilike(search_pattern)) |
+            (Employee.middle_name.ilike(search_pattern))
         )
     
     employees = query.order_by(Employee.last_name, Employee.first_name).all()
@@ -172,10 +175,11 @@ async def get_available_rooms(
         query = query.filter(Room.department_id == department_id)
 
     if search:
+        search_pattern = f"%{search}%"
         query = query.filter(
-            (Room.name.contains(search)) |
-            (Room.floor.contains(search)) |
-            (Room.building.contains(search))
+            (Room.name.ilike(search_pattern)) |
+            (Room.floor.ilike(search_pattern)) |
+            (Room.building.ilike(search_pattern))
         )
 
     rooms = query.order_by(Room.name).all()
@@ -220,10 +224,11 @@ async def list_placements(
             query = query.filter(Asset.responsible_person.like(f"%{emp_full}%"))
     
     if search:
+        search_pattern = f"%{search}%"
         query = query.filter(
-            (Asset.name.contains(search)) | 
-            (Asset.inventory_number.contains(search)) |
-            (Asset.responsible_person.contains(search))
+            (Asset.name.ilike(search_pattern)) | 
+            (Asset.inventory_number.ilike(search_pattern)) |
+            (Asset.responsible_person.ilike(search_pattern))
         )
     
     total = query.count()

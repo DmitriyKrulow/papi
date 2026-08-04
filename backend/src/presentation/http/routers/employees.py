@@ -83,12 +83,13 @@ async def list_employees(
     )
     
     if search:
+        search_pattern = f"%{search}%"
         query = query.filter(
-            (Employee.first_name.contains(search)) |
-            (Employee.last_name.contains(search)) |
-            (Employee.middle_name.contains(search)) |
-            (Employee.position.contains(search)) |
-            (Employee.phone.contains(search))
+            (Employee.first_name.ilike(search_pattern)) |
+            (Employee.last_name.ilike(search_pattern)) |
+            (Employee.middle_name.ilike(search_pattern)) |
+            (Employee.position.ilike(search_pattern)) |
+            (Employee.phone.ilike(search_pattern))
         )
     
     if department_id:

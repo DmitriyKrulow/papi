@@ -89,10 +89,11 @@ async def get_marking_assets(
         query = query.filter(Asset.status == status)
     
     if search:
+        search_pattern = f"%{search}%"
         query = query.filter(
-            (Asset.name.contains(search)) |
-            (Asset.inventory_number.contains(search)) |
-            (Asset.responsible_person.contains(search))
+            (Asset.name.ilike(search_pattern)) |
+            (Asset.inventory_number.ilike(search_pattern)) |
+            (Asset.responsible_person.ilike(search_pattern))
         )
     
     assets = query.order_by(Asset.inventory_number).all()
