@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Optional
 import os
+import logging
 
 from sqlalchemy.orm import Session
 
@@ -9,6 +10,8 @@ from src.infrastructure.db.models import Base
 from src.infrastructure.db.session import SessionLocal, engine
 from src.core.value_objects.password_hash import PasswordHash
 from src.infrastructure.db.models.asset_type_config import seed_asset_types
+
+logger = logging.getLogger(__name__)
 
 
 # Удаляем papi.db если он был создан ошибочно
@@ -110,6 +113,7 @@ def _ensure_asset_inventory_columns():
 
 
 def get_or_create_admin() -> Optional[User]:
+    """Создаёт администратора по умолчанию, если его нет. НЕ изменяет существующий аккаунт."""
     db = SessionLocal()
     try:
         admin = db.query(User).filter(User.username == "admin").first()
@@ -129,26 +133,8 @@ def get_or_create_admin() -> Optional[User]:
             db.add(admin)
             db.commit()
             db.refresh(admin)
-        else:
-            # Check if password_hash is valid
-            if not admin.password_hash:
-                password_hash = PasswordHash.from_plain_password("admin123")
-                admin.password_hash = str(password_hash)
-                db.commit()
-            else:
-                # Try to verify the password to check if hash is valid
-                try:
-                    password_hash = PasswordHash.from_hash_string(admin.password_hash)
-                    # Test with admin123 - if it fails, reset the password
-                    if not password_hash.verify("admin123"):
-                        password_hash = PasswordHash.from_plain_password("admin123")
-                        admin.password_hash = str(password_hash)
-                        db.commit()
-                except (ValueError, AttributeError):
-                    # Invalid hash, reset password
-                    password_hash = PasswordHash.from_plain_password("admin123")
-                    admin.password_hash = str(password_hash)
-                    db.commit()
+            logger.info("[InitDB] Created default admin account (username: admin, password: admin123)")
+        # Существующий аккаунт администратора НЕ изменяем — пользователь мог сменить пароль
         return admin
     finally:
         db.close()
