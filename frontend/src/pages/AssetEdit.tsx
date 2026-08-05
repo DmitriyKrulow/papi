@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+﻿import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import AssetForm from '../components/forms/AssetForm';
 import { useAssets } from '../hooks/useAssets';
@@ -117,12 +117,12 @@ const AssetEdit: React.FC = () => {
         >
           ← Назад
         </button>
-        <h1 className="text-3xl font-bold text-gray-900">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
           Редактирование актива: {asset.name}
         </h1>
       </div>
 
-      <div className="bg-white shadow sm:rounded-lg">
+      <div className="bg-white dark:bg-gray-800 shadow sm:rounded-lg">
         <div className="px-4 py-5 sm:p-6">
           <AssetForm onSubmit={handleSubmit} defaultValue={formData} loading={loading} />
           {error && (

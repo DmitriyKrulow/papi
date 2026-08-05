@@ -1,4 +1,4 @@
-// frontend/src/components/assets/AddAssetForm.tsx
+﻿// frontend/src/components/assets/AddAssetForm.tsx
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import type { Asset, AssetTypeConfig } from '../../types';
@@ -156,7 +156,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
     return (
       <div className="flex justify-center py-8">
         <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-        <span className="ml-3 text-gray-600">Загрузка данных...</span>
+        <span className="ml-3 text-gray-600 dark:text-gray-300">Загрузка данных...</span>
       </div>
     );
   }
@@ -166,7 +166,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
       <form onSubmit={handleSubmit(handleSubmitForm)} className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
               Инвентарный номер *
             </label>
             <input
@@ -178,15 +178,15 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
                   message: 'Минимум 3 символа',
                 },
               })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="INV-001"
             />
             {errors.inventory_number && (
-              <p className="mt-1 text-sm text-red-600">{String(errors.inventory_number.message)}</p>
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{String(errors.inventory_number.message)}</p>
             )}
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
               Название *
             </label>
             <input
@@ -198,18 +198,18 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
                   message: 'Минимум 2 символа',
                 },
               })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="Название актива"
             />
             {errors.name && (
-              <p className="mt-1 text-sm text-red-600">{String(errors.name.message)}</p>
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{String(errors.name.message)}</p>
             )}
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
               Тип актива
             </label>
             <select
@@ -222,7 +222,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
                   setValue('depreciation_years', typeConfig.default_depreciation_years);
                 }
               }}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="">Не выбран</option>
               {assetTypes.map((type) => (
@@ -233,7 +233,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
               Срок амортизации (лет)
             </label>
             <input
@@ -242,7 +242,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
               {...register('depreciation_years', {
                 valueAsNumber: true,
               })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="5"
             />
           </div>
@@ -251,25 +251,25 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
         {selectedType === 'fire_extinguisher' && (
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                 Объём (л)
               </label>
               <input
                 type="number"
                 step="0.1"
                 {...register('capacity', { valueAsNumber: true })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="2"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                 Следующая проверка
               </label>
               <input
                 type="date"
                 {...register('next_maintenance_date')}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
           </div>
@@ -278,24 +278,24 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
         {(selectedType === 'computer' || selectedType === 'printer') && (
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                 Серийный номер
               </label>
               <input
                 type="text"
                 {...register('serial_number')}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="SN-12345"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                 Мощность (Вт)
               </label>
               <input
                 type="text"
                 {...register('power')}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="300"
               />
             </div>
@@ -305,24 +305,24 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
         {selectedType === 'printer' && (
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                 Тип тонера
               </label>
               <input
                 type="text"
                 {...register('consumable_type')}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="CF280A"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                 Следующее обслуживание
               </label>
               <input
                 type="date"
                 {...register('next_maintenance_date')}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
           </div>
@@ -331,24 +331,24 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
         {selectedType === 'crypto_token' && (
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                 Имя пользователя / Логин
               </label>
               <input
                 type="text"
                 {...register('crypto_wallet_address')}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="ivanov.a"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                 Серийный номер / Идентификатор
               </label>
               <input
                 type="text"
                 {...register('crypto_token_symbol')}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="SN-XXXXX"
               />
             </div>
@@ -358,24 +358,24 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
         {selectedType === 'consumables' && (
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                 Тип расходника
               </label>
               <input
                 type="text"
                 {...register('consumable_type')}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Бумага А4"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                 Вес (кг)
               </label>
               <input
                 type="text"
                 {...register('weight')}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="1.5"
               />
             </div>
@@ -384,67 +384,67 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
               Дата покупки
             </label>
             <input
               type="date"
               {...register('purchase_date')}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
               Гарантия до
             </label>
             <input
               type="date"
               {...register('warranty_expiry')}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
               Модель
             </label>
             <input
               type="text"
               {...register('model')}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="Модель"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
               Код производителя
             </label>
             <input
               type="text"
               {...register('manufacturer_code')}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="Код производителя"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
             Производитель
           </label>
           <input
             type="text"
             {...register('manufacturer_name')}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="Производитель"
           />
         </div>
 
         <div className="grid grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
               Стоимость покупки (₽)
             </label>
             <input
@@ -454,12 +454,12 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
               {...register('purchase_price', {
                 valueAsNumber: true,
               })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="0.00"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
               Текущая стоимость (₽)
             </label>
             <input
@@ -469,12 +469,12 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
               {...register('current_value', {
                 valueAsNumber: true,
               })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="0.00"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
               Количество
             </label>
             <input
@@ -484,7 +484,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
                 valueAsNumber: true,
                 value: 1,
               })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="1"
             />
           </div>
@@ -492,7 +492,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
 
         <div className="grid grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
               Подразделение / Кабинет
             </label>
             <select
@@ -511,7 +511,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
                   setValue('location_address', '');
                 }
               }}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               disabled={loadingOptions || allRooms.length === 0}
             >
               <option value="">Не выбрано</option>
@@ -522,12 +522,12 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
               ))}
             </select>
             {allRooms.length === 0 && !loadingOptions && (
-              <p className="mt-1 text-xs text-gray-500">Нет доступных кабинетов</p>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 dark:text-gray-500">Нет доступных кабинетов</p>
             )}
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
               Ответственное лицо
             </label>
             <select
@@ -544,7 +544,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
                   setValue('responsible_person', '');
                 }
               }}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               disabled={loadingOptions || responsibleOptions.length === 0}
             >
               <option value="">Не выбрано</option>
@@ -555,12 +555,12 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
               ))}
             </select>
             {responsibleOptions.length === 0 && !loadingOptions && (
-              <p className="mt-1 text-xs text-gray-500">Нет доступных сотрудников</p>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 dark:text-gray-500">Нет доступных сотрудников</p>
             )}
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
               Сотрудник (получатель имущества)
             </label>
             <select
@@ -569,7 +569,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
                 const empId = e.target.value ? Number(e.target.value) : null;
                 setSelectedEmployeeId(empId || '');
               }}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               disabled={loadingOptions || allEmployees.length === 0}
             >
               <option value="">Не выбран</option>
@@ -580,17 +580,17 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
               ))}
             </select>
             {allEmployees.length === 0 && !loadingOptions && (
-              <p className="mt-1 text-xs text-gray-500">Нет доступных сотрудников</p>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 dark:text-gray-500">Нет доступных сотрудников</p>
             )}
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
               Статус
             </label>
             <select
               {...register('status', { required: 'Обязательное поле' })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="active">Активен</option>
               <option value="maintenance">На ремонте</option>
@@ -603,13 +603,13 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
             Описание
           </label>
           <textarea
             {...register('description')}
             rows={3}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="Описание актива..."
           />
         </div>
@@ -618,7 +618,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-gray-700"
+            className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition text-gray-700 dark:text-gray-200"
           >
             Отмена
           </button>

@@ -130,12 +130,12 @@ const RepairEdit: React.FC = () => {
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Редактирование заявки #{repairId}</h1>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Редактирование заявки #{repairId}</h1>
         <div className="mt-2 flex flex-wrap gap-2">
-          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${RepairStatusMap[repair.status as keyof typeof RepairStatusMap].color === 'green' ? 'bg-green-100 text-green-800' : repair.status === 'rejected' ? 'bg-red-100 text-red-800' : repair.status === 'in_progress' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}`}>
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${RepairStatusMap[repair.status as keyof typeof RepairStatusMap].color === 'green' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' : repair.status === 'rejected' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300' : repair.status === 'in_progress' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}`}>
             {RepairStatusMap[repair.status as keyof typeof RepairStatusMap].label}
           </span>
-          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${PriorityMap[repair.priority as keyof typeof PriorityMap].color === 'red' ? 'bg-red-100 text-red-800' : PriorityMap[repair.priority as keyof typeof PriorityMap].color === 'orange' ? 'bg-orange-100 text-orange-800' : PriorityMap[repair.priority as keyof typeof PriorityMap].color === 'blue' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}`}>
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${PriorityMap[repair.priority as keyof typeof PriorityMap].color === 'red' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300' : PriorityMap[repair.priority as keyof typeof PriorityMap].color === 'orange' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300' : PriorityMap[repair.priority as keyof typeof PriorityMap].color === 'blue' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}`}>
             {PriorityMap[repair.priority as keyof typeof PriorityMap].label}
           </span>
         </div>
@@ -143,18 +143,18 @@ const RepairEdit: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <div className="bg-white shadow rounded-lg p-6">
+          <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 border border-gray-100 dark:border-gray-700">
             <div className="mb-6">
-              <label className="block text-sm font-medium mb-2">Шаблоны заявок</label>
+              <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Шаблоны заявок</label>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {templateOptions.map((template) => (
                   <button
                     key={template.id}
                     onClick={() => applyTemplate(template)}
-                    className="text-left p-4 border rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors"
+                    className="text-left p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
                   >
-                    <h3 className="font-medium text-blue-600">{template.title}</h3>
-                    <p className="text-sm text-gray-600 mt-1">{template.description}</p>
+                    <h3 className="font-medium text-blue-600 dark:text-blue-400">{template.title}</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{template.description}</p>
                   </button>
                 ))}
               </div>
@@ -162,22 +162,22 @@ const RepairEdit: React.FC = () => {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Название</label>
+                <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Название</label>
                 <input
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-md"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                   placeholder="Краткое описание проблемы"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">Описание</label>
+                <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Описание</label>
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-md"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                   rows={4}
                   placeholder="Подробное описание неисправности"
                 />
@@ -185,11 +185,11 @@ const RepairEdit: React.FC = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Приоритет</label>
+                  <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Приоритет</label>
                   <select
                     value={priority}
                     onChange={(e) => handlePriorityChange(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-md"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                   >
                     <option value="low">Низкий</option>
                     <option value="medium">Средний</option>
@@ -199,11 +199,11 @@ const RepairEdit: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1">Статус</label>
+                  <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Статус</label>
                   <select
                     value={status}
                     onChange={(e) => handleStatusChange(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-md"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                   >
                     <option value="draft">Черновик</option>
                     <option value="submitted">Подана</option>
@@ -216,33 +216,33 @@ const RepairEdit: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1">Желаемая дата выполнения</label>
+                  <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Желаемая дата выполнения</label>
                   <input
                     type="date"
                     value={desiredCompletionDate}
                     onChange={(e) => setDesiredCompletionDate(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-md"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1">Срок выполнения</label>
+                  <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Срок выполнения</label>
                   <input
                     type="date"
                     value={deadline}
                     onChange={(e) => setDeadline(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-md"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1">Сметная стоимость</label>
+                  <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Сметная стоимость</label>
                   <input
                     type="number"
                     value={estimatedCost}
                     onChange={(e) => setEstimatedCost(e.target.value)}
                     min="0"
-                    className="w-full px-3 py-2 border rounded-md"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                     placeholder="0.00"
                   />
                 </div>
@@ -260,42 +260,42 @@ const RepairEdit: React.FC = () => {
         </div>
 
         <div className="lg:col-span-1">
-          <div className="bg-white shadow rounded-lg p-6">
-            <h2 className="text-lg font-medium mb-4">Информация о заявке</h2>
+          <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 border border-gray-100 dark:border-gray-700">
+            <h2 className="text-lg font-medium mb-4 text-gray-900 dark:text-gray-100">Информация о заявке</h2>
             
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-500">Актив</label>
-                <p className="mt-1 text-sm text-gray-900">
+                <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Актив</label>
+                <p className="mt-1 text-sm text-gray-900 dark:text-gray-100">
                   {asset ? `${asset.name} (ID: ${asset.id})` : `Актив ID: ${repair.asset_id}`}
                 </p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-500">Создано</label>
-                <p className="mt-1 text-sm text-gray-900">
+                <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Создано</label>
+                <p className="mt-1 text-sm text-gray-900 dark:text-gray-100">
                   {new Date(repair.created_at).toLocaleDateString('ru-RU')}
                 </p>
               </div>
 
               {repair.created_by && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-500">Автор</label>
-                  <p className="mt-1 text-sm text-gray-900">{repair.created_by}</p>
+                  <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Автор</label>
+                  <p className="mt-1 text-sm text-gray-900 dark:text-gray-100">{repair.created_by}</p>
                 </div>
               )}
 
               {repair.assigned_to && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-500">Исполнитель</label>
-                  <p className="mt-1 text-sm text-gray-900">{repair.assigned_to}</p>
+                  <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Исполнитель</label>
+                  <p className="mt-1 text-sm text-gray-900 dark:text-gray-100">{repair.assigned_to}</p>
                 </div>
               )}
 
               {repair.estimated_cost !== undefined && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-500">Сметная стоимость</label>
-                  <p className="mt-1 text-sm text-gray-900">
+                  <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Сметная стоимость</label>
+                  <p className="mt-1 text-sm text-gray-900 dark:text-gray-100">
                     {new Intl.NumberFormat('ru-RU', {
                       style: 'currency',
                       currency: 'RUB',
@@ -306,8 +306,8 @@ const RepairEdit: React.FC = () => {
 
               {repair.actual_cost !== undefined && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-500">Фактическая стоимость</label>
-                  <p className="mt-1 text-sm text-gray-900">
+                  <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Фактическая стоимость</label>
+                  <p className="mt-1 text-sm text-gray-900 dark:text-gray-100">
                     {new Intl.NumberFormat('ru-RU', {
                       style: 'currency',
                       currency: 'RUB',
@@ -318,22 +318,22 @@ const RepairEdit: React.FC = () => {
 
               {repair.completion_notes && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-500">Заметки о выполнении</label>
-                  <p className="mt-1 text-sm text-gray-900">{repair.completion_notes}</p>
+                  <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Заметки о выполнении</label>
+                  <p className="mt-1 text-sm text-gray-900 dark:text-gray-100">{repair.completion_notes}</p>
                 </div>
               )}
 
               {repair.rejection_reason && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-500">Причина отклонения</label>
-                  <p className="mt-1 text-sm text-gray-900">{repair.rejection_reason}</p>
+                  <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Причина отклонения</label>
+                  <p className="mt-1 text-sm text-gray-900 dark:text-gray-100">{repair.rejection_reason}</p>
                 </div>
               )}
             </div>
 
             {user?.role === UserRole.ADMIN && (
-              <div className="mt-6 pt-6 border-t">
-                <h3 className="text-sm font-medium text-gray-900 mb-3">Действия администратора</h3>
+              <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">Действия администратора</h3>
                 <div className="space-y-2">
                   <button
                     onClick={() => handleStatusChange('approved')}

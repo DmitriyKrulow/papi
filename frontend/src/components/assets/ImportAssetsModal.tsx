@@ -1,4 +1,4 @@
-// frontend/src/components/assets/ImportAssetsModal.tsx
+﻿// frontend/src/components/assets/ImportAssetsModal.tsx
 import React, { useState } from 'react';
 import toast from 'react-hot-toast';
 
@@ -120,20 +120,20 @@ const ImportAssetsModal: React.FC<ImportAssetsModalProps> = ({ isOpen, onClose, 
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
         <div className="fixed inset-0 transition-opacity" aria-hidden="true">
-          <div className="absolute inset-0 bg-gray-500 opacity-75" onClick={handleClose}></div>
+          <div className="absolute inset-0 bg-gray-500 dark:bg-gray-600 opacity-75 dark:opacity-80" onClick={handleClose}></div>
         </div>
 
         <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">
           &#8203;
         </span>
 
-        <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
-          <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+        <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+          <div className="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-medium text-gray-900">📤 Загрузка активов из файла</h3>
               <button
                 onClick={handleClose}
-                className="text-gray-400 hover:text-gray-500 focus:outline-none"
+                className="text-gray-400 dark:text-gray-500 dark:text-gray-400 hover:text-gray-500 dark:text-gray-400 focus:outline-none"
               >
                 <span className="sr-only">Закрыть</span>
                 <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -144,13 +144,13 @@ const ImportAssetsModal: React.FC<ImportAssetsModalProps> = ({ isOpen, onClose, 
 
             {!importResult ? (
               <>
-                <p className="text-sm text-gray-500 mb-4">
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
                   Загрузите файл инвентаризационной описи в формате Excel (.xlsx, .xls)
                 </p>
 
                 <div
                   className={`border-2 border-dashed rounded-lg p-8 text-center ${
-                    dragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
+                    dragActive ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-300 dark:border-gray-600'
                   }`}
                   onDragEnter={handleDrag}
                   onDragLeave={handleDrag}
@@ -160,8 +160,8 @@ const ImportAssetsModal: React.FC<ImportAssetsModalProps> = ({ isOpen, onClose, 
                   {file ? (
                     <div className="space-y-2">
                       <div className="text-4xl">📄</div>
-                      <p className="font-medium text-gray-700">{file.name}</p>
-                      <p className="text-sm text-gray-500">
+                      <p className="font-medium text-gray-700 dark:text-gray-200">{file.name}</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
                         {(file.size / 1024).toFixed(1)} KB
                       </p>
                       <button
@@ -174,10 +174,10 @@ const ImportAssetsModal: React.FC<ImportAssetsModalProps> = ({ isOpen, onClose, 
                   ) : (
                     <>
                       <div className="text-4xl mb-2">📂</div>
-                      <p className="text-gray-600">
+                      <p className="text-gray-600 dark:text-gray-300">
                         Перетащите файл сюда или кликните для выбора
                       </p>
-                      <p className="text-sm text-gray-400 mt-1">
+                      <p className="text-sm text-gray-400 dark:text-gray-500 dark:text-gray-400 mt-1">
                         Поддерживаются файлы .xlsx, .xls (макс. 10 MB)
                       </p>
                       <input
@@ -197,8 +197,8 @@ const ImportAssetsModal: React.FC<ImportAssetsModalProps> = ({ isOpen, onClose, 
                   )}
                 </div>
 
-                <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                  <p className="text-sm text-yellow-700">
+                <div className="mt-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
+                  <p className="text-sm text-yellow-700 dark:text-yellow-200">
                     ⚠️ Файл должен соответствовать формату инвентаризационной описи (форма 0510466)
                   </p>
                 </div>
@@ -206,7 +206,7 @@ const ImportAssetsModal: React.FC<ImportAssetsModalProps> = ({ isOpen, onClose, 
                 <div className="mt-6 flex justify-end space-x-3">
                   <button
                     onClick={handleClose}
-                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
+                    className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition"
                   >
                     Отмена
                   </button>
@@ -228,9 +228,9 @@ const ImportAssetsModal: React.FC<ImportAssetsModalProps> = ({ isOpen, onClose, 
               </>
             ) : (
               <div className="space-y-4">
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <h4 className="text-green-800 font-medium mb-2">✅ Импорт запущен!</h4>
-                  <div className="space-y-1 text-sm text-green-700">
+                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                  <h4 className="text-green-800 dark:text-green-200 font-medium mb-2">✅ Импорт запущен!</h4>
+                  <div className="space-y-1 text-sm text-green-700 dark:text-green-300">
                     <p>📊 Всего строк: {importResult.total_rows || 0}</p>
                     <p>✅ Валидных: {importResult.valid_rows || 0}</p>
                     <p>❌ Ошибок: {importResult.errors || 0}</p>
@@ -238,8 +238,8 @@ const ImportAssetsModal: React.FC<ImportAssetsModalProps> = ({ isOpen, onClose, 
                   </div>
                 </div>
 
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <p className="text-sm text-blue-700">
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                  <p className="text-sm text-blue-700 dark:text-blue-300">
                     ℹ️ Импорт выполняется в фоновом режиме. Проверьте статус в разделе отчетов.
                   </p>
                 </div>

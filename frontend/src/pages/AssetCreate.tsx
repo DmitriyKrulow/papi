@@ -25,14 +25,14 @@ const AssetCreate: React.FC = () => {
       <div className="flex items-center gap-4 mb-6">
         <button
           onClick={() => navigate('/assets')}
-          className="text-blue-600 hover:text-blue-800 transition"
+          className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition"
         >
           ← Назад
         </button>
-        <h1 className="text-2xl font-bold text-gray-800">Новый актив</h1>
+        <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Новый актив</h1>
       </div>
 
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-100 dark:border-gray-700 p-6">
         <AddAssetForm
           onSubmit={handleSubmit}
           onClose={() => navigate('/assets')}
