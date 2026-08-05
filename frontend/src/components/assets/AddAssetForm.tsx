@@ -178,7 +178,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
                   message: 'Минимум 3 символа',
                 },
               })}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="INV-001"
             />
             {errors.inventory_number && (
@@ -198,7 +198,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
                   message: 'Минимум 2 символа',
                 },
               })}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="Название актива"
             />
             {errors.name && (
@@ -222,7 +222,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
                   setValue('depreciation_years', typeConfig.default_depreciation_years);
                 }
               }}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="">Не выбран</option>
               {assetTypes.map((type) => (
@@ -242,7 +242,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
               {...register('depreciation_years', {
                 valueAsNumber: true,
               })}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="5"
             />
           </div>
@@ -258,7 +258,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
                 type="number"
                 step="0.1"
                 {...register('capacity', { valueAsNumber: true })}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="2"
               />
             </div>
@@ -269,7 +269,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
               <input
                 type="date"
                 {...register('next_maintenance_date')}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
           </div>
@@ -284,7 +284,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
               <input
                 type="text"
                 {...register('serial_number')}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="SN-12345"
               />
             </div>
@@ -295,7 +295,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
               <input
                 type="text"
                 {...register('power')}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="300"
               />
             </div>
@@ -311,7 +311,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
               <input
                 type="text"
                 {...register('consumable_type')}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="CF280A"
               />
             </div>
@@ -322,7 +322,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
               <input
                 type="date"
                 {...register('next_maintenance_date')}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
           </div>
@@ -337,7 +337,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
               <input
                 type="text"
                 {...register('crypto_wallet_address')}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="ivanov.a"
               />
             </div>
@@ -348,7 +348,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
               <input
                 type="text"
                 {...register('crypto_token_symbol')}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="SN-XXXXX"
               />
             </div>
@@ -364,7 +364,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
               <input
                 type="text"
                 {...register('consumable_type')}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Бумага А4"
               />
             </div>
@@ -375,7 +375,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
               <input
                 type="text"
                 {...register('weight')}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="1.5"
               />
             </div>
@@ -390,7 +390,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
             <input
               type="date"
               {...register('purchase_date')}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
           <div>
@@ -400,7 +400,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
             <input
               type="date"
               {...register('warranty_expiry')}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
         </div>
@@ -413,7 +413,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
             <input
               type="text"
               {...register('model')}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="Модель"
             />
           </div>
@@ -424,7 +424,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
             <input
               type="text"
               {...register('manufacturer_code')}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="Код производителя"
             />
           </div>
@@ -437,7 +437,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
           <input
             type="text"
             {...register('manufacturer_name')}
-            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="Производитель"
           />
         </div>
@@ -454,7 +454,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
               {...register('purchase_price', {
                 valueAsNumber: true,
               })}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="0.00"
             />
           </div>
@@ -469,7 +469,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
               {...register('current_value', {
                 valueAsNumber: true,
               })}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="0.00"
             />
           </div>
@@ -484,7 +484,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
                 valueAsNumber: true,
                 value: 1,
               })}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="1"
             />
           </div>
@@ -511,7 +511,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
                   setValue('location_address', '');
                 }
               }}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               disabled={loadingOptions || allRooms.length === 0}
             >
               <option value="">Не выбрано</option>
@@ -544,7 +544,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
                   setValue('responsible_person', '');
                 }
               }}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               disabled={loadingOptions || responsibleOptions.length === 0}
             >
               <option value="">Не выбрано</option>
@@ -569,7 +569,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
                 const empId = e.target.value ? Number(e.target.value) : null;
                 setSelectedEmployeeId(empId || '');
               }}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               disabled={loadingOptions || allEmployees.length === 0}
             >
               <option value="">Не выбран</option>
@@ -590,7 +590,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
             </label>
             <select
               {...register('status', { required: 'Обязательное поле' })}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="active">Активен</option>
               <option value="maintenance">На ремонте</option>
@@ -609,7 +609,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
           <textarea
             {...register('description')}
             rows={3}
-            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="Описание актива..."
           />
         </div>

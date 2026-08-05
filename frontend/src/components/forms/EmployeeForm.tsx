@@ -52,7 +52,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, defaultValue, loa
             name="first_name"
             control={control}
             render={({ field }) => (
-              <input {...field} className="w-full px-3 py-2 border rounded-md" />
+              <input {...field} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
             )}
           />
           {errors.first_name && (
@@ -66,7 +66,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, defaultValue, loa
             name="last_name"
             control={control}
             render={({ field }) => (
-              <input {...field} className="w-full px-3 py-2 border rounded-md" />
+              <input {...field} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
             )}
           />
           {errors.last_name && (
@@ -80,7 +80,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, defaultValue, loa
             name="middle_name"
             control={control}
             render={({ field }) => (
-              <input {...field} className="w-full px-3 py-2 border rounded-md" />
+              <input {...field} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
             )}
           />
         </div>
@@ -91,7 +91,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, defaultValue, loa
             name="position"
             control={control}
             render={({ field }) => (
-              <input {...field} className="w-full px-3 py-2 border rounded-md" />
+              <input {...field} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
             )}
           />
         </div>
@@ -102,7 +102,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, defaultValue, loa
             name="email"
             control={control}
             render={({ field }) => (
-              <input {...field} type="email" className="w-full px-3 py-2 border rounded-md" />
+              <input {...field} type="email" className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
             )}
           />
           {errors.email && <p className="text-red-500 text-xs">{errors.email.message}</p>}
@@ -114,7 +114,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, defaultValue, loa
             name="phone"
             control={control}
             render={({ field }) => (
-              <input {...field} type="tel" className="w-full px-3 py-2 border rounded-md" />
+              <input {...field} type="tel" className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
             )}
           />
         </div>
@@ -125,7 +125,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, defaultValue, loa
             name="employee_number"
             control={control}
             render={({ field }) => (
-              <input {...field} className="w-full px-3 py-2 border rounded-md" />
+              <input {...field} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
             )}
           />
         </div>
@@ -141,7 +141,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, defaultValue, loa
                 type="date" 
                 value={field.value instanceof Date ? field.value.toISOString().split('T')[0] : (field.value || '')}
                 onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : null)}
-                className="w-full px-3 py-2 border rounded-md" 
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" 
               />
             )}
           />
@@ -158,7 +158,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, defaultValue, loa
                 type="date" 
                 value={field.value instanceof Date ? field.value.toISOString().split('T')[0] : (field.value || '')}
                 onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : null)}
-                className="w-full px-3 py-2 border rounded-md" 
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" 
               />
             )}
           />

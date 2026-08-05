@@ -101,7 +101,7 @@ const RepairForm: React.FC<RepairFormProps> = ({
           render={({ field }) => (
             <input
               {...field}
-              className="w-full px-3 py-2 border rounded-md"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
               placeholder="Краткое описание проблемы"
               readOnly={!!defaultValue?.title}
             />
@@ -118,7 +118,7 @@ const RepairForm: React.FC<RepairFormProps> = ({
           render={({ field }) => (
             <textarea
               {...field}
-              className="w-full px-3 py-2 border rounded-md"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
               rows={4}
               placeholder="Подробное описание неисправности"
               readOnly={!!defaultValue?.description}
@@ -137,7 +137,7 @@ const RepairForm: React.FC<RepairFormProps> = ({
             name="priority"
             control={control}
             render={({ field }) => (
-              <select {...field} className="w-full px-3 py-2 border rounded-md">
+              <select {...field} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
                 <option value="low">Низкий</option>
                 <option value="medium">Средний</option>
                 <option value="high">Высокий</option>
@@ -156,7 +156,7 @@ const RepairForm: React.FC<RepairFormProps> = ({
               <input
                 {...field}
                 type="date"
-                className="w-full px-3 py-2 border rounded-md"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
               />
             )}
           />
@@ -168,7 +168,7 @@ const RepairForm: React.FC<RepairFormProps> = ({
             name="deadline"
             control={control}
             render={({ field }) => (
-              <input {...field} type="date" className="w-full px-3 py-2 border rounded-md" />
+              <input {...field} type="date" className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
             )}
           />
         </div>
@@ -183,7 +183,7 @@ const RepairForm: React.FC<RepairFormProps> = ({
                 {...field}
                 type="number"
                 min="0"
-                className="w-full px-3 py-2 border rounded-md"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                 placeholder="0.00"
               />
             )}
