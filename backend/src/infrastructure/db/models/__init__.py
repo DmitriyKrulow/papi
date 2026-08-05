@@ -25,6 +25,7 @@ from .asset_type import AssetType
 from .asset_photo import AssetPhoto
 from .document_link import DocumentLink
 from .import_job import ImportJob
+from .brute_force_log import BruteForceLog
 from .department import Room
 
 __all__ = [
@@ -50,4 +51,5 @@ __all__ = [
     "AssetType",
     "AssetPhoto",
     "ImportJob",
+    "BruteForceLog",
 ]

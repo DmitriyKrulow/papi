@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Generator, Optional
 import os
 import logging
 
@@ -25,7 +25,7 @@ if os.path.exists(_db_path):
         pass
 
 
-def get_db() -> Session:
+def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
     try:
         yield db
@@ -39,6 +39,8 @@ def init_db():
     _ensure_document_links_table()
     _ensure_inventory_check_columns()
     _ensure_asset_inventory_columns()
+    _ensure_brute_force_table()
+    _ensure_user_allowed_ips_column()
 
 
 def _ensure_photo_category_column():
@@ -178,3 +180,32 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         return password_hash.verify(plain_password)
     except (ValueError, AttributeError):
         return False
+
+
+def _ensure_brute_force_table():
+    """Создаёт таблицу brute_force_logs, если её нет"""
+    from sqlalchemy import text, inspect
+    try:
+        inspector = inspect(engine)
+        table_names = inspector.get_table_names()
+        if "brute_force_logs" not in table_names:
+            from src.infrastructure.db.models.brute_force_log import BruteForceLog
+            BruteForceLog.__table__.create(engine)
+            print("Created brute_force_logs table")
+    except Exception as e:
+        print(f"Could not create brute_force_logs table: {e}")
+
+
+def _ensure_user_allowed_ips_column():
+    """Добавляет колонку allowed_ips в users, если её нет"""
+    from sqlalchemy import text, inspect
+    try:
+        inspector = inspect(engine)
+        columns = [c["name"] for c in inspector.get_columns("users")]
+        if "allowed_ips" not in columns:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE users ADD COLUMN allowed_ips TEXT"))
+                conn.commit()
+            print("Added allowed_ips column to users table")
+    except Exception as e:
+        print(f"Could not check/add allowed_ips column: {e}")

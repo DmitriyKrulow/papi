@@ -32,6 +32,7 @@ class User(Base):
 
     role = Column(String(50), nullable=False, default="user")
     is_active = Column(Boolean, nullable=False, default=True)
+    allowed_ips = Column(Text, nullable=True, comment="JSON-список разрешённых IP для администраторов (whitelist)")
 
     created_at = Column(DateTime, nullable=False, default=datetime.now)
     updated_at = Column(
