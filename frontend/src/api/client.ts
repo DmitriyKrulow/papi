@@ -1,5 +1,5 @@
 // frontend/src/api/client.ts
-import axios from 'axios';
+import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 
 // Создаем экземпляр axios с базовыми настройками
 const api = axios.create({
@@ -9,6 +9,9 @@ const api = axios.create({
   },
   timeout: 10000,
 });
+
+// Флаг чтобы избежать рекурсии при logout
+let isLoggingOut = false;
 
 // Перехватчик для добавления токена
 api.interceptors.request.use(
@@ -24,15 +27,50 @@ api.interceptors.request.use(
   }
 );
 
+// Перехватчик для обработки ошибок авторизации
 api.interceptors.response.use(
   (response) => response,
-  (error) => Promise.reject(error)
-);
-
-// Перехватчик для обработки ошибок
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
+  (error: AxiosError) => {
+    const originalRequest = error.config as InternalAxiosRequestConfig & { _retried?: boolean };
+    
+    // Если 401 - токен истек или невалидный
+    if (error.response?.status === 401 && !originalRequest?._retried) {
+      // Не пытаемся перезапросить если уже logout
+      if (isLoggingOut) {
+        return Promise.reject(error);
+      }
+      
+      isLoggingOut = true;
+      
+      try {
+        // Очищаем данные сессии
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        
+        // Если пользователь не на странице логина - редиректим
+        if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
+          window.location.href = '/login';
+        }
+      } finally {
+        isLoggingOut = false;
+      }
+      
+      return Promise.reject(error);
+    }
+    
+    // Если 403 - нет прав доступа
+    if (error.response?.status === 403) {
+      // Пытаемся перезапросить с обновленным токеном (если это не первый запрос)
+      if (originalRequest && !originalRequest._retried) {
+        originalRequest._retried = true;
+        const token = localStorage.getItem('token');
+        if (token) {
+          originalRequest.headers.Authorization = `Bearer ${token}`;
+          return api(originalRequest);
+        }
+      }
+    }
+    
     return Promise.reject(error);
   }
 );
