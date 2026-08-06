@@ -1,5 +1,5 @@
 # backend/src/presentation/http/routers/employees.py
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from sqlalchemy.orm import Session, selectinload
 from typing import Optional, Any
 from datetime import datetime, date
@@ -151,7 +151,7 @@ async def get_employee(
 
 @router.post("/")
 async def create_employee(
-    data: dict,
+    data: dict = Body(...),
     db: Session = Depends(get_db),
     current_user: Any = Depends(get_current_admin),
 ):
@@ -208,7 +208,7 @@ async def create_employee(
 @router.put("/{employee_id}")
 async def update_employee(
     employee_id: int,
-    data: dict,
+    data: dict = Body(...),
     db: Session = Depends(get_db),
     current_user: Any = Depends(get_current_admin),
 ):

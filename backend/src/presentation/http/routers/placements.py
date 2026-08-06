@@ -1,5 +1,5 @@
 # backend/src/presentation/http/routers/placements.py
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from sqlalchemy.orm import Session, joinedload
 from typing import Optional, Any
 from datetime import datetime
@@ -157,7 +157,7 @@ async def get_department(
 
 @router.post("/")
 async def create_department(
-    data: dict,
+    data: dict = Body(...),
     db: Session = Depends(get_db),
     current_user: Any = Depends(get_current_admin),
 ):
@@ -195,7 +195,7 @@ async def create_department(
 @router.put("/{department_id}")
 async def update_department(
     department_id: int,
-    data: dict,
+    data: dict = Body(...),
     db: Session = Depends(get_db),
     current_user: Any = Depends(get_current_admin),
 ):
@@ -316,7 +316,7 @@ async def get_department_rooms(
 @router.post("/{department_id}/rooms")
 async def create_room(
     department_id: int,
-    data: dict,
+    data: dict = Body(...),
     db: Session = Depends(get_db),
     current_user: Any = Depends(get_current_admin),
 ):
@@ -348,7 +348,7 @@ async def create_room(
 @router.put("/rooms/{room_id}")
 async def update_room(
     room_id: int,
-    data: dict,
+    data: dict = Body(...),
     db: Session = Depends(get_db),
     current_user: Any = Depends(get_current_admin),
 ):

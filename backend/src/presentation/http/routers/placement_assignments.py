@@ -1,5 +1,5 @@
 # backend/src/presentation/http/routers/placement_assignments.py
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from sqlalchemy.orm import Session, joinedload
 from typing import Optional, Any
 from datetime import datetime
@@ -264,7 +264,7 @@ async def list_placements(
 
 @router.post("/")
 async def create_placement_assignment(
-    data: dict,
+    data: dict = Body(...),
     db: Session = Depends(get_db),
     current_user: Any = Depends(get_current_admin),
 ):
@@ -311,7 +311,7 @@ async def create_placement_assignment(
 @router.put("/{assignment_id}")
 async def update_placement_assignment(
     assignment_id: int,
-    data: dict,
+    data: dict = Body(...),
     db: Session = Depends(get_db),
     current_user: Any = Depends(get_current_admin),
 ):

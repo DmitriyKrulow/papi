@@ -1,6 +1,6 @@
 # backend/src/presentation/http/routers/admin.py
 import json
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import Optional, Any
@@ -105,10 +105,66 @@ async def delete_user(
     return {"message": "User deleted successfully"}
 
 
+@router.post("/users")
+async def create_user(
+    user_data: dict = Body(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin),
+):
+    """Создать нового пользователя (только для админов)"""
+    username = user_data.get("username")
+    email = user_data.get("email")
+    password = user_data.get("password")
+    
+    if not username or not email:
+        raise HTTPException(status_code=400, detail="username and email are required")
+    
+    existing = db.query(User).filter(User.username == username).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Username already taken")
+    
+    existing_email = db.query(User).filter(User.email == email).first()
+    if existing_email:
+        raise HTTPException(status_code=400, detail="Email already taken")
+    
+    if password:
+        password_hash = PasswordHash.from_plain_password(password)
+        ph = str(password_hash)
+    else:
+        ph = None
+    
+    user = User(
+        username=username,
+        email=email,
+        full_name=user_data.get("full_name", ""),
+        phone=user_data.get("phone", ""),
+        role=user_data.get("role", "user"),
+        is_active=user_data.get("is_active", True),
+        password_hash=ph,
+        created_at=datetime.now(),
+        updated_at=datetime.now(),
+    )
+    
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    
+    return {
+        "id": getattr(user, 'id', None),
+        "username": safe_str(getattr(user, 'username', None)),
+        "email": safe_str(getattr(user, 'email', None)),
+        "full_name": safe_str(getattr(user, 'full_name', None)),
+        "phone": safe_str(getattr(user, 'phone', None)),
+        "role": safe_str(getattr(user, 'role', None)),
+        "is_active": getattr(user, 'is_active', False),
+        "created_at": safe_isoformat(getattr(user, 'created_at', None)),
+    }
+
+
 @router.put("/users/{user_id}")
 async def update_user(
     user_id: int,
-    user_data: dict,
+    user_data: dict = Body(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin),
 ):
@@ -171,7 +227,7 @@ async def update_user(
 @router.put("/users/{user_id}/password")
 async def reset_user_password(
     user_id: int,
-    password_data: dict,
+    password_data: dict = Body(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin),
 ):
@@ -200,7 +256,7 @@ async def reset_user_password(
 @router.put("/users/{user_id}/role")
 async def update_user_role(
     user_id: int,
-    role_data: dict,
+    role_data: dict = Body(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin),
 ):
@@ -227,7 +283,7 @@ async def update_user_role(
 @router.put("/users/{user_id}/status")
 async def update_user_status(
     user_id: int,
-    status_data: dict,
+    status_data: dict = Body(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin),
 ):
@@ -263,7 +319,7 @@ async def update_user_status(
 @router.put("/users/{user_id}/allowed-ips")
 async def set_user_allowed_ips(
     user_id: int,
-    ips_data: dict,
+    ips_data: dict = Body(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin),
 ):
