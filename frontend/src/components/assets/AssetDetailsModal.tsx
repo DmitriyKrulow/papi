@@ -45,11 +45,8 @@ const AssetDetailsModal: React.FC<AssetDetailsModalProps> = ({ asset, onClose, o
     if (!asset) return;
     setLoadingEvents(true);
     try {
-      const res = await fetch(`/api/maintenance-events/asset/${asset.id}`);
-      if (res.ok) {
-        const data = await res.json();
-        setMaintenanceEvents(data.items || []);
-      }
+      const res = await api.get(`/maintenance-events/asset/${asset.id}`);
+      setMaintenanceEvents(res.data.items || []);
     } catch (err) {
       console.error('Ошибка загрузки событий:', err);
     } finally {
@@ -66,14 +63,8 @@ useEffect(() => {
     if (!asset) return;
     setLoadingRepairs(true);
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`/api/assets/${asset.id}/repair-history`, {
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setRepairHistory(data.items || []);
-      }
+      const res = await api.get(`/assets/${asset.id}/repair-history`);
+      setRepairHistory(res.data.items || []);
     } catch (err) {
       console.error('Ошибка загрузки истории ремонтов:', err);
     } finally {
@@ -115,12 +106,11 @@ useEffect(() => {
     e.preventDefault();
     if (!asset) return;
     try {
-      const res = await fetch(`/api/maintenance-events/asset/${asset.id}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...newEvent, cost: newEvent.cost ? parseFloat(newEvent.cost) : undefined }),
+      const res = await api.post(`/maintenance-events/asset/${asset.id}`, {
+        ...newEvent,
+        cost: newEvent.cost ? parseFloat(newEvent.cost) : undefined,
       });
-      if (res.ok) {
+      if (res.status === 200 || res.status === 201 || res.status === 204) {
         toast.success('Событие добавлено');
         setShowAddEvent(false);
         setNewEvent({

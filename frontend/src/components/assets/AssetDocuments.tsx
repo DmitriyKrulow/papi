@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { FileText, Upload, Download, Trash2, Link, ExternalLink, Search, File as FileIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
+import api from '../../api/client';
 
 interface AssetDocument {
   id: number;
@@ -57,16 +58,10 @@ const AssetDocuments: React.FC<AssetDocumentsProps> = ({ assetId, assetName }) =
   const fetchDocuments = useCallback(async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
       const params = new URLSearchParams({ asset_id: String(assetId) });
       if (searchQuery) params.set('search', searchQuery);
-      const res = await fetch(`/api/asset-documents/?${params}`, {
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setDocuments(data.items || []);
-      }
+      const res = await api.get(`/asset-documents/?${params}`);
+      setDocuments(res.data.items || []);
     } catch (err) {
       console.error('Error fetching documents:', err);
     } finally {
@@ -135,28 +130,15 @@ const AssetDocuments: React.FC<AssetDocumentsProps> = ({ assetId, assetName }) =
     if (!confirm(`Отвязать документ "${doc.title || doc.filename}" от этого актива?\n\nЕсли документ больше не привязан ни к одному активу — он будет удалён.`)) return;
 
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(
-        `/api/asset-documents/${doc.id}/unlink?asset_ids=${encodeURIComponent(JSON.stringify([assetId]))}`,
-        {
-          method: 'DELETE',
-          headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-        }
-      );
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data.document_deleted) {
-          toast.success('Документ удалён (больше не привязан ни к одному активу)');
-        } else {
-          toast.success('Документ отвязан от актива');
-        }
-        fetchDocuments();
-      } else {
-        toast.error('Ошибка отвязки');
+      const res = await api.delete(`/asset-documents/${doc.id}/unlink`, {
+        params: { asset_ids: JSON.stringify([assetId]) },
+      });
+      if (res.status === 200 || res.status === 204) {
+        toast.success('Документ отвязан от актива');
       }
+      fetchDocuments();
     } catch (err) {
-      toast.error('Ошибка соединения');
+      toast.error('Ошибка отвязки');
     }
   };
 
@@ -164,20 +146,13 @@ const AssetDocuments: React.FC<AssetDocumentsProps> = ({ assetId, assetName }) =
     if (!confirm(`ПОЛНОСТЬЮ удалить документ "${doc.title || doc.filename}"?\n\nОн будет удалён со всех активов и с диска. Это действие необратимо.`)) return;
 
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`/api/asset-documents/${doc.id}`, {
-        method: 'DELETE',
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-      });
-
-      if (res.ok) {
+      const res = await api.delete(`/asset-documents/${doc.id}`);
+      if (res.status === 200 || res.status === 204) {
         toast.success('Документ полностью удалён');
-        fetchDocuments();
-      } else {
-        toast.error('Ошибка удаления');
       }
+      fetchDocuments();
     } catch (err) {
-      toast.error('Ошибка соединения');
+      toast.error('Ошибка удаления');
     }
   };
 
