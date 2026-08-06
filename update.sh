@@ -6,7 +6,7 @@
 #   1. Обновляет код из GitHub (от пользователя papi)
 #   2. Обновляет зависимости бэкенда (pip)
 #   3. Собирает фронтенд (npm run build)
-#   4. Обновляет конфиг Nginx из inventory-system.conf
+#   4. Обновляет конфиг Nginx из nginx/inventory-system.conf
 #   5. Перезапускает сервисы (бэкенд и Nginx)
 # ============================================================
 
@@ -16,7 +16,7 @@ set -e  # Останавливаемся при любой ошибке
 PROJECT_DIR="/opt/papi"
 NGINX_AVAILABLE="/etc/nginx/sites-available"
 NGINX_ENABLED="/etc/nginx/sites-enabled"
-NGINX_CONF_SOURCE="$PROJECT_DIR/inventory-system.conf"
+NGINX_CONF_SOURCE="$PROJECT_DIR/nginx/inventory-system.conf"   # <-- ИСПРАВЛЕНО
 NGINX_CONF_TARGET="$NGINX_AVAILABLE/papi.conf"
 BACKEND_SERVICE="papi-backend"
 LOG_FILE="/var/log/papi-update.log"
@@ -85,7 +85,7 @@ sudo chown -R www-data:www-data "$PROJECT_DIR/frontend/dist"
 sudo chmod -R 755 "$PROJECT_DIR/frontend/dist"
 
 # --- 5. Обновление конфига Nginx ---
-log "🔄 Обновляем конфиг Nginx..."
+log "🔄 Обновляем конфиг Nginx из $NGINX_CONF_SOURCE..."
 
 if [ -f "$NGINX_CONF_SOURCE" ]; then
     log "📄 Копируем $NGINX_CONF_SOURCE -> $NGINX_CONF_TARGET"
