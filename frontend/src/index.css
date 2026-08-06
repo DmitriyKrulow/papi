@@ -252,3 +252,47 @@
   color: #9ca3af;
   text-align: right;
 }
+
+/* ==================== Печать актива ==================== */
+@media screen {
+  .print-area {
+    display: none;
+  }
+}
+
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  .print-area,
+  .print-area * {
+    visibility: visible !important;
+  }
+  .print-area {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    background: #fff;
+    color: #000;
+  }
+  .print-area .print-section {
+    page-break-inside: avoid;
+    margin-bottom: 16px;
+  }
+  .print-area .print-photos {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    page-break-inside: avoid;
+  }
+  .print-area .print-photo img {
+    max-width: 100%;
+    height: auto;
+    border: 1px solid #ccc;
+  }
+  @page {
+    margin: 1.5cm;
+  }
+}

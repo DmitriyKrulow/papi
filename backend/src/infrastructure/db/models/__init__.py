@@ -27,6 +27,7 @@ from .document_link import DocumentLink
 from .import_job import ImportJob
 from .brute_force_log import BruteForceLog
 from .department import Room
+from .password_reset_request import PasswordResetRequest
 
 __all__ = [
     "Base",
@@ -52,4 +53,5 @@ __all__ = [
     "AssetPhoto",
     "ImportJob",
     "BruteForceLog",
+    "PasswordResetRequest",
 ]

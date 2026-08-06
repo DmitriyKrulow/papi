@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import axios, { AxiosError } from 'axios';
+import api from '../api/client';
 
 export interface AssetPhoto {
   id: number;
@@ -34,12 +34,11 @@ export const useAssetPhotos = (assetId: number) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.get<AssetPhotoListResponse>(`/api/assets/${assetId}/photos`);
+      const response = await api.get<AssetPhotoListResponse>(`/assets/${assetId}/photos`);
       setPhotos(response.data.items || []);
       setTotal(response.data.total || (response.data.items ? response.data.items.length : 0));
     } catch (err) {
-      const axiosError = err as AxiosError;
-      setError(axiosError.message || 'Failed to fetch asset photos');
+      setError((err as Error).message || 'Failed to fetch asset photos');
     } finally {
       setLoading(false);
     }
@@ -49,11 +48,10 @@ export const useAssetPhotos = (assetId: number) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.get<AssetPhoto>(`/api/asset-photos/${photoId}`);
+      const response = await api.get<AssetPhoto>(`/asset-photos/${photoId}`);
       return response.data;
     } catch (err) {
-      const axiosError = err as AxiosError;
-      setError(axiosError.message || `Failed to fetch photo with id ${photoId}`);
+      setError((err as Error).message || `Failed to fetch photo with id ${photoId}`);
       throw err;
     } finally {
       setLoading(false);
@@ -88,7 +86,7 @@ const uploadPhoto = useCallback(async (file: File, data?: any) => {
         }
       }
       
-      const response = await axios.post<AssetPhoto>(`/api/asset-photos/${assetId}/upload`, formData, {
+      const response = await api.post<AssetPhoto>(`/asset-photos/${assetId}/upload`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -96,8 +94,7 @@ const uploadPhoto = useCallback(async (file: File, data?: any) => {
       setPhotos((prev) => [...prev, response.data]);
       return response.data;
     } catch (err) {
-      const axiosError = err as AxiosError;
-      setError(axiosError.message || 'Failed to upload photo');
+      setError((err as Error).message || 'Failed to upload photo');
       throw err;
     } finally {
       setLoading(false);
@@ -108,11 +105,10 @@ const uploadPhoto = useCallback(async (file: File, data?: any) => {
     setLoading(true);
     setError(null);
     try {
-      await axios.delete(`/api/asset-photos/${photoId}`);
+      await api.delete(`/asset-photos/${photoId}`);
       setPhotos((prev) => prev.filter((photo) => photo.id !== photoId));
     } catch (err) {
-      const axiosError = err as AxiosError;
-      setError(axiosError.message || `Failed to delete photo with id ${photoId}`);
+      setError((err as Error).message || `Failed to delete photo with id ${photoId}`);
       throw err;
     } finally {
       setLoading(false);

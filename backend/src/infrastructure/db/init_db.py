@@ -41,6 +41,7 @@ def init_db():
     _ensure_asset_inventory_columns()
     _ensure_brute_force_table()
     _ensure_user_allowed_ips_column()
+    _ensure_password_reset_table()
 
 
 def _ensure_photo_category_column():
@@ -209,3 +210,17 @@ def _ensure_user_allowed_ips_column():
             print("Added allowed_ips column to users table")
     except Exception as e:
         print(f"Could not check/add allowed_ips column: {e}")
+
+
+def _ensure_password_reset_table():
+    """Создаёт таблицу password_reset_requests, если её нет"""
+    from sqlalchemy import inspect
+    try:
+        inspector = inspect(engine)
+        table_names = inspector.get_table_names()
+        if "password_reset_requests" not in table_names:
+            from src.infrastructure.db.models.password_reset_request import PasswordResetRequest
+            PasswordResetRequest.__table__.create(engine)
+            print("Created password_reset_requests table")
+    except Exception as e:
+        print(f"Could not create password_reset_requests table: {e}")

@@ -150,7 +150,7 @@ export const apiClient = {
         },
       });
     },
-    list: (assetId: number) => api.get(`/asset-photos/${assetId}/photos`),
+    list: (assetId: number) => api.get(`/assets/${assetId}/photos`),
     get: (photoId: number) => api.get(`/asset-photos/${photoId}`),
     delete: (photoId: number) => api.delete(`/asset-photos/${photoId}`),
   },

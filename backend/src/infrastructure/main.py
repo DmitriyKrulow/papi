@@ -1,4 +1,5 @@
 # src/main.py
+import re
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,7 +20,91 @@ os.makedirs("uploads/reports", exist_ok=True)
 os.makedirs("uploads/inventory", exist_ok=True)
 os.makedirs("uploads/asset_photos", exist_ok=True)
 
-app = FastAPI(title="PAPI Backend", redirect_slashes=False)
+app = FastAPI(title="PAPI Backend", redirect_slashes=True)
+
+
+# ---------------------------------------------------------------------------
+# Сопоставление маршрутов для корректной обработки trailing slash.
+#
+# Роуты объявлены НЕОДНОРОДНО: часть с trailing slash (напр. POST /),
+# часть без (напр. POST /{department_id}/rooms). При этом фронтенд шлёт пути
+# без завершающего слэша. Чтобы не полагаться на 307-редиректы FastAPI
+# (которые при кросс-ориджин переходе теряют Authorization header и могут
+# зацикливаться), middleware добавляет trailing slash к scope-пути ТОЛЬКО
+# когда маршрут реально объявлен с trailing slash. Иначе роут без слэша
+# совпадает напрямую и редиректа не происходит.
+# ---------------------------------------------------------------------------
+
+# Кэш матчеров маршрутов: список (regex, methods). Строится один раз.
+_route_matcher_cache = None
+
+
+def _build_route_matcher(app):
+    routes = []
+    for r in app.router.routes:
+        if type(r).__name__ == "_IncludedRouter":
+            prefix = getattr(r.include_context, "prefix", "") or ""
+            for rr in r.original_router.routes:
+                pr = getattr(rr, "path_regex", None)
+                if pr is None:
+                    continue
+                pat = pr.pattern
+                if pat.startswith("^"):
+                    pat = pat[1:]
+                if pat.endswith("$"):
+                    pat = pat[:-1]
+                rx = re.compile("^" + re.escape(prefix) + pat + "$")
+                routes.append((rx, getattr(rr, "methods", None)))
+        else:
+            pr = getattr(r, "path_regex", None)
+            if pr is not None:
+                routes.append((pr, getattr(r, "methods", None)))
+    return routes
+
+
+def _get_route_matcher(app):
+    global _route_matcher_cache
+    if _route_matcher_cache is None:
+        _route_matcher_cache = _build_route_matcher(app)
+    return _route_matcher_cache
+
+
+def _route_matches(matcher, path, method):
+    for rx, methods in matcher:
+        if rx.fullmatch(path) and (not methods or method in methods):
+            return True
+    return False
+
+
+@app.middleware("http")
+async def add_trailing_slash_if_missing(request: Request, call_next):
+    """Добавляет trailing slash к POST/PUT/PATCH/DELETE запросам, если его нет —
+    но ТОЛЬКО когда маршрут реально объявлен с trailing slash.
+
+    Раньше слэш добавлялся принудительно ко всем запросам, из-за чего роуты,
+    объявленные БЕЗ trailing slash (например POST /{department_id}/rooms),
+    попадали в бесконечную 307-редирект-петлю (redirect_slashes=True),
+    а при кросс-ориджин редиректе ещё и терялся Authorization header.
+    """
+    path = request.url.path
+    method = request.method
+    if method in ("POST", "PUT", "PATCH", "DELETE") and not path.endswith("/") and path != "/":
+        matcher = _get_route_matcher(request.app)
+        candidate = path + "/"
+        # Есть ли маршрут, объявленный С trailing slash
+        matches_with_slash = _route_matches(matcher, candidate, method)
+        # Есть ли маршрут, объявленный БЕЗ trailing slash
+        matches_without_slash = _route_matches(matcher, path, method)
+
+        # Переписываем путь только если слэш действительно нужен,
+        # иначе оставляем без слэша, чтобы роут без слэша совпал напрямую.
+        if matches_with_slash and not matches_without_slash:
+            scope = request.scope
+            scope["path"] = candidate
+            if scope.get("raw_path"):
+                scope["raw_path"] = candidate.encode("utf-8")
+    response = await call_next(request)
+    return response
 
 
 @app.get("/")
@@ -65,6 +150,8 @@ def register_routers():
     from src.presentation.http.routers.asset_documents import router as asset_documents_router
     from src.presentation.http.routers.inventory_checks import router as inventory_checks_router
     from src.presentation.http.routers.marking import router as marking_router
+    from src.presentation.http.routers.password_reset import public_router as password_reset_public_router
+    from src.presentation.http.routers.password_reset import admin_router as password_reset_admin_router
 
     app.include_router(assets_router, prefix="/api")
     app.include_router(assets_export_router)
@@ -85,6 +172,8 @@ def register_routers():
     app.include_router(asset_documents_router, prefix="/api")
     app.include_router(inventory_checks_router, prefix="/api")
     app.include_router(marking_router, prefix="/api")
+    app.include_router(password_reset_public_router, prefix="/api")
+    app.include_router(password_reset_admin_router, prefix="/api")
 
 
 @app.on_event("startup")

@@ -468,7 +468,7 @@ const AdminPanel: React.FC = () => {
     if (!editingDept) return;
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`/api/admin/placements/${editingDept.id}/`, {
+      const response = await fetch(`/api/admin/placements/${editingDept.id}`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(deptFormData),
@@ -491,7 +491,7 @@ const AdminPanel: React.FC = () => {
     if (!window.confirm('Удалить подразделение?')) return;
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`/api/admin/placements/${id}/`, {
+      const response = await fetch(`/api/admin/placements/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` },
       });
@@ -575,7 +575,7 @@ const AdminPanel: React.FC = () => {
     if (!window.confirm('Удалить кабинет?')) return;
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`/api/admin/placements/rooms/${roomId}/`, {
+      const response = await fetch(`/api/admin/placements/rooms/${roomId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` },
       });
@@ -997,9 +997,9 @@ const AdminPanel: React.FC = () => {
                             </div>
                           </div>
                           {isExpanded && (
-                            <div className="px-4 py-3 bg-white border-t border-gray-100">
+                            <div className="px-4 py-3 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700">
                               <div className="flex justify-between items-center mb-3">
-                                <span className="text-xs font-semibold text-purple-700 uppercase tracking-wide">Кабинеты подразделения {dept.name}</span>
+                                <span className="text-xs font-semibold text-purple-700 dark:text-purple-300 uppercase tracking-wide">Кабинеты подразделения {dept.name}</span>
                                 <button
                                   onClick={() => { setEditingRoom(null); setRoomFormData({ name: '', floor: '', building: '' }); setRoomDeptId(dept.id); setShowRoomForm(true); }}
                                   className="bg-purple-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-purple-700 transition"
@@ -1009,43 +1009,43 @@ const AdminPanel: React.FC = () => {
                               </div>
 
                               {showRoomForm && roomDeptId === dept.id && !editingRoom && (
-                                <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 mb-3">
-                                  <div className="text-xs font-semibold text-purple-800 mb-2">Новый кабинет</div>
+                                <div className="bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-700 rounded-lg p-3 mb-3">
+                                  <div className="text-xs font-semibold text-purple-800 dark:text-purple-300 mb-2">Новый кабинет</div>
                                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2">
-                                    <input type="text" placeholder="Название *" value={roomFormData.name} onChange={(e) => setRoomFormData({...roomFormData, name: e.target.value})} className="px-3 py-1.5 border border-purple-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-purple-400" />
+                                    <input type="text" placeholder="Название *" value={roomFormData.name} onChange={(e) => setRoomFormData({...roomFormData, name: e.target.value})} className="px-3 py-1.5 border border-purple-300 dark:border-purple-600 rounded text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100" />
                                     <div className="flex flex-col gap-1">
-                                      <label className="text-xs text-purple-700 font-medium">Этаж</label>
-                                      <input type="text" placeholder="напр. 2" value={roomFormData.floor} onChange={(e) => setRoomFormData({...roomFormData, floor: e.target.value})} className="px-3 py-1.5 border border-purple-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-purple-400" />
+                                      <label className="text-xs text-purple-700 dark:text-purple-300 font-medium">Этаж</label>
+                                      <input type="text" placeholder="напр. 2" value={roomFormData.floor} onChange={(e) => setRoomFormData({...roomFormData, floor: e.target.value})} className="px-3 py-1.5 border border-purple-300 dark:border-purple-600 rounded text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100" />
                                     </div>
                                     <div className="flex flex-col gap-1">
-                                      <label className="text-xs text-purple-700 font-medium">Корпус / Здание</label>
-                                      <input type="text" placeholder="напр. Корп. А" value={roomFormData.building} onChange={(e) => setRoomFormData({...roomFormData, building: e.target.value})} className="px-3 py-1.5 border border-purple-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-purple-400" />
+                                      <label className="text-xs text-purple-700 dark:text-purple-300 font-medium">Корпус / Здание</label>
+                                      <input type="text" placeholder="напр. Корп. А" value={roomFormData.building} onChange={(e) => setRoomFormData({...roomFormData, building: e.target.value})} className="px-3 py-1.5 border border-purple-300 dark:border-purple-600 rounded text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100" />
                                     </div>
                                   </div>
                                   <div className="flex gap-2">
                                     <button onClick={handleCreateRoom} className="bg-blue-600 text-white px-4 py-1.5 rounded text-sm hover:bg-blue-700 transition">Добавить</button>
-                                    <button onClick={() => { setShowRoomForm(false); setEditingRoom(null); setRoomDeptId(null); setRoomFormData({ name: '', floor: '', building: '' }); }} className="bg-gray-300 text-gray-700 px-4 py-1.5 rounded text-sm hover:bg-gray-400 transition">Отмена</button>
+                                    <button onClick={() => { setShowRoomForm(false); setEditingRoom(null); setRoomDeptId(null); setRoomFormData({ name: '', floor: '', building: '' }); }} className="bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-200 px-4 py-1.5 rounded text-sm hover:bg-gray-400 dark:hover:bg-gray-500 transition">Отмена</button>
                                   </div>
                                 </div>
                               )}
 
                               {editingRoom && roomDeptId === dept.id && (
-                                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-3">
-                                  <div className="text-xs font-semibold text-yellow-800 mb-2">Редактирование: {editingRoom.name}</div>
+                                <div className="bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700 rounded-lg p-3 mb-3">
+                                  <div className="text-xs font-semibold text-yellow-800 dark:text-yellow-300 mb-2">Редактирование: {editingRoom.name}</div>
                                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2">
-                                    <input type="text" placeholder="Название *" value={roomFormData.name} onChange={(e) => setRoomFormData({...roomFormData, name: e.target.value})} className="px-3 py-1.5 border border-yellow-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400" />
+                                    <input type="text" placeholder="Название *" value={roomFormData.name} onChange={(e) => setRoomFormData({...roomFormData, name: e.target.value})} className="px-3 py-1.5 border border-yellow-300 dark:border-yellow-600 rounded text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100" />
                                     <div className="flex flex-col gap-1">
-                                      <label className="text-xs text-yellow-700 font-medium">Этаж</label>
-                                      <input type="text" placeholder="напр. 2" value={roomFormData.floor} onChange={(e) => setRoomFormData({...roomFormData, floor: e.target.value})} className="px-3 py-1.5 border border-yellow-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400" />
+                                      <label className="text-xs text-yellow-700 dark:text-yellow-300 font-medium">Этаж</label>
+                                      <input type="text" placeholder="напр. 2" value={roomFormData.floor} onChange={(e) => setRoomFormData({...roomFormData, floor: e.target.value})} className="px-3 py-1.5 border border-yellow-300 dark:border-yellow-600 rounded text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100" />
                                     </div>
                                     <div className="flex flex-col gap-1">
-                                      <label className="text-xs text-yellow-700 font-medium">Корпус / Здание</label>
-                                      <input type="text" placeholder="напр. Корп. А" value={roomFormData.building} onChange={(e) => setRoomFormData({...roomFormData, building: e.target.value})} className="px-3 py-1.5 border border-yellow-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400" />
+                                      <label className="text-xs text-yellow-700 dark:text-yellow-300 font-medium">Корпус / Здание</label>
+                                      <input type="text" placeholder="напр. Корп. А" value={roomFormData.building} onChange={(e) => setRoomFormData({...roomFormData, building: e.target.value})} className="px-3 py-1.5 border border-yellow-300 dark:border-yellow-600 rounded text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100" />
                                     </div>
                                   </div>
                                   <div className="flex gap-2">
                                     <button onClick={handleUpdateRoom} className="bg-blue-600 text-white px-4 py-1.5 rounded text-sm hover:bg-blue-700 transition">Сохранить</button>
-                                    <button onClick={() => { setShowRoomForm(false); setEditingRoom(null); setRoomDeptId(null); setRoomFormData({ name: '', floor: '', building: '' }); }} className="bg-gray-300 text-gray-700 px-4 py-1.5 rounded text-sm hover:bg-gray-400 transition">Отмена</button>
+                                    <button onClick={() => { setShowRoomForm(false); setEditingRoom(null); setRoomDeptId(null); setRoomFormData({ name: '', floor: '', building: '' }); }} className="bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-200 px-4 py-1.5 rounded text-sm hover:bg-gray-400 dark:hover:bg-gray-500 transition">Отмена</button>
                                   </div>
                                 </div>
                               )}
@@ -1055,22 +1055,22 @@ const AdminPanel: React.FC = () => {
                               ) : (
                                 <div className="flex flex-wrap gap-2">
                                   {sortedRooms.map((room) => (
-                                    <div key={room.id} className="inline-flex items-center gap-1.5 bg-purple-50 border border-purple-200 rounded-full pl-3 pr-1 py-1">
+                                    <div key={room.id} className="inline-flex items-center gap-1.5 bg-purple-50 dark:bg-purple-900/40 border border-purple-200 dark:border-purple-700 rounded-full pl-3 pr-1 py-1">
                                       <div className="flex items-center gap-1.5">
-                                        <span className="text-sm font-medium text-gray-900">{room.name}</span>
-                                        {room.floor && <span className="text-xs text-purple-600 bg-purple-100 px-1.5 py-0.5 rounded-full">Эт. {room.floor}</span>}
-                                        {room.building && <span className="text-xs text-purple-600 bg-purple-100 px-1.5 py-0.5 rounded-full">Корп. {room.building}</span>}
+                                        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{room.name}</span>
+                                        {room.floor && <span className="text-xs text-purple-600 dark:text-purple-300 bg-purple-100 dark:bg-purple-900/60 px-1.5 py-0.5 rounded-full">Эт. {room.floor}</span>}
+                                        {room.building && <span className="text-xs text-purple-600 dark:text-purple-300 bg-purple-100 dark:bg-purple-900/60 px-1.5 py-0.5 rounded-full">Корп. {room.building}</span>}
                                       </div>
                                       <button
                                         onClick={() => handleEditRoom(dept, room)}
-                                        className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded-full transition flex-shrink-0"
+                                        className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-full transition flex-shrink-0"
                                         title="Редактировать"
                                       >
                                         ✏️
                                       </button>
                                       <button
                                         onClick={() => handleDeleteRoom(room.id)}
-                                        className="p-1 text-red-600 hover:text-red-900 hover:bg-red-100 rounded-full transition flex-shrink-0"
+                                        className="p-1 text-red-600 hover:text-red-900 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-full transition flex-shrink-0"
                                         title="Удалить"
                                       >
                                         🗑️
