@@ -16,7 +16,7 @@ import {
   Package, Search, Eye, Plus, Upload, Edit, Trash2, Download,
   Filter, ChevronDown, ChevronUp, X,
   ArrowUpDown, ArrowUp, ArrowDown,
-  MoreHorizontal, RefreshCw, ClipboardCheck, CheckCircle2, XCircle, Clock
+  MoreHorizontal, RefreshCw, ClipboardCheck, CheckCircle2, XCircle, Clock, Loader2
 } from 'lucide-react';
 
 interface PaginatedResponse {
@@ -68,6 +68,7 @@ const Assets: React.FC = () => {
   const [employeeDropdownOpen, setEmployeeDropdownOpen] = useState(false);
   const [departmentSearch, setDepartmentSearch] = useState('');
   const [deptDropdownOpen, setDeptDropdownOpen] = useState(false);
+  const [activeInventory, setActiveInventory] = useState<any>(null);
 
   // Debounce для поиска — API вызывается только через 300мс после последнего ввода
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -97,6 +98,25 @@ const Assets: React.FC = () => {
     return () => {
       if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     };
+  }, []);
+
+  // Загрузка активной инвентаризации
+  useEffect(() => {
+    const fetchActiveInventory = async () => {
+      try {
+        const token = await getToken();
+        const res = await fetch('/api/inventory-checks/active', {
+          headers: { 'Authorization': token ? `Bearer ${token}` : '' },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setActiveInventory(data);
+        }
+      } catch {
+        // ignore
+      }
+    };
+    fetchActiveInventory();
   }, []);
 
   const getAssetTypeLabel = (assetType: string | undefined): { icon: string; name: string } => {
@@ -411,43 +431,59 @@ const handleEditClick = (asset: Asset) => {
     );
   };
 
-  useEffect(() => {
-    const loadAssets = async () => {
-      try {
-        setLoading(true);
-        const skip = (currentPage - 1) * pageSize;
-        const params = new URLSearchParams({
-          skip: String(skip),
-          limit: String(pageSize),
-        });
-        if (debouncedSearchTerm) params.set('search', debouncedSearchTerm);
+  const loadAssets = useCallback(async () => {
+    try {
+      setLoading(true);
+      const skip = (currentPage - 1) * pageSize;
+      const params = new URLSearchParams({
+        skip: String(skip),
+        limit: String(pageSize),
+      });
+      if (debouncedSearchTerm) params.set('search', debouncedSearchTerm);
  if (filterStatus) params.set('status', filterStatus);
-        if (filterDepartment) params.set('department', filterDepartment);
-        if (showHidden) params.set('include_hidden', 'true');
+      if (filterDepartment) params.set('department', filterDepartment);
+      if (showHidden) params.set('include_hidden', 'true');
 
-        const token = await getToken();
-        const response = await fetch(`/api/assets/?${params}`, {
-          headers: { 'Authorization': token ? `Bearer ${token}` : '' },
-        });
+      const token = await getToken();
+      const response = await fetch(`/api/assets/?${params}`, {
+        headers: { 
+          'Authorization': token ? `Bearer ${token}` : '',
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
+        },
+      });
 
-        if (response.ok) {
-          const data: PaginatedResponse = await response.json();
-          setAssets(data.items || []);
-          setTotalAssets(data.total);
-          setError(null);
-        } else {
-          setError('Ошибка загрузки активов');
-          toast.error('Ошибка загрузки активов');
-        }
-      } catch (err: any) {
-        setError('Ошибка загрузки активов: ' + (err.message || 'Неизвестная ошибка'));
+      if (response.ok) {
+        const data: PaginatedResponse = await response.json();
+        setAssets(data.items || []);
+        setTotalAssets(data.total);
+        setError(null);
+      } else {
+        setError('Ошибка загрузки активов');
         toast.error('Ошибка загрузки активов');
-      } finally {
-        setLoading(false);
+      }
+    } catch (err: any) {
+      setError('Ошибка загрузки активов: ' + (err.message || 'Неизвестная ошибка'));
+      toast.error('Ошибка загрузки активов');
+    } finally {
+      setLoading(false);
+    }
+  }, [currentPage, pageSize, debouncedSearchTerm, filterStatus, filterDepartment, showHidden]);
+
+  useEffect(() => {
+    loadAssets();
+  }, [loadAssets]);
+
+  // Перезагружаем данные при возвращении на страницу
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        setRefreshKey(k => k + 1);
       }
     };
-loadAssets();
-  }, [currentPage, pageSize, debouncedSearchTerm, filterStatus, filterDepartment, showHidden, refreshKey]);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
 
   const handleSort = (column: SortColumn) => {
     setSortConfig(prev => ({
@@ -918,7 +954,12 @@ loadAssets();
                           {asset.responsible_person || '—'}
                         </td>
                         <td className="px-4 py-3 text-center">
-                          {asset.last_inventory_confirmed ? (
+                          {activeInventory ? (
+                            <div className="flex flex-col items-center gap-0.5">
+                              <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
+                              <span className="text-[10px] text-blue-600 dark:text-blue-400 font-medium">Проверяется</span>
+                            </div>
+                          ) : asset.last_inventory_confirmed ? (
                             <div className="flex flex-col items-center gap-0.5">
                               <CheckCircle2 className="w-4 h-4 text-green-500" />
                               <span className="text-[10px] text-gray-400 truncate max-w-[80px]" title={asset.last_inventory_date}>

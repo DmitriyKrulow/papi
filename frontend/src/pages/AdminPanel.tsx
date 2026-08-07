@@ -862,7 +862,7 @@ const AdminPanel: React.FC = () => {
               </div>
             )}
 
-            {viewingUser && (
+            {viewingUser && activeTab === 'users' && (
               <div className="bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4 mb-4">
                 <div className="flex justify-between items-center mb-3">
                   <h3 className="font-medium text-gray-700 dark:text-gray-300">👤 Информация о пользователе</h3>

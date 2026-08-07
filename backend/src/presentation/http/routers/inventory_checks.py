@@ -253,6 +253,8 @@ async def start_inventory_check(
     # Сбрасываем статус подтверждения у всех активов
     for a in assets:
         a.last_inventory_confirmed = False
+        a.last_inventory_date = None
+        a.last_inventory_by_id = None
 
     # Создаём элементы проверки
     for a in assets:
@@ -621,4 +623,28 @@ async def get_asset_check_status(
         "last_inventory_date": asset.last_inventory_date.isoformat() if asset.last_inventory_date else None,
         "last_inventory_by_id": asset.last_inventory_by_id,
         "last_inventory_confirmed": asset.last_inventory_confirmed,
+    })
+
+
+@router.get("/active")
+async def get_active_inventory_check(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Получить текущую активную инвентаризацию (если есть)"""
+    active_check = db.query(InventoryCheck).filter(
+        InventoryCheck.status == "in_progress"
+    ).order_by(InventoryCheck.created_at.desc()).first()
+
+    if not active_check:
+        return JSONResponse(content=None)
+
+    return JSONResponse(content={
+        "id": active_check.id,
+        "name": active_check.name,
+        "check_type": active_check.check_type,
+        "started_at": active_check.started_at.isoformat() if active_check.started_at else None,
+        "found": active_check.found,
+        "missing": active_check.missing,
+        "total_checked": active_check.total_checked,
     })

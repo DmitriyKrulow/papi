@@ -2,12 +2,23 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { ClipboardCheck, CheckCircle2, Clock, Loader2 } from 'lucide-react';
 
 interface Stats {
   total: number;
   active: number;
   maintenance: number;
   written_off: number;
+}
+
+interface InventoryCheck {
+  id: number;
+  name: string;
+  check_type: string;
+  started_at: string;
+  found: number;
+  missing: number;
+  total_checked: number;
 }
 
 const Dashboard: React.FC = () => {
@@ -23,6 +34,8 @@ const Dashboard: React.FC = () => {
     maintenance: 0,
     written_off: 0,
   });
+  const [activeInventory, setActiveInventory] = useState<InventoryCheck | null>(null);
+  const [inventoryLoading, setInventoryLoading] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -65,6 +78,21 @@ const Dashboard: React.FC = () => {
         } else {
           // Статистика не загружена — используем пустые значения
         }
+
+        // Загрузка активной инвентаризации
+        setInventoryLoading(true);
+        const invResponse = await fetch('/api/inventory-checks/active', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          },
+        });
+        
+        if (invResponse.ok) {
+          const invData = await invResponse.json();
+          setActiveInventory(invData);
+        }
+        
+        setInventoryLoading(false);
         
         setLoading(false);
       } catch (err: any) {
@@ -180,6 +208,132 @@ const Dashboard: React.FC = () => {
                 </div>
               ))}
             </div>
+
+            {/* Блок активной инвентаризации */}
+            {inventoryLoading ? (
+              <div className="mt-6 sm:mt-8 bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 border border-gray-100 dark:border-gray-700">
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-blue-600 dark:text-blue-400" />
+                  <span className="ml-2 text-gray-500 dark:text-gray-400">Загрузка данных инвентаризации...</span>
+                </div>
+              </div>
+            ) : activeInventory ? (
+              <div className="mt-6 sm:mt-8 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg shadow p-4 sm:p-6 border-2 border-blue-200 dark:border-blue-700">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-600 dark:bg-blue-700 rounded-lg">
+                      <ClipboardCheck className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-blue-900 dark:text-blue-100">{activeInventory.name}</h3>
+                      <p className="text-sm text-blue-700 dark:text-blue-300">
+                        {activeInventory.check_type === 'full' ? 'Полная инвентаризация' : 
+                         activeInventory.check_type === 'by_room' ? 'По помещениям' :
+                         activeInventory.check_type === 'by_employee' ? 'По сотрудникам' :
+                         'По ответственному лицу'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 dark:bg-blue-700 text-white rounded-full text-sm font-medium">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    В процессе
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-3 shadow-sm">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Clock className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                      <span className="text-xs text-gray-500 dark:text-gray-400">Начата</span>
+                    </div>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                      {new Date(activeInventory.started_at).toLocaleDateString('ru-RU')}
+                    </p>
+                  </div>
+
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-3 shadow-sm">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-lg">📦</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">Всего</span>
+                    </div>
+                    <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{activeInventory.total_checked}</p>
+                  </div>
+
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-3 shadow-sm">
+                    <div className="flex items-center gap-2 mb-1">
+                      <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
+                      <span className="text-xs text-gray-500 dark:text-gray-400">Найдено</span>
+                    </div>
+                    <p className="text-lg font-bold text-green-600 dark:text-green-400">{activeInventory.found}</p>
+                  </div>
+
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-3 shadow-sm">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-lg">❌</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">Отсутствует</span>
+                    </div>
+                    <p className="text-lg font-bold text-red-600 dark:text-red-400">{activeInventory.missing}</p>
+                  </div>
+                </div>
+
+                {/* Прогресс-бар */}
+                <div className="mt-4">
+                  <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400 mb-1">
+                    <span>Прогресс проверки</span>
+                    <span>
+                      {activeInventory.total_checked > 0 
+                        ? Math.round(((activeInventory.found + activeInventory.missing) / activeInventory.total_checked) * 100) 
+                        : 0}%
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+                    <div
+                      className="bg-blue-600 dark:bg-blue-500 h-2.5 rounded-full transition-all duration-500"
+                      style={{
+                        width: `${activeInventory.total_checked > 0 
+                          ? ((activeInventory.found + activeInventory.missing) / activeInventory.total_checked) * 100 
+                          : 0}%`,
+                      }}
+                    ></div>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex gap-2">
+                  <button
+                    onClick={() => navigate('/inventory')}
+                    className="flex-1 px-4 py-2 bg-blue-600 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition text-sm font-medium"
+                  >
+                    Перейти к инвентаризации
+                  </button>
+                  <button
+                    onClick={() => navigate('/assets')}
+                    className="flex-1 px-4 py-2 bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-700 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition text-sm font-medium"
+                  >
+                    Смотреть активы
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-6 sm:mt-8 bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 border border-gray-100 dark:border-gray-700">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-gray-100 dark:bg-gray-700 rounded-lg">
+                      <ClipboardCheck className="w-6 h-6 text-gray-500 dark:text-gray-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Инвентаризация</h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Нет активных проверок</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => navigate('/inventory')}
+                    className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition text-sm font-medium"
+                  >
+                    Создать инвентаризацию
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Дополнительная информация */}
             <div className="mt-6 sm:mt-8 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
