@@ -30,6 +30,9 @@ class User(Base):
 
     password_hash = Column(String(255), nullable=True)
 
+    # ID пользователя для MAX chat
+    max_user_id = Column(String(100), nullable=True, comment="Идентификатор пользователя в MAX chat")
+
     role = Column(String(50), nullable=False, default="user")
     is_active = Column(Boolean, nullable=False, default=True)
     allowed_ips = Column(Text, nullable=True, comment="JSON-список разрешённых IP для администраторов (whitelist)")
@@ -52,6 +55,7 @@ class User(Base):
     employees = relationship("Employee", back_populates="user")
     asset_photos = relationship("AssetPhoto", back_populates="uploaded_by_user")
     documents = relationship("Document", foreign_keys="Document.uploaded_by", back_populates="uploader")
+    notifications = relationship("Notification", foreign_keys="Notification.user_id", back_populates="user", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, username='{self.username}', email='{self.email}')>"

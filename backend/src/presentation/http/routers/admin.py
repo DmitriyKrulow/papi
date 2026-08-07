@@ -138,6 +138,7 @@ async def create_user(
         email=email,
         full_name=user_data.get("full_name", ""),
         phone=user_data.get("phone", ""),
+        max_user_id=user_data.get("max_user_id", ""),
         role=user_data.get("role", "user"),
         is_active=user_data.get("is_active", True),
         password_hash=ph,
@@ -155,6 +156,7 @@ async def create_user(
         "email": safe_str(getattr(user, 'email', None)),
         "full_name": safe_str(getattr(user, 'full_name', None)),
         "phone": safe_str(getattr(user, 'phone', None)),
+        "max_user_id": safe_str(getattr(user, 'max_user_id', None)),
         "role": safe_str(getattr(user, 'role', None)),
         "is_active": getattr(user, 'is_active', False),
         "created_at": safe_isoformat(getattr(user, 'created_at', None)),
@@ -190,6 +192,8 @@ async def update_user(
             user.full_name = user_data["full_name"]
         if "phone" in user_data:
             user.phone = user_data["phone"]
+        if "max_user_id" in user_data:
+            user.max_user_id = user_data["max_user_id"]
         if "role" in user_data:
             if user_data["role"] not in ["admin", "user", "responsible"]:
                 raise HTTPException(status_code=400, detail="Invalid role")

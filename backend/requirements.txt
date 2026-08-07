@@ -15,3 +15,6 @@ pydantic
 pydantic[email]
 pydantic-settings
 reportlab
+qrcode
+Pillow
+requests

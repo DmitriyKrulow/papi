@@ -152,6 +152,8 @@ def register_routers():
     from src.presentation.http.routers.marking import router as marking_router
     from src.presentation.http.routers.password_reset import public_router as password_reset_public_router
     from src.presentation.http.routers.password_reset import admin_router as password_reset_admin_router
+    from src.presentation.http.routers.notifications import router as notifications_router
+    from src.presentation.http.routers.notification_settings import router as notification_settings_router
 
     app.include_router(assets_router, prefix="/api")
     app.include_router(assets_export_router)
@@ -174,6 +176,62 @@ def register_routers():
     app.include_router(marking_router, prefix="/api")
     app.include_router(password_reset_public_router, prefix="/api")
     app.include_router(password_reset_admin_router, prefix="/api")
+    app.include_router(notifications_router, prefix="/api")
+    app.include_router(notification_settings_router, prefix="/api")
+
+
+def seed_notification_templates(db):
+    """Создать шаблоны уведомлений по умолчанию"""
+    from src.infrastructure.db.models.notification_template import NotificationTemplate
+    
+    templates = [
+        {
+            "key": "inventory_started",
+            "name": "Инвентаризация начата",
+            "title_template": "📋 Начата инвентаризация: {check_name}",
+            "message_template": "Начата инвентаризация «{check_name}». Пожалуйста, проверьте наличие вашего имущества.\n\nНайдено: {found}\nОтсутствует: {missing}",
+            "type": "inventory",
+        },
+        {
+            "key": "inventory_completed",
+            "name": "Инвентаризация завершена",
+            "title_template": "✅ Инвентаризация завершена: {check_name}",
+            "message_template": "Инвентаризация «{check_name}» завершена.\n\nИтого активов: {total}\nНайдено: {found}\nОтсутствует: {missing}",
+            "type": "inventory",
+        },
+        {
+            "key": "repair_created",
+            "name": "Заявка на ремонт создана",
+            "title_template": "🔧 Новая заявка на ремонт: {repair_id}",
+            "message_template": "Создана заявка на ремонт актива «{asset_name}».\n\nЗаявка #{repair_id}\nСтатус: {status}",
+            "type": "repair",
+        },
+        {
+            "key": "manual",
+            "name": "Ручное уведомление",
+            "title_template": "📢 Уведомление",
+            "message_template": "{message}",
+            "type": "general",
+        },
+    ]
+    
+    for tpl in templates:
+        existing = db.query(NotificationTemplate).filter(
+            NotificationTemplate.key == tpl["key"]
+        ).first()
+        if not existing:
+            db.add(NotificationTemplate(**tpl))
+    
+    db.commit()
+
+
+def seed_notification_settings(db):
+    """Создать настройки уведомлений по умолчанию"""
+    from src.infrastructure.db.models.notification_settings import NotificationSettings
+    
+    if not db.query(NotificationSettings).first():
+        db.add(NotificationSettings())
+        db.commit()
 
 
 @app.on_event("startup")
@@ -183,9 +241,11 @@ def startup_event():
     try:
         db = SessionLocal()
         seed_asset_types(db)
+        seed_notification_templates(db)
+        seed_notification_settings(db)
         db.close()
     except Exception as e:
-        logger.warning(f"Could not seed asset types: {e}")
+        logger.warning(f"Could not seed data: {e}")
 
 
 @app.exception_handler(RequestValidationError)

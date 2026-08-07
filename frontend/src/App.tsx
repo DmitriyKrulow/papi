@@ -23,6 +23,8 @@ import Register from './pages/Register';
 import PasswordReset from './pages/PasswordReset';
 import Profile from './pages/Profile';
 import AdminPanel from './pages/AdminPanel';
+import InventoryMobile from './pages/InventoryMobile';
+import InventoryAssetMobile from './pages/InventoryAssetMobile';
 import './index.css';
 
 class ErrorBoundary extends React.Component<
@@ -167,6 +169,16 @@ function App() {
                 <Route path="/inventory" element={
                   <PrivateRoute>
                     <Inventory />
+                  </PrivateRoute>
+                } />
+                <Route path="/inventory-mobile" element={
+                  <PrivateRoute>
+                    <InventoryMobile />
+                  </PrivateRoute>
+                } />
+                <Route path="/inventory/asset/:assetId" element={
+                  <PrivateRoute>
+                    <InventoryAssetMobile />
                   </PrivateRoute>
                 } />
                 <Route path="/marking" element={

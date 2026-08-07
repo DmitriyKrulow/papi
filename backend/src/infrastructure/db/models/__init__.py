@@ -28,6 +28,9 @@ from .import_job import ImportJob
 from .brute_force_log import BruteForceLog
 from .department import Room
 from .password_reset_request import PasswordResetRequest
+from .notification import Notification
+from .notification_template import NotificationTemplate
+from .notification_settings import NotificationSettings
 
 __all__ = [
     "Base",
@@ -54,4 +57,7 @@ __all__ = [
     "ImportJob",
     "BruteForceLog",
     "PasswordResetRequest",
+    "Notification",
+    "NotificationTemplate",
+    "NotificationSettings",
 ]

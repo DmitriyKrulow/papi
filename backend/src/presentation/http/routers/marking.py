@@ -2,6 +2,9 @@
 """Маркировка имущества — генерация бирок для печати"""
 import os
 import uuid
+import base64
+import io
+import qrcode
 from datetime import date
 from typing import Optional, List
 from fastapi import APIRouter, Depends, Query, HTTPException, UploadFile, File, Form
@@ -223,6 +226,33 @@ async def get_label_html(
     
     purchase_date = safe_date(asset.purchase_date) or "—"
     
+    # Генерируем QR-код
+    import io
+    import qrcode
+    from PIL import Image
+    
+    # URL для мобильной страницы актива (публичный)
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+    qr_url = f"{frontend_url}/inventory/asset/{asset.id}"
+    
+    # Генерируем QR-код в base64
+    qr = qrcode.QRCode(version=1, box_size=10, border=2)
+    qr.add_data(qr_url)
+    qr.make(fit=True)
+    
+    img = qr.make_image(fill_color="black", back_color="white")
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    buf.seek(0)
+    qr_base64 = base64.b64encode(buf.read()).decode('utf-8')
+    
+    qr_html = f'''<div style="text-align: center; margin-top: 1mm;">
+        <img src="data:image/png;base64,{qr_base64}" style="width: 20mm; height: 20mm;" />
+        <div style="font-size: 5pt; color: #666; margin-top: 0.5mm;">
+            {safe_str(asset.inventory_number)}
+        </div>
+    </div>'''
+    
     # Logo HTML if exists
     logo_html = ""
     if logo_url:
@@ -265,13 +295,14 @@ async def get_label_html(
                 <div style="font-weight: bold; font-size: 9pt;">{purchase_date}</div>
             </div>
         </div>
+        {qr_html}
         <div style="font-size: 6pt; color: #666; text-align: right;">
             {company_short}
         </div>
     </div>
     """
     
-    return {"html": html, "inventory_number": safe_str(asset.inventory_number)}
+    return {"html": html, "inventory_number": safe_str(asset.inventory_number), "qr_url": qr_url}
 
 
 @router.get("/label-batch")
@@ -307,6 +338,27 @@ async def get_batch_labels(
         formatted = format_responsible(responsible)
         purchase_date = safe_date(asset.purchase_date) or "—"
         
+        # Генерируем QR-код
+        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+        qr_url = f"{frontend_url}/inventory/asset/{asset.id}"
+        
+        qr = qrcode.QRCode(version=1, box_size=10, border=2)
+        qr.add_data(qr_url)
+        qr.make(fit=True)
+        
+        img = qr.make_image(fill_color="black", back_color="white")
+        buf = io.BytesIO()
+        img.save(buf, format='PNG')
+        buf.seek(0)
+        qr_base64 = base64.b64encode(buf.read()).decode('utf-8')
+        
+        qr_html = f'''<div style="text-align: center; margin-top: 1mm;">
+            <img src="data:image/png;base64,{qr_base64}" style="width: 18mm; height: 18mm;" />
+            <div style="font-size: 4pt; color: #666; margin-top: 0.5mm;">
+                {safe_str(asset.inventory_number)}
+            </div>
+        </div>'''
+        
         label = f"""
         <div class="label" style="
             width: {label_width}mm; height: {label_height}mm; border: 1px solid #000; padding: 2mm;
@@ -336,6 +388,7 @@ async def get_batch_labels(
                     <div style="font-weight: bold; font-size: 8pt;">{purchase_date}</div>
                 </div>
             </div>
+            {qr_html}
             <div style="font-size: 5pt; color: #666; text-align: right;">
                 {company_short}
             </div>

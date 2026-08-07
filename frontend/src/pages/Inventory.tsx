@@ -1,11 +1,12 @@
 // frontend/src/pages/Inventory.tsx
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import {
-  ClipboardList, Plus, Trash2, Play, CheckCircle2, XCircle,
-  Download, QrCode, Search, ChevronRight, ChevronLeft,
-  Building2, User, Users, Package, AlertTriangle, RefreshCw,
-  Check, X, Clock, FileText, Printer
+  ClipboardList, Plus, FileText, CheckCircle2, XCircle, Loader2,
+  Building2, Users, User, Camera, ChevronRight, QrCode,
+  ChevronLeft, Play, Trash2, Search, Clock, Check, X,
+  RefreshCw, Package, Download, Printer
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -94,6 +95,7 @@ const STATUS_COLORS: Record<string, string> = {
 // ====================== ОСНОВНОЙ КОМПОНЕНТ ======================
 
 const Inventory: React.FC = () => {
+  const navigate = useNavigate();
   const { isAdmin, user } = useAuth();
   const [checks, setChecks] = useState<InventoryCheck[]>([]);
   const [loading, setLoading] = useState(true);
@@ -265,15 +267,24 @@ const Inventory: React.FC = () => {
             Сверка имущества по помещениям, сотрудникам и ответственным лицам
           </p>
         </div>
-        {isAdmin && (
+        <div className="flex gap-2">
           <button
-            onClick={() => setShowCreateModal(true)}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition"
+            onClick={() => navigate('/inventory-mobile')}
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition"
           >
-            <Plus className="w-4 h-4" />
-            Создать инвентаризацию
+            <Camera className="w-4 h-4" />
+            Мобильная проверка
           </button>
-        )}
+          {isAdmin && (
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition"
+            >
+              <Plus className="w-4 h-4" />
+              Создать инвентаризацию
+            </button>
+          )}
+        </div>
       </div>
 
       {/* List view */}
@@ -342,14 +353,6 @@ const Inventory: React.FC = () => {
                     >
                       <ChevronRight className="w-3.5 h-3.5" /> Открыть
                     </button>
-                    {check.status === 'in_progress' && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setShowQrModal(check); }}
-                        className="px-3 py-1.5 text-xs border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition flex items-center gap-1"
-                      >
-                        <QrCode className="w-3.5 h-3.5" /> QR
-                      </button>
-                    )}
                   </div>
                 </div>
               ))}

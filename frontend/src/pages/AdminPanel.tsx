@@ -30,6 +30,7 @@ interface User {
   email: string;
   full_name?: string;
   phone?: string;
+  max_user_id?: string;
   role: string;
   is_active: boolean;
   created_at?: string;
@@ -41,6 +42,7 @@ interface UserFormData {
   email: string;
   full_name: string;
   phone: string;
+  max_user_id: string;
   role: string;
   is_active: boolean;
 }
@@ -91,7 +93,7 @@ interface RoomFormData {
 
 const AdminPanel: React.FC = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'users' | 'placements' | 'employees' | 'password-requests'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'placements' | 'employees' | 'password-requests' | 'notifications'>('users');
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -105,7 +107,7 @@ const AdminPanel: React.FC = () => {
     password: '', confirmPassword: ''
   });
   const [userFormData, setUserFormData] = useState<UserFormData>({
-    username: '', email: '', full_name: '', phone: '', role: 'user', is_active: false
+    username: '', email: '', full_name: '', phone: '', max_user_id: '', role: 'user', is_active: false
   });
   const [resettingPassword, setResettingPassword] = useState<number | null>(null);
 
@@ -142,6 +144,68 @@ const AdminPanel: React.FC = () => {
   const [requestsLoading, setRequestsLoading] = useState(false);
   const [requestsFilter, setRequestsFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
 
+  // Notifications state
+  const [notifUsers, setNotifUsers] = useState<User[]>([]);
+  const [selectedUsers, setSelectedUsers] = useState<number[]>([]);
+  const [notifTitle, setNotifTitle] = useState('');
+  const [notifMessage, setNotifMessage] = useState('');
+  const [notifSending, setNotifSending] = useState(false);
+  const [notifConfig, setNotifConfig] = useState<any>(null);
+  const [notifSaving, setNotifSaving] = useState(false);
+  const [notifSettings, setNotifSettings] = useState({
+    smtp_host: '',
+    smtp_port: 587,
+    smtp_user: '',
+    smtp_password: '',
+    sender_email: '',
+    max_api_url: '',
+    max_api_token: '',
+    enable_email: true,
+    enable_max: false,
+  });
+
+  // Notifications functions (moved before useEffect)
+  const fetchNotifUsers = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/notification-settings/users', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setNotifUsers(data);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchNotifConfig = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/notification-settings/config', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setNotifConfig(data);
+        setNotifSettings({
+          smtp_host: data.smtp_host || '',
+          smtp_port: data.smtp_port || 587,
+          smtp_user: data.smtp_user || '',
+          smtp_password: '',
+          sender_email: data.sender_email || '',
+          max_api_url: data.max_api_url || '',
+          max_api_token: '',
+          enable_email: data.enable_email,
+          enable_max: data.enable_max,
+        });
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
   }, []);
@@ -157,6 +221,10 @@ const AdminPanel: React.FC = () => {
     }
     if (activeTab === 'password-requests') {
       fetchPasswordRequests();
+    }
+    if (activeTab === 'notifications') {
+      fetchNotifUsers();
+      fetchNotifConfig();
     }
   }, [activeTab]);
 
@@ -227,6 +295,87 @@ const AdminPanel: React.FC = () => {
       }
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleSaveNotifSettings = async () => {
+    try {
+      setNotifSaving(true);
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/notification-settings/config', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(notifSettings),
+      });
+      
+      if (response.ok) {
+        toast.success('Настройки уведомлений сохранены');
+      } else {
+        toast.error('Ошибка сохранения настроек');
+      }
+    } catch (err) {
+      toast.error('Ошибка соединения');
+    } finally {
+      setNotifSaving(false);
+    }
+  };
+
+  const handleSendNotification = async () => {
+    if (!notifTitle || !notifMessage) {
+      toast.error('Заполните заголовок и текст');
+      return;
+    }
+    
+    try {
+      setNotifSending(true);
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/notification-settings/send', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_ids: selectedUsers,
+          title: notifTitle,
+          message: notifMessage,
+          type: 'manual',
+        }),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        toast.success(data.message);
+        setNotifTitle('');
+        setNotifMessage('');
+        setSelectedUsers([]);
+      } else {
+        const err = await response.json();
+        toast.error(err.detail || 'Ошибка отправки');
+      }
+    } catch (err) {
+      toast.error('Ошибка соединения');
+    } finally {
+      setNotifSending(false);
+    }
+  };
+
+  const toggleUserSelection = (userId: number) => {
+    setSelectedUsers(prev => 
+      prev.includes(userId) 
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
+    );
+  };
+
+  const selectAllUsers = () => {
+    if (selectedUsers.length === notifUsers.length) {
+      setSelectedUsers([]);
+    } else {
+      setSelectedUsers(notifUsers.map(u => u.id));
     }
   };
 
@@ -730,6 +879,12 @@ const AdminPanel: React.FC = () => {
                       </span>
                     )}
                   </button>
+                  <button
+                    onClick={() => setActiveTab('notifications')}
+                    className={`px-4 py-2 font-medium text-sm rounded-t-lg transition ${activeTab === 'notifications' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
+                  >
+                    📧 Уведомления
+                  </button>
                 </div>
                 
                 {error && activeTab === 'users' && (
@@ -743,7 +898,7 @@ const AdminPanel: React.FC = () => {
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Пользователи системы</h2>
                   <button
-                    onClick={() => { setEditingUser(null); setUserFormData({ username: '', email: '', full_name: '', phone: '', role: 'user', is_active: true }); setShowUserForm(true); setShowPasswordReset(false); }}
+                    onClick={() => { setEditingUser(null); setUserFormData({ username: '', email: '', full_name: '', phone: '', max_user_id: '', role: 'user', is_active: true }); setShowUserForm(true); setShowPasswordReset(false); }}
                     className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition text-sm"
                   >
                     ➕ Создать пользователя
@@ -799,7 +954,7 @@ const AdminPanel: React.FC = () => {
                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
                               <div className="flex justify-end gap-2">
                                 <button onClick={() => handleViewUser(user.id)} className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300" title="Просмотреть">👁️</button>
-                                <button onClick={() => { setEditingUser(user); setUserFormData({ username: user.username, email: user.email, full_name: user.full_name || '', phone: user.phone || '', role: user.role, is_active: user.is_active }); setShowUserForm(true); setShowPasswordReset(false); }} className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300" title="Редактировать">✏️</button>
+                                <button onClick={() => { setEditingUser(user); setUserFormData({ username: user.username, email: user.email, full_name: user.full_name || '', phone: user.phone || '', max_user_id: user.max_user_id || '', role: user.role, is_active: user.is_active }); setShowUserForm(true); setShowPasswordReset(false); }} className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300" title="Редактировать">✏️</button>
                                 <button onClick={() => { setEditingUser(user); setShowPasswordReset(true); setPasswordResetData({ password: '', confirmPassword: '' }); }} className="text-yellow-600 dark:text-yellow-400 hover:text-yellow-800 dark:hover:text-yellow-300" title="Сменить пароль">🔑</button>
                                 <button onClick={() => handleDeleteUser(user.id)} disabled={deletingUser === user.id} className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300 disabled:opacity-50">{deletingUser === user.id ? '...' : '🗑️'}</button>
                               </div>
@@ -829,6 +984,7 @@ const AdminPanel: React.FC = () => {
                       <input type="email" placeholder="Email *" value={userFormData.email} onChange={(e) => setUserFormData({...userFormData, email: e.target.value})} className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100" />
                       <input type="text" placeholder="ФИО" value={userFormData.full_name} onChange={(e) => setUserFormData({...userFormData, full_name: e.target.value})} className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100" />
                       <input type="text" placeholder="Телефон" value={userFormData.phone} onChange={(e) => setUserFormData({...userFormData, phone: e.target.value})} className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100" />
+                      <input type="text" placeholder="MAX ID (для уведомлений)" value={userFormData.max_user_id || ''} onChange={(e) => setUserFormData({...userFormData, max_user_id: e.target.value})} className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100" />
                       <select value={userFormData.role} onChange={(e) => setUserFormData({...userFormData, role: e.target.value})} className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">
                         <option value="user">Пользователь</option>
                         <option value="admin">Администратор</option>
@@ -890,6 +1046,10 @@ const AdminPanel: React.FC = () => {
                     <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{viewingUser.phone || '—'}</p>
                   </div>
                   <div>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">MAX ID</span>
+                    <p className="text-sm font-medium text-blue-600 dark:text-blue-400">{viewingUser.max_user_id || '—'}</p>
+                  </div>
+                  <div>
                     <span className="text-xs text-gray-500 dark:text-gray-400">Роль</span>
                     <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{viewingUser.role === 'admin' ? 'Администратор' : viewingUser.role === 'responsible' ? 'Ответственный' : 'Пользователь'}</p>
                   </div>
@@ -907,7 +1067,7 @@ const AdminPanel: React.FC = () => {
                   </div>
                 </div>
                 <div className="flex gap-2 mt-4">
-                  <button onClick={() => { setViewingUser(null); setEditingUser(viewingUser); setUserFormData({ username: viewingUser.username, email: viewingUser.email, full_name: viewingUser.full_name || '', phone: viewingUser.phone || '', role: viewingUser.role, is_active: viewingUser.is_active }); setShowUserForm(true); setShowPasswordReset(false); }} className="bg-green-600 text-white px-3 py-1.5 rounded text-sm hover:bg-green-700 transition">✏️ Редактировать</button>
+                  <button onClick={() => { setViewingUser(null); setEditingUser(viewingUser); setUserFormData({ username: viewingUser.username, email: viewingUser.email, full_name: viewingUser.full_name || '', phone: viewingUser.phone || '', max_user_id: viewingUser.max_user_id || '', role: viewingUser.role, is_active: viewingUser.is_active }); setShowUserForm(true); setShowPasswordReset(false); }} className="bg-green-600 text-white px-3 py-1.5 rounded text-sm hover:bg-green-700 transition">✏️ Редактировать</button>
                   <button onClick={() => { setViewingUser(null); setEditingUser(viewingUser); setShowPasswordReset(true); setPasswordResetData({ password: '', confirmPassword: '' }); }} className="bg-yellow-600 text-white px-3 py-1.5 rounded text-sm hover:bg-yellow-700 transition">🔑 Сменить пароль</button>
                 </div>
               </div>
@@ -1297,6 +1457,181 @@ const AdminPanel: React.FC = () => {
                       })}
                   </div>
                 )}
+              </>
+            )}
+
+            {activeTab === 'notifications' && (
+              <>
+                {/* Settings */}
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-6 border border-gray-200 dark:border-gray-700">
+                  <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">⚙️ Настройки уведомлений</h2>
+                  
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={notifSettings.enable_email}
+                        onChange={(e) => setNotifSettings({...notifSettings, enable_email: e.target.checked})}
+                        className="rounded"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">Включить email</span>
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={notifSettings.enable_max}
+                        onChange={(e) => setNotifSettings({...notifSettings, enable_max: e.target.checked})}
+                        className="rounded"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">Включить MAX chat</span>
+                    </label>
+                  </div>
+
+                  <h3 className="font-medium text-gray-700 dark:text-gray-300 mb-2">SMTP (Email)</h3>
+                  <div className="grid grid-cols-2 gap-3 mb-4">
+                    <input
+                      type="text"
+                      placeholder="SMTP хост (smtp.gmail.com)"
+                      value={notifSettings.smtp_host}
+                      onChange={(e) => setNotifSettings({...notifSettings, smtp_host: e.target.value})}
+                      className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                    />
+                    <input
+                      type="number"
+                      placeholder="Порт"
+                      value={notifSettings.smtp_port}
+                      onChange={(e) => setNotifSettings({...notifSettings, smtp_port: parseInt(e.target.value)})}
+                      className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Логин SMTP"
+                      value={notifSettings.smtp_user}
+                      onChange={(e) => setNotifSettings({...notifSettings, smtp_user: e.target.value})}
+                      className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                    />
+                    <input
+                      type="password"
+                      placeholder="Пароль SMTP (оставьте пустым, чтобы не менять)"
+                      value={notifSettings.smtp_password}
+                      onChange={(e) => setNotifSettings({...notifSettings, smtp_password: e.target.value})}
+                      className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                    />
+                    <input
+                      type="email"
+                      placeholder="Отправитель (noreply@company.com)"
+                      value={notifSettings.sender_email}
+                      onChange={(e) => setNotifSettings({...notifSettings, sender_email: e.target.value})}
+                      className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 col-span-2"
+                    />
+                  </div>
+
+                  <h3 className="font-medium text-gray-700 dark:text-gray-300 mb-2">MAX chat</h3>
+                  <div className="grid grid-cols-2 gap-3 mb-4">
+                    <input
+                      type="text"
+                      placeholder="API URL (http://localhost:8080/api/notify)"
+                      value={notifSettings.max_api_url}
+                      onChange={(e) => setNotifSettings({...notifSettings, max_api_url: e.target.value})}
+                      className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 col-span-2"
+                    />
+                    <input
+                      type="password"
+                      placeholder="API токен MAX"
+                      value={notifSettings.max_api_token}
+                      onChange={(e) => setNotifSettings({...notifSettings, max_api_token: e.target.value})}
+                      className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 col-span-2"
+                    />
+                  </div>
+
+                  <button
+                    onClick={handleSaveNotifSettings}
+                    disabled={notifSaving}
+                    className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition disabled:opacity-50"
+                  >
+                    {notifSaving ? 'Сохранение...' : '💾 Сохранить настройки'}
+                  </button>
+                </div>
+
+                {/* Send Notification */}
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-6 border border-gray-200 dark:border-gray-700">
+                  <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">📤 Отправить уведомление</h2>
+                  
+                  <div className="grid grid-cols-2 gap-3 mb-4">
+                    <input
+                      type="text"
+                      placeholder="Заголовок"
+                      value={notifTitle}
+                      onChange={(e) => setNotifTitle(e.target.value)}
+                      className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Текст сообщения"
+                      value={notifMessage}
+                      onChange={(e) => setNotifMessage(e.target.value)}
+                      className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                    />
+                  </div>
+
+                  {/* User selection */}
+                  <div className="mb-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <h3 className="font-medium text-gray-700 dark:text-gray-300">Выберите пользователей</h3>
+                      <button
+                        onClick={selectAllUsers}
+                        className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+                      >
+                        {selectedUsers.length === notifUsers.length ? 'Отменить выбор' : 'Выбрать всех'}
+                      </button>
+                    </div>
+                    
+                    <div className="max-h-48 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded p-2">
+                      {notifUsers.map(user => (
+                        <label
+                          key={user.id}
+                          className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedUsers.includes(user.id)}
+                            onChange={() => toggleUserSelection(user.id)}
+                            className="rounded"
+                          />
+                          <span className="text-sm text-gray-700 dark:text-gray-300">
+                            {user.full_name || user.username} ({user.email})
+                            {user.max_user_id && <span className="text-xs text-blue-600 dark:text-blue-400 ml-2">[MAX]</span>}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                    
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                      Выбрано: {selectedUsers.length} из {notifUsers.length}
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={handleSendNotification}
+                    disabled={notifSending || selectedUsers.length === 0}
+                    className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition disabled:opacity-50"
+                  >
+                    {notifSending ? 'Отправка...' : `📤 Отправить (${selectedUsers.length} получателей)`}
+                  </button>
+                </div>
+
+                {/* Info */}
+                <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <h3 className="text-lg font-medium text-blue-900 dark:text-blue-300 mb-2">ℹ️ Как использовать</h3>
+                  <ul className="list-disc list-inside text-sm text-blue-700 dark:text-blue-400 space-y-1">
+                    <li>Настройте SMTP для отправки email уведомлений</li>
+                    <li>Настройте MAX chat API для отправки в мессенджер</li>
+                    <li>Для каждого пользователя укажите <strong>MAX ID</strong> в профиле пользователя</li>
+                    <li>Выберите пользователей из списка или выберите всех</li>
+                    <li>Введите заголовок и текст сообщения</li>
+                    <li>Нажмите "Отправить"</li>
+                  </ul>
+                </div>
               </>
             )}
 

@@ -41,7 +41,9 @@ def init_db():
     _ensure_asset_inventory_columns()
     _ensure_brute_force_table()
     _ensure_user_allowed_ips_column()
+    _ensure_user_max_user_id_column()
     _ensure_password_reset_table()
+    _ensure_notification_table()
 
 
 def _ensure_photo_category_column():
@@ -224,3 +226,32 @@ def _ensure_password_reset_table():
             print("Created password_reset_requests table")
     except Exception as e:
         print(f"Could not create password_reset_requests table: {e}")
+
+
+def _ensure_notification_table():
+    """Создаёт таблицу notifications, если её нет"""
+    from sqlalchemy import inspect
+    try:
+        inspector = inspect(engine)
+        table_names = inspector.get_table_names()
+        if "notifications" not in table_names:
+            from src.infrastructure.db.models.notification import Notification
+            Notification.__table__.create(engine)
+            print("Created notifications table")
+    except Exception as e:
+        print(f"Could not create notifications table: {e}")
+
+
+def _ensure_user_max_user_id_column():
+    """Добавляет колонку max_user_id в users, если её нет"""
+    from sqlalchemy import text, inspect
+    try:
+        inspector = inspect(engine)
+        columns = [c["name"] for c in inspector.get_columns("users")]
+        if "max_user_id" not in columns:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE users ADD COLUMN max_user_id VARCHAR(100)"))
+                conn.commit()
+            print("Added max_user_id column to users table")
+    except Exception as e:
+        print(f"Could not check/add max_user_id column: {e}")

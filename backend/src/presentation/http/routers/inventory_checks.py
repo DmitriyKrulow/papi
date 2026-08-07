@@ -18,6 +18,9 @@ from src.infrastructure.db.models.user import User
 from src.infrastructure.db.models.department import Department, Room
 from src.infrastructure.db.models.employee import Employee
 from src.presentation.http.dependencies.auth import get_current_user, get_current_admin
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/inventory-checks", tags=["inventory-checks"])
 
@@ -273,6 +276,24 @@ async def start_inventory_check(
 
     db.commit()
 
+    # Отправляем уведомления ответственному лицу
+    try:
+        from src.core.services.notification_service import NotificationService
+        service = NotificationService()
+        # Уведомляем ответственного
+        if inv_check.responsible_id:
+            responsible = db.query(User).filter(User.id == inv_check.responsible_id).first()
+            if responsible:
+                service.send_inventory_notification(responsible, inv_check)
+        
+        # Уведомляем создателя
+        if inv_check.created_by and inv_check.created_by != inv_check.responsible_id:
+            creator = db.query(User).filter(User.id == inv_check.created_by).first()
+            if creator:
+                service.send_inventory_notification(creator, inv_check)
+    except Exception as e:
+        logger.warning(f"Failed to send inventory notifications: {e}")
+
     return JSONResponse(content={
         "message": f"Инвентаризация начата. Активов для проверки: {len(assets)}",
         "total_assets": len(assets),
@@ -359,6 +380,21 @@ async def complete_inventory_check(
     inv_check.completed_at = datetime.now()
 
     db.commit()
+
+    # Отправляем уведомления о завершении
+    try:
+        from src.core.services.notification_service import NotificationService
+        service = NotificationService()
+        if inv_check.responsible_id:
+            responsible = db.query(User).filter(User.id == inv_check.responsible_id).first()
+            if responsible:
+                service.send_inventory_notification(responsible, inv_check)
+        if inv_check.created_by and inv_check.created_by != inv_check.responsible_id:
+            creator = db.query(User).filter(User.id == inv_check.created_by).first()
+            if creator:
+                service.send_inventory_notification(creator, inv_check)
+    except Exception as e:
+        logger.warning(f"Failed to send completion notifications: {e}")
 
     return JSONResponse(content={
         "message": "Инвентаризация завершена",
@@ -492,19 +528,22 @@ async def get_asset_qr(
     if not asset:
         raise HTTPException(status_code=404, detail="Актив не найден")
 
-    base_url = "http://localhost:5173"
+    # Формируем ссылку на мобильную страницу актива
+    base_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+    asset_url = f"{base_url}/inventory/asset/{asset_id}?check_id={check_id}"
+    
     qr_data = json.dumps({
         "type": "asset_check",
         "check_id": check_id,
         "asset_id": asset_id,
         "inventory_number": safe_str(asset.inventory_number),
         "asset_name": safe_str(asset.name),
-        "url": f"{base_url}/inventory/{check_id:int}/asset/{asset_id:int}",
+        "url": asset_url,
     }, ensure_ascii=False)
 
     return JSONResponse(content={
         "qr_text": qr_data,
-        "qr_url": f"{base_url}/inventory/{check_id:int}/asset/{asset_id:int}",
+        "qr_url": asset_url,
         "asset_id": asset_id,
         "inventory_number": safe_str(asset.inventory_number),
         "asset_name": safe_str(asset.name),
@@ -647,4 +686,95 @@ async def get_active_inventory_check(
         "found": active_check.found,
         "missing": active_check.missing,
         "total_checked": active_check.total_checked,
+    })
+
+
+@router.get("/my-assets")
+async def get_my_assets_for_inventory(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Получить список активов пользователя для инвентаризации"""
+    # Получаем активы, где пользователь указан как ответственное лицо
+    assets = db.query(Asset).filter(
+        Asset.responsible_person == (current_user.full_name or current_user.username),
+        Asset.is_active == True
+    ).order_by(Asset.inventory_number).all()
+    
+    return JSONResponse(content=[{
+        "id": a.id,
+        "inventory_number": safe_str(a.inventory_number),
+        "name": safe_str(a.name),
+        "model": safe_str(a.model),
+        "location": safe_str(a.location_address),
+        "responsible": safe_str(a.responsible_person),
+        "last_inventory_date": a.last_inventory_date.isoformat() if a.last_inventory_date else None,
+        "last_inventory_confirmed": a.last_inventory_confirmed,
+    } for a in assets])
+
+
+@router.post("/{check_id:int}/scan-qr")
+async def scan_qr_for_inventory(
+    check_id: int,
+    inventory_number: str = Query(..., description="Инвентарный номер актива"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Сканирование QR-кода для быстрой отметки актива"""
+    inv_check = db.query(InventoryCheck).filter(
+        InventoryCheck.id == check_id,
+        InventoryCheck.status == "in_progress"
+    ).first()
+    
+    if not inv_check:
+        raise HTTPException(status_code=404, detail="Инвентаризация не найдена или не активна")
+    
+    # Ищем актив по инвентарному номеру
+    asset = db.query(Asset).filter(
+        Asset.inventory_number == inventory_number,
+        Asset.is_active == True
+    ).first()
+    
+    if not asset:
+        raise HTTPException(status_code=404, detail="Актив не найден")
+    
+    # Проверяем, есть ли актив в инвентаризации
+    item = db.query(InventoryCheckItem).filter(
+        InventoryCheckItem.inventory_check_id == check_id,
+        InventoryCheckItem.asset_id == asset.id
+    ).first()
+    
+    if not item:
+        raise HTTPException(status_code=404, detail="Актив не включен в эту инвентаризацию")
+    
+    # Если уже подтвержден
+    if item.result != "pending":
+        return JSONResponse(content={
+            "message": f"Актив уже отмечен как '{item.result}'",
+            "result": item.result,
+        })
+    
+    # Отмечаем как найденный
+    item.result = "found"
+    item.confirmed_by = current_user.id
+    item.confirmed_at = datetime.now()
+    
+    inv_check.found += 1
+    
+    # Обновляем актив
+    asset.last_inventory_date = datetime.now()
+    asset.last_inventory_by_id = current_user.id
+    asset.last_inventory_confirmed = True
+    
+    db.commit()
+    
+    return JSONResponse(content={
+        "message": "Актив найден и отмечен",
+        "asset_id": asset.id,
+        "inventory_number": safe_str(asset.inventory_number),
+        "asset_name": safe_str(asset.name),
+        "result": "found",
+        "found_count": inv_check.found,
+        "missing_count": inv_check.missing,
+        "remaining": inv_check.total_checked - inv_check.found - inv_check.missing,
     })
