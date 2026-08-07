@@ -262,12 +262,54 @@ const Marking: React.FC = () => {
   };
 
   const printBatch = () => {
+    const fullHtml = `
+      <html>
+      <head>
+        <title>Бирки для печати</title>
+        <style>
+          @page { size: A4; margin: 5mm; }
+          body { margin: 0; padding: 0; }
+          .label { page-break-inside: avoid; }
+          img { display: block; }
+        </style>
+      </head>
+      <body>${batchHtml}</body>
+      </html>
+    `;
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
       toast.error('Блокировщик всплывающих окон');
       return;
     }
-    printWindow.document.write(batchHtml);
+    printWindow.document.write(fullHtml);
+    printWindow.document.close();
+    printWindow.onload = () => {
+      printWindow.print();
+    };
+  };
+
+  const printSingle = () => {
+    if (!previewHtml || !previewAsset) return;
+    const fullHtml = `
+      <html>
+      <head>
+        <title>Бирка — ${previewAsset.inventory_number}</title>
+        <style>
+          @page { margin: 0; size: auto; }
+          body { margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+          .label { page-break-inside: avoid; }
+          img { display: block; }
+        </style>
+      </head>
+      <body>${previewHtml}</body>
+      </html>
+    `;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast.error('Блокировщик всплывающих окон');
+      return;
+    }
+    printWindow.document.write(fullHtml);
     printWindow.document.close();
     printWindow.onload = () => {
       printWindow.print();
@@ -733,20 +775,26 @@ const Marking: React.FC = () => {
       {/* Single Label Preview Modal */}
       {previewAsset && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setPreviewAsset(null)}>
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-lg w-full p-6" onClick={e => e.stopPropagation()}>
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-2xl w-full p-6" onClick={e => e.stopPropagation()}>
             <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 mb-4">
               Предпросмотр бирки
             </h3>
-            <div className="flex justify-center mb-4">
+            <div className="flex justify-center mb-4 overflow-auto max-h-[60vh] p-4 bg-gray-50 dark:bg-gray-900 rounded-lg" style={{ minHeight: '200px' }}>
               <div
                 dangerouslySetInnerHTML={{ __html: previewHtml }}
-                className="max-w-full overflow-auto"
               />
             </div>
             <div className="text-center text-sm text-gray-600 dark:text-gray-400 mb-4">
               {previewAsset.name} | Инв. № {previewAsset.inventory_number}
             </div>
             <div className="flex gap-2">
+              <button
+                onClick={printSingle}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+              >
+                <PrinterIcon className="w-4 h-4" />
+                Печать
+              </button>
               <button
                 onClick={() => setPreviewAsset(null)}
                 className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition"
@@ -761,13 +809,16 @@ const Marking: React.FC = () => {
       {/* Batch Preview Modal */}
       {showBatchPreview && batchHtml && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowBatchPreview(false)}>
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-4xl w-full p-6 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-6xl w-full p-6 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 mb-4 flex items-center gap-2">
               <PrinterIcon className="w-5 h-5" />
               Пакетная печать бирок ({selectedIds.size} шт.)
             </h3>
-            <div ref={printRef} className="mb-4">
-              <div dangerouslySetInnerHTML={{ __html: batchHtml }} />
+            <div ref={printRef} className="mb-4 bg-gray-50 dark:bg-gray-900 rounded-lg p-4" style={{ minHeight: '200px', overflow: 'auto', maxHeight: '70vh' }}>
+              <div
+                dangerouslySetInnerHTML={{ __html: batchHtml.replace(/<\/?html[^>]*>/g, '').replace(/<\/?head[^>]*>/g, '').replace(/<\/?body[^>]*>/g, '').replace(/<title>[^<]*<\/title>/gi, '') }}
+                style={{ display: 'flex', flexWrap: 'wrap', gap: '1mm', justifyContent: 'center' }}
+              />
             </div>
             <div className="flex gap-2">
               <button
