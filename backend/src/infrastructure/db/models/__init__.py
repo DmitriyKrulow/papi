@@ -31,6 +31,7 @@ from .password_reset_request import PasswordResetRequest
 from .notification import Notification
 from .notification_template import NotificationTemplate
 from .notification_settings import NotificationSettings
+from .audit_log import AuditLog
 
 __all__ = [
     "Base",
@@ -60,4 +61,5 @@ __all__ = [
     "Notification",
     "NotificationTemplate",
     "NotificationSettings",
+    "AuditLog",
 ]

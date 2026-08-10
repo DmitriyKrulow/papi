@@ -136,6 +136,19 @@ async def upload_inventory_file(
                 db.flush()
                 db.commit()
                 logger.info(f"[Inventory Import] Import completed. Added: {processed_count}, Duplicates: {duplicate_count}, Errors: {error_count}")
+                
+                # Логирование импорта в аудит
+                try:
+                    from src.core.services.audit_service import AuditService
+                    audit_service = AuditService(db)
+                    audit_service.log_import(
+                        "Asset",
+                        count=processed_count,
+                        user_id=current_user.id,
+                        comment=f"Импорт из файла: {file.filename}",
+                    )
+                except Exception:
+                    pass
             else:
                 logger.warning("[Inventory Import] No assets were processed — nothing to commit")
             
@@ -174,6 +187,19 @@ async def reset_assets(
         deleted_count = db.query(Asset).count()
         db.query(Asset).delete()
         db.commit()
+        
+        # Логирование сброса в аудит
+        try:
+            from src.core.services.audit_service import AuditService
+            audit_service = AuditService(db)
+            audit_service.log_import(
+                "Asset",
+                count=-deleted_count,  # отрицательное — означает удаление
+                user_id=current_user.id,
+                comment=f"Полный сброс активов: {deleted_count} удалено",
+            )
+        except Exception:
+            pass
         
         logger.info(f"[Inventory Import] Reset completed. Deleted {deleted_count} assets")
         

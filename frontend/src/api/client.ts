@@ -75,6 +75,8 @@ api.interceptors.response.use(
   }
 );
 
+export const API_BASE = '/api';
+
 export const apiClient = {
   // Аутентификация
   auth: {

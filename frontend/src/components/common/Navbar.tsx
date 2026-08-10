@@ -26,6 +26,7 @@ const Navbar: React.FC = () => {
 
   const adminItems = [
     { path: '/admin', label: '⚙️ Админка' },
+    { path: '/audit', label: '📜 Аудит' },
   ];
 
   const handleLogout = () => {

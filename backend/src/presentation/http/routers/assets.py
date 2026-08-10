@@ -17,6 +17,7 @@ from src.presentation.http.dependencies.auth import get_current_user
 from src.infrastructure.db.models.asset_type_config import AssetTypeConfig
 from src.infrastructure.db.models.department import Department
 from src.infrastructure.db.models.employee import Employee
+from src.core.services.audit_service import AuditService, AuditAction
 
 router = APIRouter(prefix="/assets", tags=["assets"])
 
@@ -234,6 +235,7 @@ async def get_asset(
 async def create_asset(
     asset_data: dict,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Создать новый актив.
@@ -315,6 +317,17 @@ async def create_asset(
         db.commit()
         db.refresh(asset)
         
+        # Логирование в аудит
+        try:
+            audit_service = AuditService(db)
+            audit_service.log_asset_create(
+                int(asset.id),  # type: ignore[arg-type]
+                asset_to_dict(asset, db),
+                user_id=int(current_user.id) if hasattr(current_user, 'id') and current_user.id else None,  # type: ignore[arg-type]
+            )
+        except Exception:
+            pass  # Аудит не должен ломать создание актива
+        
         return asset_to_dict(asset, db)
         
     except HTTPException:
@@ -342,35 +355,35 @@ async def update_asset(
         # Преобразуем даты
         if "purchase_date" in asset_data and asset_data["purchase_date"]:
             try:
-                asset.purchase_date = datetime.strptime(asset_data["purchase_date"], "%Y-%m-%d").date()
+                asset.purchase_date = datetime.strptime(asset_data["purchase_date"], "%Y-%m-%d").date()  # type: ignore[assignment]
             except:
-                asset.purchase_date = datetime.fromisoformat(asset_data["purchase_date"]).date()
+                asset.purchase_date = datetime.fromisoformat(asset_data["purchase_date"]).date()  # type: ignore[assignment]
         elif "purchase_date" in asset_data:
-            asset.purchase_date = None
+            asset.purchase_date = None  # type: ignore[assignment]
             
         if "commissioning_date" in asset_data and asset_data["commissioning_date"]:
             try:
-                asset.commissioning_date = datetime.strptime(asset_data["commissioning_date"], "%Y-%m-%d").date()
+                asset.commissioning_date = datetime.strptime(asset_data["commissioning_date"], "%Y-%m-%d").date()  # type: ignore[assignment]
             except:
-                asset.commissioning_date = datetime.fromisoformat(asset_data["commissioning_date"]).date()
+                asset.commissioning_date = datetime.fromisoformat(asset_data["commissioning_date"]).date()  # type: ignore[assignment]
         elif "commissioning_date" in asset_data:
-            asset.commissioning_date = None
+            asset.commissioning_date = None  # type: ignore[assignment]
             
         if "warranty_expiry" in asset_data and asset_data["warranty_expiry"]:
             try:
-                asset.warranty_expiry = datetime.strptime(asset_data["warranty_expiry"], "%Y-%m-%d").date()
+                asset.warranty_expiry = datetime.strptime(asset_data["warranty_expiry"], "%Y-%m-%d").date()  # type: ignore[assignment]
             except:
-                asset.warranty_expiry = datetime.fromisoformat(asset_data["warranty_expiry"]).date()
+                asset.warranty_expiry = datetime.fromisoformat(asset_data["warranty_expiry"]).date()  # type: ignore[assignment]
         elif "warranty_expiry" in asset_data:
-            asset.warranty_expiry = None
+            asset.warranty_expiry = None  # type: ignore[assignment]
             
         if "next_maintenance_date" in asset_data and asset_data["next_maintenance_date"]:
             try:
-                asset.next_maintenance_date = datetime.strptime(asset_data["next_maintenance_date"], "%Y-%m-%d").date()
+                asset.next_maintenance_date = datetime.strptime(asset_data["next_maintenance_date"], "%Y-%m-%d").date()  # type: ignore[assignment]
             except:
-                asset.next_maintenance_date = datetime.fromisoformat(asset_data["next_maintenance_date"]).date()
+                asset.next_maintenance_date = datetime.fromisoformat(asset_data["next_maintenance_date"]).date()  # type: ignore[assignment]
         elif "next_maintenance_date" in asset_data:
-            asset.next_maintenance_date = None
+            asset.next_maintenance_date = None  # type: ignore[assignment]
 
         # Обновляем только переданные поля
         if "name" in asset_data:
@@ -384,11 +397,11 @@ async def update_asset(
         if "status" in asset_data:
             asset.status = asset_data["status"]
         if "purchase_price" in asset_data:
-            asset.purchase_price = Decimal(str(asset_data["purchase_price"])) if asset_data["purchase_price"] is not None else None
+            asset.purchase_price = Decimal(str(asset_data["purchase_price"])) if asset_data["purchase_price"] is not None else None  # type: ignore[assignment]
         if "current_value" in asset_data:
-            asset.current_value = Decimal(str(asset_data["current_value"])) if asset_data["current_value"] is not None else None
+            asset.current_value = Decimal(str(asset_data["current_value"])) if asset_data["current_value"] is not None else None  # type: ignore[assignment]
         if "quantity" in asset_data:
-            asset.quantity = int(asset_data["quantity"]) if asset_data["quantity"] is not None else 1
+            asset.quantity = int(asset_data["quantity"]) if asset_data["quantity"] is not None else 1  # type: ignore[assignment]
         if "department_code" in asset_data:
             asset.department_code = asset_data["department_code"]
         if "responsible_person" in asset_data:
@@ -402,7 +415,7 @@ async def update_asset(
         if "serial_number" in asset_data:
             asset.serial_number = asset_data["serial_number"]
         if "capacity" in asset_data:
-            asset.capacity = Decimal(str(asset_data["capacity"])) if asset_data["capacity"] is not None else None
+            asset.capacity = Decimal(str(asset_data["capacity"])) if asset_data["capacity"] is not None else None  # type: ignore[assignment]
         if "power" in asset_data:
             asset.power = asset_data["power"]
         if "weight" in asset_data:
@@ -414,14 +427,40 @@ async def update_asset(
         if "crypto_token_symbol" in asset_data:
             asset.crypto_token_symbol = asset_data["crypto_token_symbol"]
         if "depreciation_years" in asset_data:
-            asset.depreciation_years = asset_data["depreciation_years"] if asset_data["depreciation_years"] is not None else None
+            asset.depreciation_years = asset_data["depreciation_years"] if asset_data["depreciation_years"] is not None else None  # type: ignore[assignment]
         if "employee_id" in asset_data:
-            asset.employee_id = asset_data["employee_id"] if asset_data["employee_id"] is not None else None
+            asset.employee_id = asset_data["employee_id"] if asset_data["employee_id"] is not None else None  # type: ignore[assignment]
         
-        asset.updated_at = datetime.now()
+        asset.updated_at = datetime.now()  # type: ignore[assignment]
+        
+        # Сохраняем old values до коммита для аудита
+        old_data = asset_to_dict(asset, db)
+        # Перечитываем из БД до изменений (берём до commit)
+        old_snapshot = {
+            "name": asset.name,
+            "status": asset.status,
+            "department_code": asset.department_code,
+            "responsible_person": asset.responsible_person,
+            "location_address": asset.location_address,
+            "purchase_price": float(asset.purchase_price) if asset.purchase_price else None,  # type: ignore[arg-type]
+            "current_value": float(asset.current_value) if asset.current_value else None,  # type: ignore[arg-type]
+            "employee_id": asset.employee_id,  # type: ignore[arg-type]
+        }
         
         db.commit()
         db.refresh(asset)
+        
+        # Логирование в аудит
+        try:
+            audit_service = AuditService(db)
+            audit_service.log_asset_update(
+                int(asset.id),  # type: ignore[arg-type]
+                old_snapshot,
+                asset_to_dict(asset, db),
+                user_id=int(current_user.id) if hasattr(current_user, 'id') and current_user.id else None,  # type: ignore[arg-type]
+            )
+        except Exception:
+            pass  # Аудит не должен ломать обновление актива
         
         return asset_to_dict(asset, db)
         
@@ -446,10 +485,28 @@ async def delete_asset(
         if not asset:
             raise HTTPException(status_code=404, detail="Asset not found")
         
-        asset.is_active = False
-        asset.status = "written_off"
-        asset.updated_at = datetime.now()
+        # Сохраняем для аудита
+        old_snapshot = {
+            "name": asset.name,
+            "status": asset.status,
+            "is_active": asset.is_active,
+        }
+        
+        asset.is_active = False  # type: ignore[assignment]
+        asset.status = "written_off"  # type: ignore[assignment]
+        asset.updated_at = datetime.now()  # type: ignore[assignment]
         db.commit()
+        
+        # Логирование в аудит
+        try:
+            audit_service = AuditService(db)
+            audit_service.log_asset_delete(
+                int(asset.id),  # type: ignore[arg-type]
+                old_snapshot,
+                user_id=int(current_user.id) if hasattr(current_user, 'id') and current_user.id else None,  # type: ignore[arg-type]
+            )
+        except Exception:
+            pass
         
         return {"message": "Asset hidden successfully"}
         
@@ -470,7 +527,7 @@ async def hard_delete_asset(
     Полностью удалить актив (hard delete). Только для администраторов.
     Также удаляются связанные заявки на ремонт и события обслуживания.
     """
-    if current_user.role != "admin":
+    if current_user.role != "admin":  # type: ignore[operator]
         raise HTTPException(status_code=403, detail="Только администратор может полностью удалять активы")
     
     try:
@@ -483,8 +540,8 @@ async def hard_delete_asset(
         for photo in photos:
             doc = db.query(Document).filter(Document.id == photo.document_id).first()
             if doc:
-                if os.path.exists(doc.file_path):
-                    os.remove(doc.file_path)
+                if os.path.exists(doc.file_path):  # type: ignore[arg-type]
+                    os.remove(doc.file_path)  # type: ignore[arg-type]
                 db.delete(doc)
             db.delete(photo)
         
@@ -499,6 +556,17 @@ async def hard_delete_asset(
         # Удаляем сам актив
         db.delete(asset)
         db.commit()
+        
+        # Логирование в аудит
+        try:
+            audit_service = AuditService(db)
+            audit_service.log_asset_delete(
+                int(asset_id),  # type: ignore[arg-type]
+                {"name": asset.name, "inventory_number": asset.inventory_number},
+                user_id=int(current_user.id) if hasattr(current_user, 'id') and current_user.id else None,  # type: ignore[arg-type]
+            )
+        except Exception:
+            pass
         
         return {"message": "Asset permanently deleted", "deleted_id": asset_id}
         
@@ -523,9 +591,9 @@ async def restore_asset(
         if not asset:
             raise HTTPException(status_code=404, detail="Asset not found")
         
-        asset.is_active = True
-        asset.status = "active"
-        asset.updated_at = datetime.now()
+        asset.is_active = True  # type: ignore[assignment]
+        asset.status = "active"  # type: ignore[assignment]
+        asset.updated_at = datetime.now()  # type: ignore[assignment]
         db.commit()
         db.refresh(asset)
         
@@ -555,7 +623,7 @@ async def get_asset_repair_history(
             raise HTTPException(status_code=404, detail="Asset not found")
         
         # Скрытые активы видны только администраторам
-        if not asset.is_active and current_user.role != "admin":
+        if not asset.is_active and current_user.role != "admin":  # type: ignore[operator]
             raise HTTPException(status_code=403, detail="Актив скрыт. Доступно только администраторам")
         
         from src.infrastructure.db.models.repair_request import RepairRequest
@@ -595,22 +663,22 @@ async def get_asset_repair_history(
                 "asset_id": r.asset_id,
                 "title": safe_str(r.title),
                 "description": safe_str(r.description),
-                "priority": r.priority.value if r.priority else "medium",
-                "status": r.status.value if r.status else "draft",
+                "priority": r.priority.value if r.priority else "medium",  # type: ignore[operator]
+                "status": r.status.value if r.status else "draft",  # type: ignore[operator]
                 "created_by": r.created_by,
                 "creator_name": safe_str(r.creator.username) if r.creator else None,
                 "created_at": safe_isoformat(r.created_at),
                 "assigned_to": r.assigned_to,
                 "assigned_at": safe_isoformat(r.assigned_at),
                 "actual_completion_date": safe_isoformat(r.actual_completion_date),
-                "actual_cost": safe_decimal_to_float(r.actual_cost) if r.actual_cost else None,
+                "actual_cost": safe_decimal_to_float(r.actual_cost) if r.actual_cost else None,  # type: ignore[operator]
                 "completion_notes": safe_str(r.completion_notes),
                 "rejection_reason": safe_str(r.rejection_reason),
                 "updated_at": safe_isoformat(r.updated_at),
                 "assigned_to_name": safe_str(r.assignee.username) if r.assignee else None,
                 "desired_completion_date": safe_isoformat(r.desired_completion_date),
                 "deadline": safe_isoformat(r.deadline),
-                "estimated_cost": safe_decimal_to_float(r.estimated_cost) if r.estimated_cost else None,
+                "estimated_cost": safe_decimal_to_float(r.estimated_cost) if r.estimated_cost else None,  # type: ignore[operator]
             })
         
         return {
@@ -644,7 +712,7 @@ async def get_asset_photos(
         
         items = []
         for photo in photos:
-            doc = db.query(Document).filter(Document.id == photo.document_id).first() if photo.document_id else None
+            doc = db.query(Document).filter(Document.id == photo.document_id).first() if photo.document_id else None  # type: ignore[operator]
             items.append({
                 "id": photo.id,
                 "asset_id": photo.asset_id,
@@ -656,7 +724,7 @@ async def get_asset_photos(
                 "is_before": photo.is_before,
                 "is_after": photo.is_after,
                 "sort_order": photo.sort_order,
-                "uploaded_at": photo.uploaded_at.isoformat() if photo.uploaded_at else None,
+                "uploaded_at": photo.uploaded_at.isoformat() if photo.uploaded_at else None,  # type: ignore[operator]
                 "filename": doc.filename if doc else None,
                 "file_size": doc.file_size if doc else None,
                 "mime_type": doc.mime_type if doc else None,

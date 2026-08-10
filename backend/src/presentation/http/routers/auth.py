@@ -117,6 +117,15 @@ def login(
         expires_delta=access_token_expires,
     )
     logger.info(f"[Auth] Login successful for user: {user.username}, token: {access_token[:50]}...")
+    
+    # Логирование в аудит
+    try:
+        from src.core.services.audit_service import AuditService
+        audit_service = AuditService(db)
+        audit_service.log_login(user.id, ip_address)
+    except Exception:
+        pass  # Аудит не должен ломать вход
+    
     return UserToken(access_token=access_token, token_type="bearer")
 
 

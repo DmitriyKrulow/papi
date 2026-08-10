@@ -25,6 +25,7 @@ import Profile from './pages/Profile';
 import AdminPanel from './pages/AdminPanel';
 import InventoryMobile from './pages/InventoryMobile';
 import InventoryAssetMobile from './pages/InventoryAssetMobile';
+import AuditLog from './pages/AuditLog';
 import './index.css';
 
 class ErrorBoundary extends React.Component<
@@ -218,6 +219,13 @@ function App() {
                 <Route path="/admin" element={
                   <AdminRoute>
                     <AdminPanel />
+                  </AdminRoute>
+                } />
+                
+                {/* Журнал аудита (только админ) */}
+                <Route path="/audit" element={
+                  <AdminRoute>
+                    <AuditLog />
                   </AdminRoute>
                 } />
                 

@@ -276,6 +276,18 @@ async def start_inventory_check(
 
     db.commit()
 
+    # Логирование в аудит
+    try:
+        from src.core.services.audit_service import AuditService
+        audit_service = AuditService(db)
+        audit_service.log_inventory_start(
+            inv_check.id,
+            inv_check.name,
+            user_id=admin.id,
+        )
+    except Exception:
+        pass
+
     # Отправляем уведомления ответственному лицу
     try:
         from src.core.services.notification_service import NotificationService
@@ -380,6 +392,18 @@ async def complete_inventory_check(
     inv_check.completed_at = datetime.now()
 
     db.commit()
+
+    # Логирование в аудит
+    try:
+        from src.core.services.audit_service import AuditService
+        audit_service = AuditService(db)
+        audit_service.log_inventory_complete(
+            inv_check.id,
+            inv_check.name,
+            user_id=admin.id,
+        )
+    except Exception:
+        pass
 
     # Отправляем уведомления о завершении
     try:
