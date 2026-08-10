@@ -42,6 +42,7 @@ class Asset(Base):
     department_code = Column(String(50), nullable=True)
     responsible_person = Column(String(100), nullable=True)
     location_address = Column(String(255), nullable=True)
+    room_id = Column(Integer, ForeignKey("rooms.id"), nullable=True, index=True)
     employee_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
     manufacturer_code = Column(String(100), nullable=True)
     manufacturer_name = Column(String(255), nullable=True)
@@ -87,6 +88,7 @@ class Asset(Base):
     document_links = relationship("DocumentLink", back_populates="asset", cascade="all, delete-orphan")
     last_inventory_by = relationship("User", foreign_keys=[last_inventory_by_id])
     inventory_check_items = relationship("InventoryCheckItem", back_populates="asset", cascade="all, delete-orphan")
+    assigned_room = relationship("Room", backref="assets")
 
     def __repr__(self) -> str:
         return f"<Asset(id={self.id}, name='{self.name}', status='{self.status}')>"

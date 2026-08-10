@@ -138,6 +138,13 @@ const AdminPanel: React.FC = () => {
     name: '', floor: '', building: ''
   });
   const [roomDeptId, setRoomDeptId] = useState<number | null>(null);
+  
+  // Move room state
+  const [moveRoomModal, setMoveRoomModal] = useState<{open: boolean; room: TreeRoom | null; deptId: number}>({
+    open: false, room: null, deptId: 0
+  });
+  const [moveTargetDept, setMoveTargetDept] = useState<number | null>(null);
+  const [moveLoading, setMoveLoading] = useState(false);
 
   // Password reset requests state
   const [passwordRequests, setPasswordRequests] = useState<PasswordResetRequest[]>([]);
@@ -739,6 +746,36 @@ const AdminPanel: React.FC = () => {
     }
   };
 
+  const handleMoveRoom = async () => {
+    if (!moveRoomModal.room || moveTargetDept === null || moveTargetDept === moveRoomModal.deptId) {
+      toast.error('Выберите другое подразделение');
+      return;
+    }
+    try {
+      setMoveLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/admin/placements/rooms/${moveRoomModal.room.id}/move`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ department_id: moveTargetDept }),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        toast.success(data.message || 'Кабинет перемещен');
+        setMoveRoomModal({ open: false, room: null, deptId: 0 });
+        setMoveTargetDept(null);
+        await fetchDepartments();
+      } else {
+        const data = await response.json();
+        toast.error(data.detail || 'Ошибка перемещения');
+      }
+    } catch (err) {
+      toast.error('Ошибка перемещения кабинета');
+    } finally {
+      setMoveLoading(false);
+    }
+  };
+
   const findDeptInTree = (tree: TreeDepartment[], id: number): TreeDepartment | null => {
     for (const dept of tree) {
       if (dept.id === id) return dept;
@@ -1229,6 +1266,13 @@ const AdminPanel: React.FC = () => {
                                         ✏️
                                       </button>
                                       <button
+                                        onClick={() => { setMoveRoomModal({open: true, room, deptId: dept.id}); setMoveTargetDept(null); }}
+                                        className="p-1 text-orange-600 hover:text-orange-900 hover:bg-orange-100 dark:hover:bg-orange-900/40 rounded-full transition flex-shrink-0"
+                                        title="Переместить в другое подразделение"
+                                      >
+                                        🚚
+                                      </button>
+                                      <button
                                         onClick={() => handleDeleteRoom(room.id)}
                                         className="p-1 text-red-600 hover:text-red-900 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-full transition flex-shrink-0"
                                         title="Удалить"
@@ -1644,7 +1688,45 @@ const AdminPanel: React.FC = () => {
                 <li>Начальный администратор: <strong className="text-blue-900 dark:text-blue-200">admin</strong> (пароль: <strong className="text-blue-900 dark:text-blue-200">admin123</strong>)</li>
               </ul>
             </div>
-            </>
+            
+              {moveRoomModal.open && moveRoomModal.room && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                  <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">
+                      🚚 Переместить кабинет {moveRoomModal.room.name}
+                    </h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                      Выберите подразделение, куда переместить кабинет:
+                    </p>
+                    <select
+                      value={moveTargetDept || ''}
+                      onChange={(e) => setMoveTargetDept(Number(e.target.value))}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 mb-4"
+                    >
+                      <option value="">-- Выберите подразделение --</option>
+                      {deptTree.filter(d => d.id !== moveRoomModal.deptId).map(d => (
+                        <option key={d.id} value={d.id}>{d.name} ({d.code})</option>
+                      ))}
+                    </select>
+                    <div className="flex gap-2 justify-end">
+                      <button
+                        onClick={handleMoveRoom}
+                        disabled={!moveTargetDept || moveLoading}
+                        className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {moveLoading ? 'Перемещаю...' : 'Переместить'}
+                      </button>
+                      <button
+                        onClick={() => { setMoveRoomModal({open: false, room: null, deptId: 0}); setMoveTargetDept(null); }}
+                        className="bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-lg hover:bg-gray-400 dark:hover:bg-gray-500 transition"
+                      >
+                        Отмена
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+</>
             )}
           </div>
         </div>

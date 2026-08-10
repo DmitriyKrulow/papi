@@ -391,3 +391,77 @@ async def delete_room(
     db.commit()
     
     return {"message": "Кабинет удален"}
+
+
+@router.put("/rooms/{room_id}/move")
+async def move_room(
+    room_id: int,
+    data: dict = Body(...),
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(get_current_admin),
+):
+    """
+    Переместить кабинет в другое подразделение.
+    Все привязанные активы автоматически сохраняют связь с кабинетом.
+    
+    При изменении room.department_id:
+    - кабинет переходит в новое подразделение
+    - location_address активов, привязанных к этому кабинету, обновляется
+    - department_code активов обновляется на новое подразделение
+    """
+    from src.infrastructure.db.models.asset import Asset
+    
+    room = db.query(Room).filter(Room.id == room_id).first()
+    if not room:
+        raise HTTPException(status_code=404, detail="Кабинет не найден")
+    
+    new_department_id = data.get("department_id")
+    if new_department_id is None:
+        raise HTTPException(status_code=400, detail="department_id обязателен")
+    
+    new_dept = db.query(Department).filter(
+        Department.id == new_department_id,
+        Department.is_active == True
+    ).first()
+    if not new_dept:
+        raise HTTPException(status_code=404, detail="Подразделение не найдено или неактивно")
+    
+    old_department_id = room.department_id
+    
+    # Если кабинет уже в этом подразделении — ничего не делаем
+    if old_department_id == new_department_id:
+        return {
+            "message": f"Кабинет '{room.name}' уже находится в '{new_dept.name}'",
+            "room": room_to_dict(room),
+        }
+    
+    old_dept = db.query(Department).filter(Department.id == old_department_id).first()
+    
+    # Перемещаем кабинет
+    room.department_id = new_department_id
+    room.updated_at = datetime.now()
+    
+    # Обновляем location_address для всех активов, привязанных к этому кабинету
+    assets_in_room = db.query(Asset).filter(
+        Asset.room_id == room_id
+    ).all()
+    
+    # Формируем новый location_address: "ИмяКабинета (КодПодразделения)"
+    new_location = f"{room.name} ({new_dept.code})"
+    
+    updated_assets = 0
+    for asset in assets_in_room:
+        asset.location_address = new_location
+        # Обновляем department_code если он совпадает со старым подразделением
+        if old_dept and (asset.department_code == old_dept.code or asset.department_code == old_dept.name):
+            asset.department_code = new_dept.code
+        updated_assets += 1
+    
+    db.commit()
+    
+    return {
+        "message": f"Кабинет '{room.name}' перемещен из '{old_dept.name}' в '{new_dept.name}'",
+        "room": room_to_dict(room),
+        "assets_moved": updated_assets,
+        "new_location": new_location,
+    }

@@ -167,6 +167,12 @@ export const apiClient = {
     delete: (id: number) => api.delete(`/admin/placements/${id}/`),
     options: () => api.get('/admin/placements/options'),
     getEmployees: (id: number) => api.get(`/admin/placements/${id}/employees`),
+    getTree: () => api.get('/admin/placements/tree'),
+    getRooms: (departmentId: number) => api.get(`/admin/placements/${departmentId}/rooms`),
+    createRoom: (departmentId: number, data: any) => api.post(`/admin/placements/${departmentId}/rooms`, data),
+    updateRoom: (roomId: number, data: any) => api.put(`/admin/placements/rooms/${roomId}`, data),
+    deleteRoom: (roomId: number) => api.delete(`/admin/placements/rooms/${roomId}`),
+    moveRoom: (roomId: number, data: any) => api.put(`/admin/placements/rooms/${roomId}/move`, data),
   },
   
   // Сотрудники

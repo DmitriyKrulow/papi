@@ -44,6 +44,7 @@ def init_db():
     _ensure_user_max_user_id_column()
     _ensure_password_reset_table()
     _ensure_notification_table()
+    _ensure_room_id_column()
 
 
 def _ensure_photo_category_column():
@@ -255,3 +256,47 @@ def _ensure_user_max_user_id_column():
             print("Added max_user_id column to users table")
     except Exception as e:
         print(f"Could not check/add max_user_id column: {e}")
+
+
+def _ensure_room_id_column():
+    """Добавляет колонку room_id в assets, если её нет, и сопоставляет данные"""
+    from sqlalchemy import text, inspect
+    try:
+        inspector = inspect(engine)
+        columns = [c["name"] for c in inspector.get_columns("assets")]
+        if "room_id" not in columns:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE assets ADD COLUMN room_id INTEGER REFERENCES rooms(id)"))
+                conn.commit()
+            print("Added room_id column to assets table")
+            
+            # Сопоставляем существующие location_address с room.name
+            from src.infrastructure.db.session import SessionLocal
+            from src.infrastructure.db.models.department import Room
+            from src.infrastructure.db.models.asset import Asset
+            
+            db = SessionLocal()
+            try:
+                rooms = db.query(Room).all()
+                room_map = {r.name: r.id for r in rooms if r.name}
+                
+                updated = 0
+                for asset in db.query(Asset).filter(
+                    Asset.location_address.isnot(None),
+                    Asset.location_address != ""
+                ).all():
+                    room_name = asset.location_address.strip()
+                    if room_name in room_map:
+                        asset.room_id = room_map[room_name]
+                        updated += 1
+                
+                if updated > 0:
+                    db.commit()
+                    print(f"Migrated {updated} assets: linked room_id from location_address")
+                else:
+                    db.rollback()
+                    print("No assets needed migration")
+            finally:
+                db.close()
+    except Exception as e:
+        print(f"Could not check/add room_id column: {e}")
