@@ -156,10 +156,12 @@ def register_routers():
     from src.presentation.http.routers.notifications import router as notifications_router
     from src.presentation.http.routers.notification_settings import router as notification_settings_router
     from src.presentation.http.routers.audit import router as audit_router
+    from src.presentation.http.routers.data_export import router as data_export_router
 
     app.include_router(assets_router, prefix="/api")
     app.include_router(assets_export_router)
     app.include_router(assets_restore_router)
+    app.include_router(data_export_router)
     app.include_router(users_router, prefix="/api")
     app.include_router(auth_router, prefix="/api")
     app.include_router(repairs_router, prefix="/api")

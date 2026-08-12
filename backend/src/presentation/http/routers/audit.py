@@ -91,6 +91,7 @@ def get_audit_log(
     user_id: Optional[int] = Query(None, description="ID пользователя"),
     start_date: Optional[str] = Query(None, description="Начальная дата (ISO format)"),
     end_date: Optional[str] = Query(None, description="Конечная дата (ISO format)"),
+    search: Optional[str] = Query(None, description="Поиск по комментарию или diff"),
     current_user=Depends(get_current_admin),
 ):
     """Получить журнал аудита с фильтрацией (только администратор)."""
@@ -103,6 +104,7 @@ def get_audit_log(
         user_id=user_id,
         start_date=start_date,
         end_date=end_date,
+        search=search,
     )
     
     # Обогащаем записи

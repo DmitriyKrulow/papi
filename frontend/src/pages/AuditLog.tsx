@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { auditApi } from '../api/audit';
 import {
@@ -135,6 +135,18 @@ const AuditLogPage: React.FC = () => {
   const [entityType, setEntityType] = useState('');
   const [action, setAction] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Debounce для поиска по комментарию
+  useEffect(() => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+      setPage(1);
+    }, 300);
+    return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current); };
+  }, [searchTerm]);
 
   // Детали записи
   const [selectedEntry, setSelectedEntry] = useState<AuditEntry | null>(null);
@@ -150,6 +162,7 @@ const AuditLogPage: React.FC = () => {
           offset: (page - 1) * limit,
           entity_type: entityType || undefined,
           action: action || undefined,
+          search: debouncedSearchTerm || undefined,
         }),
         auditApi.getSummary(),
         auditApi.getStatsOverview(),
@@ -163,7 +176,7 @@ const AuditLogPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, entityType, action]);
+  }, [page, entityType, action, debouncedSearchTerm]);
 
   useEffect(() => {
     if (isAuthenticated && isAdmin) {
@@ -401,7 +414,7 @@ const AuditLogPage: React.FC = () => {
                     }}
                     className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm hover:bg-gray-200 dark:hover:bg-gray-600 transition"
                   >
-                    Сбросить
+                    Сбросить фильтры
                   </button>
                 </div>
               </div>

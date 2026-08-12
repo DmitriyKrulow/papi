@@ -70,6 +70,11 @@ const Assets: React.FC = () => {
   const [deptDropdownOpen, setDeptDropdownOpen] = useState(false);
   const [activeInventory, setActiveInventory] = useState<any>(null);
 
+  // Refs для стабилизации dropdown-ов (чтобы фокус не слетал при вводе в search)
+  const deptDropdownRef = useRef<HTMLDivElement>(null);
+  const roomDropdownRef = useRef<HTMLDivElement>(null);
+  const employeeDropdownRef = useRef<HTMLDivElement>(null);
+
   // Debounce для поиска — API вызывается только через 300мс после последнего ввода
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
@@ -160,15 +165,22 @@ const Assets: React.FC = () => {
   const activeFilterCount = [filterStatus, filterAssetType, filterDepartment, filterLocation, filterEmployee].filter(Boolean).length;
 
   const totalFiltered = useMemo(() => {
-    let count = totalAssets;
-    if (filterStatus) count = assets.filter(a => a.status === filterStatus).length;
-    if (filterAssetType) count = assets.filter(a => a.asset_type === filterAssetType).length;
-    if (filterDepartment) count = assets.filter(a =>
+    let filtered = [...assets];
+    if (filterStatus) filtered = filtered.filter(a => a.status === filterStatus);
+    if (filterAssetType) filtered = filtered.filter(a => a.asset_type === filterAssetType);
+    if (filterDepartment) filtered = filtered.filter(a =>
       (a.department_name || '').toLowerCase().includes(filterDepartment.toLowerCase()) ||
       (a.department_code || '').toLowerCase().includes(filterDepartment.toLowerCase())
-    ).length;
-    return count;
-  }, [totalAssets, assets, filterStatus, filterAssetType, filterDepartment]);
+    );
+    if (filterLocation) filtered = filtered.filter(a =>
+      (a.location_address || '').toLowerCase().includes(filterLocation.toLowerCase())
+    );
+    if (filterEmployee) filtered = filtered.filter(a =>
+      (a.employee_name || '').toLowerCase().includes(filterEmployee.toLowerCase()) ||
+      (a.responsible_person || '').toLowerCase().includes(filterEmployee.toLowerCase())
+    );
+    return filtered.length;
+  }, [assets, filterStatus, filterAssetType, filterDepartment, filterLocation, filterEmployee]);
 
 const getToken = async () => localStorage.getItem('token') || '';
   
@@ -261,7 +273,7 @@ fetch('/api/asset-types/', { headers })
         body: file,
       });
       
-if (response.ok) {
+ if (response.ok) {
         const result = await response.json();
         toast.success(`База восстановлена: удалено ${result.deleted}, создано ${result.created}`);
         fetchData(); // Перезагрузить вспомогательные данные
@@ -271,6 +283,66 @@ if (response.ok) {
       toast.error('Ошибка соединения с сервером');
     } finally {
       e.target.value = ''; // Сбросить input
+    }
+  };
+
+  const handleExportAll = async () => {
+    try {
+      const token = await getToken();
+      const response = await fetch('/api/admin/data/export/all', {
+        headers: { 'Authorization': token ? `Bearer ${token}` : '' },
+      });
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `papi_full_export_${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        toast.success('Полный экспорт завершен');
+      } else {
+        toast.error('Ошибка экспорта');
+      }
+    } catch {
+      toast.error('Ошибка соединения с сервером');
+    }
+  };
+
+  const handleImportAll = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    if (!window.confirm('ВНИМАНИЕ! Все текущие данные системы (подразделения, помещения, сотрудники, активы) будут удалены и заменены данными из файла. Продолжить?')) {
+      return;
+    }
+    
+    try {
+      const token = await getToken();
+      const response = await fetch('/api/admin/data/import/all', {
+        method: 'POST',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+          'Accept': 'application/json',
+        },
+        body: file,
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        toast.success(`Данные восстановлены: импортировано ${result.imported}, пропущено ${result.skipped}`);
+        fetchData();
+        setRefreshKey(k => k + 1);
+      } else {
+        const error = await response.json();
+        toast.error(error.detail || 'Ошибка импорта');
+      }
+    } catch (err: any) {
+      toast.error('Ошибка соединения с сервером');
+    } finally {
+      e.target.value = '';
     }
   };
 
@@ -574,6 +646,32 @@ const handleEditClick = (asset: Asset) => {
               </button>
             </>
           )}
+          {isAdmin && (
+            <div className="hidden sm:flex items-center gap-2">
+              <div className="h-6 w-px bg-gray-300 dark:bg-gray-600" />
+              <button
+                onClick={handleExportAll}
+                className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition flex items-center gap-2 whitespace-nowrap shadow-sm"
+              >
+                <Download className="w-4 h-4" />
+                Экспорт всех данных
+              </button>
+              <input
+                type="file"
+                id="import-all-file"
+                accept=".json"
+                onChange={handleImportAll}
+                className="hidden"
+              />
+              <button
+                onClick={() => document.getElementById('import-all-file')?.click()}
+                className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition flex items-center gap-2 whitespace-nowrap shadow-sm"
+              >
+                <Upload className="w-4 h-4" />
+                Импорт всех данных
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -675,7 +773,17 @@ const handleEditClick = (asset: Asset) => {
               {deptDropdownOpen && (
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setDeptDropdownOpen(false)} />
-                  <div className="absolute z-20 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-hidden" style={{ top: '100%' }}>
+                  <div
+                    ref={deptDropdownRef}
+                    className="absolute z-20 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-hidden"
+                    style={{ top: '100%' }}
+                    onBlur={(e) => {
+                      if (deptDropdownRef.current && !deptDropdownRef.current.contains(e.relatedTarget as Node)) {
+                        setDeptDropdownOpen(false);
+                        setDepartmentSearch('');
+                      }
+                    }}
+                  >
                     <div className="p-2 border-b border-gray-100 dark:border-gray-700">
                       <div className="relative">
                         <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
@@ -744,7 +852,17 @@ const handleEditClick = (asset: Asset) => {
               {roomDropdownOpen && (
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setRoomDropdownOpen(false)} />
-                  <div className="absolute z-20 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-hidden" style={{ top: '100%' }}>
+                  <div
+                    ref={roomDropdownRef}
+                    className="absolute z-20 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-hidden"
+                    style={{ top: '100%' }}
+                    onBlur={(e) => {
+                      if (roomDropdownRef.current && !roomDropdownRef.current.contains(e.relatedTarget as Node)) {
+                        setRoomDropdownOpen(false);
+                        setRoomSearch('');
+                      }
+                    }}
+                  >
                     <div className="p-2 border-b border-gray-100 dark:border-gray-700">
                       <div className="relative">
                         <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />

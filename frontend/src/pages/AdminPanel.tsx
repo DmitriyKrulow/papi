@@ -275,11 +275,10 @@ const AdminPanel: React.FC = () => {
     try {
       setEmpLoading(true);
       const token = localStorage.getItem('token');
-      let params = empSearch ? `?search=${encodeURIComponent(empSearch)}` : '';
-      if (empDeptFilter) {
-        params += (params ? '&' : '?') + `department_id=${empDeptFilter}`;
-      }
-      const response = await fetch(`/api/admin/employees/${params}`, {
+      const url = new URL('/api/admin/employees/', window.location.origin);
+      if (empSearch) url.searchParams.set('search', empSearch);
+      if (empDeptFilter) url.searchParams.set('department_id', String(empDeptFilter));
+      const response = await fetch(url.toString(), {
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
       });
       if (response.ok) {

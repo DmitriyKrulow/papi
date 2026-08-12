@@ -273,7 +273,8 @@ class AuditService:
                 action: Optional[str] = None,
                 user_id: Optional[int] = None,
                 start_date: Optional[str] = None,
-                end_date: Optional[str] = None) -> Dict[str, Any]:
+                end_date: Optional[str] = None,
+                search: Optional[str] = None) -> Dict[str, Any]:
         """Получить все записи аудита с фильтрацией."""
         from src.infrastructure.db.models.audit_log import AuditLog
 
@@ -289,6 +290,12 @@ class AuditService:
             query = query.filter(AuditLog.created_at >= datetime.fromisoformat(start_date))
         if end_date:
             query = query.filter(AuditLog.created_at <= datetime.fromisoformat(end_date))
+        if search:
+            search_pattern = f"%{search}%"
+            query = query.filter(
+                (AuditLog.comment.ilike(search_pattern)) |
+                (AuditLog.diff_summary.ilike(search_pattern))
+            )
 
         total = query.count()
         results = (

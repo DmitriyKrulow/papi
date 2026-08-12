@@ -9,6 +9,7 @@ export const auditApi = {
     user_id?: number;
     start_date?: string;
     end_date?: string;
+    search?: string;
   } = {}) => {
     const token = localStorage.getItem('token');
     const searchParams = new URLSearchParams();
@@ -19,6 +20,7 @@ export const auditApi = {
     if (params.user_id) searchParams.set('user_id', String(params.user_id));
     if (params.start_date) searchParams.set('start_date', params.start_date);
     if (params.end_date) searchParams.set('end_date', params.end_date);
+    if (params.search) searchParams.set('search', params.search);
 
     const response = await fetch(`${API_BASE}/audit/?${searchParams}`, {
       headers: { Authorization: `Bearer ${token}` },
