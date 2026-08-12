@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useTheme } from '../../hooks/useTheme';
 import { Sun, Moon, Menu, X, ChevronDown } from 'lucide-react';
+import NotificationDropdown from '../notifications/NotificationDropdown';
 
 const Navbar: React.FC = () => {
   const location = useLocation();
@@ -22,6 +23,7 @@ const Navbar: React.FC = () => {
     { path: '/marking', label: '🏷️ Маркировка' },
     { path: '/reports', label: '📈 Отчеты' },
     { path: '/repairs', label: '🔧 Ремонты' },
+    { path: '/notifications', label: '🔔 Уведомления' },
   ];
 
   const adminItems = [
@@ -84,6 +86,8 @@ const Navbar: React.FC = () => {
 
           {/* Desktop Right Side */}
           <div className="hidden lg:flex items-center space-x-3">
+            {isAuthenticated && <NotificationDropdown />}
+            
             <button
               onClick={toggleTheme}
               className="p-2 rounded-lg hover:bg-blue-500 dark:hover:bg-gray-700 transition"

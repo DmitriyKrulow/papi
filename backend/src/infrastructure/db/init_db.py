@@ -44,6 +44,7 @@ def init_db():
     _ensure_user_max_user_id_column()
     _ensure_password_reset_table()
     _ensure_notification_table()
+    _ensure_notification_reference_key_column()
     _ensure_room_id_column()
 
 
@@ -173,7 +174,7 @@ def authenticate_user(db: Session, username: str, password: str) -> Optional[Use
     user = db.query(User).filter(User.username == username).first()
     if not user:
         return None
-    if not verify_password(password, user.password_hash or ""):
+    if not verify_password(password, user.password_hash or ""):  # type: ignore[arg-type]
         return None
     return user
 
@@ -243,6 +244,24 @@ def _ensure_notification_table():
         print(f"Could not create notifications table: {e}")
 
 
+def _ensure_notification_reference_key_column():
+    """Добавляет колонку reference_key в notifications, если её нет"""
+    from sqlalchemy import text, inspect
+    try:
+        inspector = inspect(engine)
+        table_names = inspector.get_table_names()
+        if "notifications" not in table_names:
+            return
+        columns = [c["name"] for c in inspector.get_columns("notifications")]
+        if "reference_key" not in columns:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE notifications ADD COLUMN reference_key VARCHAR(50)"))
+                conn.commit()
+            print("Added reference_key column to notifications table")
+    except Exception as e:
+        print(f"Could not check/add reference_key column: {e}")
+
+
 def _ensure_user_max_user_id_column():
     """Добавляет колонку max_user_id в users, если её нет"""
     from sqlalchemy import text, inspect
@@ -278,7 +297,7 @@ def _ensure_room_id_column():
             db = SessionLocal()
             try:
                 rooms = db.query(Room).all()
-                room_map = {r.name: r.id for r in rooms if r.name}
+                room_map = {r.name: r.id for r in rooms if r.name is not None}
                 
                 updated = 0
                 for asset in db.query(Asset).filter(

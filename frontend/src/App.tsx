@@ -26,6 +26,7 @@ import AdminPanel from './pages/AdminPanel';
 import InventoryMobile from './pages/InventoryMobile';
 import InventoryAssetMobile from './pages/InventoryAssetMobile';
 import AuditLog from './pages/AuditLog';
+import NotificationsPage from './pages/NotificationsPage';
 import './index.css';
 
 class ErrorBoundary extends React.Component<
@@ -84,40 +85,43 @@ class ErrorBoundary extends React.Component<
 
 // Компонент для защиты маршрутов (требуется авторизация)
 const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { loading, token } = useAuth();
+  const { loading, token, isAuthenticated } = useAuth();
 
-  if (token) {
-    return <>{children}</>;
-  }
-  
+  // Если всё ещё загружается — показываем спиннер
   if (loading) {
     return <div className="flex justify-center items-center py-12"><div className="text-gray-500">⏳ Загрузка...</div></div>;
   }
   
+  // Если авторизован — показываем контент
+  if (isAuthenticated) {
+    return <>{children}</>;
+  }
+  
+  // Иначе редиректим на логин
   return <Navigate to="/login" replace />;
 };
 
 // Компонент для защиты админ-маршрутов (требуется роль admin)
 const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { loading, user, token } = useAuth();
+  const { loading, user, token, isAuthenticated } = useAuth();
 
-  if (token && user && user.role === 'admin') {
-    return <>{children}</>;
-  }
-  
-  if (token && user && user.role !== 'admin') {
-    return <Navigate to="/dashboard" replace />;
-  }
-  
-  if (token) {
-    return <>{children}</>;
-  }
-  
+  // Если всё ещё загружается — показываем спиннер
   if (loading) {
     return <div className="flex justify-center items-center py-12"><div className="text-gray-500">⏳ Загрузка...</div></div>;
   }
   
-  return <Navigate to="/login" replace />;
+  // Если не авторизован — редиректим на логин
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  // Если авторизован, но не админ — редиректим на дашборд
+  if (user && user.role !== 'admin') {
+    return <Navigate to="/dashboard" replace />;
+  }
+  
+  // Если админ — показываем контент
+  return <>{children}</>;
 };
 
 function App() {
@@ -227,6 +231,13 @@ function App() {
                   <AdminRoute>
                     <AuditLog />
                   </AdminRoute>
+                } />
+                
+                {/* Уведомления */}
+                <Route path="/notifications" element={
+                  <PrivateRoute>
+                    <NotificationsPage />
+                  </PrivateRoute>
                 } />
                 
                 {/* 404 - перенаправление на главную */}

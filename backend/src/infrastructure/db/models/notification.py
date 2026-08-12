@@ -35,6 +35,9 @@ class Notification(Base):
     reference_type = Column(String(50), nullable=True)  # inventory_check, repair_request, asset
     reference_id = Column(Integer, nullable=True)
     
+    # Уникальный ключ события внутри типа (например "warn_30", "overdue_7") — для дедупликации
+    reference_key = Column(String(50), nullable=True)
+    
     # Статус отправки
     email_sent = Column(Boolean, nullable=False, default=False)
     email_sent_at = Column(DateTime, nullable=True)

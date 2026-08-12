@@ -142,6 +142,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return response.data;
     } catch (err) {
       const axiosError = err as AxiosError;
+      // Удаляем токен только при реальном 401 от сервера, не при сетевых ошибках
       if (axiosError.response?.status === 401) {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
@@ -201,10 +202,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setToken(storedToken);
         try {
           await getCurrentUser();
-        } catch {
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          setUser(null);
+        } catch (err) {
+          const axiosError = err as any;
+          // Удаляем токен только при реальном 401, не при сетевых ошибках
+          if (axiosError?.response?.status === 401) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            setUser(null);
+          }
+          // При сетевых ошибках токен сохраняется!
+          console.log('[Auth] Init error (server may be down):', axiosError?.message);
         }
       }
     };
@@ -212,6 +219,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   const isAdmin = user?.role === 'admin';
+  // isAuthenticated true если есть пользователь ИЛИ токен (пока загружается user)
+  const isAuthenticated = !!user || !!token;
 
   return (
     <AuthContext.Provider value={{
@@ -226,7 +235,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       getCurrentUser,
       updateProfile,
       changePassword,
-      isAuthenticated: !!user,
+      isAuthenticated,
       isAdmin,
     }}>
       {children}

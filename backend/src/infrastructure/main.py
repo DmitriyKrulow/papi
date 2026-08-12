@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from src.infrastructure.db.init_db import init_db, get_or_create_admin
 from src.infrastructure.db.session import SessionLocal
 from src.infrastructure.db.models.asset_type_config import seed_asset_types
+from src.core.services.notification_scheduler import NotificationScheduler
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -238,6 +239,9 @@ def seed_notification_settings(db):
 
 @app.on_event("startup")
 def startup_event():
+    """Запуск при старте приложения."""
+    global notification_scheduler
+    
     init_db()
     get_or_create_admin()
     try:
@@ -248,6 +252,21 @@ def startup_event():
         db.close()
     except Exception as e:
         logger.warning(f"Could not seed data: {e}")
+    
+    # Запуск планировщика уведомлений
+    notification_scheduler = NotificationScheduler(interval_seconds=3600)  # 1 час
+    notification_scheduler.start()
+    
+    # Запускаем генерацию уведомлений при старте
+    try:
+        results = notification_scheduler.run_once()
+        total = sum(results.values())
+        if total > 0:
+            logger.info(f"Startup notification generation: {total} notifications created")
+    except Exception as e:
+        logger.error(f"Failed to generate notifications at startup: {e}")
+    
+    logger.info("Application started with notification scheduler")
 
 
 @app.exception_handler(RequestValidationError)

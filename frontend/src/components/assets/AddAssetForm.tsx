@@ -215,7 +215,6 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
             <select
               {...register('asset_type')}
               onChange={(e) => {
-                register('asset_type').onChange(e);
                 const selectedCode = e.target.value;
                 const typeConfig = assetTypes.find(t => t.code === selectedCode);
                 if (typeConfig && typeConfig.default_depreciation_years) {

@@ -315,7 +315,6 @@ const handleSubmitForm = async (data: any) => {
             <select
               {...register('asset_type')}
               onChange={(e) => {
-                register('asset_type').onChange(e);
                 setSelectedType(e.target.value);
                 const typeConfig = assetTypes.find(t => t.code === e.target.value);
                 if (typeConfig && typeConfig.default_depreciation_years && !existingAsset.depreciation_years) {

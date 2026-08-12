@@ -33,6 +33,13 @@ api.interceptors.response.use(
   (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retried?: boolean };
     
+    // Если Network Error (сервер не отвечает) - НЕ удаляем токен!
+    if (!error.response) {
+      console.warn('[API] Network error (server not responding):', error.message);
+      console.log('[API] Token preserved - server may be down');
+      return Promise.reject(error);
+    }
+    
     // Если 401 - токен истек или невалидный
     if (error.response?.status === 401 && !originalRequest?._retried) {
       // Не пытаемся перезапросить если уже logout
@@ -43,7 +50,8 @@ api.interceptors.response.use(
       isLoggingOut = true;
       
       try {
-        // Очищаем данные сессии
+        // Очищаем данные сессии только при реальном 401
+        console.log('[API] 401 Unauthorized - clearing session');
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         
