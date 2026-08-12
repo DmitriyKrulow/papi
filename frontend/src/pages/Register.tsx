@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import RegisterForm from '../components/forms/RegisterForm';
 
@@ -42,9 +42,9 @@ const Register: React.FC = () => {
         <div className="text-center">
           <p className="text-sm text-gray-600 dark:text-gray-400">
             Уже есть учетная запись?{' '}
-            <a href="/login" className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 transition-colors">
+            <Link to="/login" className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 transition-colors">
               Войдите
-            </a>
+            </Link>
           </p>
         </div>
       </div>

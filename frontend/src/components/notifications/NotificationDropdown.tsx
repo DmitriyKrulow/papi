@@ -1,5 +1,6 @@
 // frontend/src/components/notifications/NotificationDropdown.tsx
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { notificationsApi, type NotificationItem } from '../../api/notifications';
 import { useAuth } from '../../hooks/useAuth';
 import {
@@ -237,12 +238,13 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ onCountChan
           {/* Footer */}
           {notifications.length > 0 && (
             <div className="p-3 border-t border-gray-200 dark:border-gray-700 text-center">
-              <a
-                href="/notifications"
+              <Link
+                to="/notifications"
                 className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                onClick={() => setIsOpen(false)}
               >
                 Все уведомления →
-              </a>
+              </Link>
             </div>
           )}
         </div>

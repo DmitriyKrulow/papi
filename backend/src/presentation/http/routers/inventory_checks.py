@@ -171,6 +171,54 @@ async def create_inventory_check(
     })
 
 
+@router.get("/active")
+async def get_active_inventory_check(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Получить текущую активную инвентаризацию (если есть)"""
+    active_check = db.query(InventoryCheck).filter(
+        InventoryCheck.status == "in_progress"
+    ).order_by(InventoryCheck.created_at.desc()).first()
+
+    if not active_check:
+        return JSONResponse(content=None)
+
+    return JSONResponse(content={
+        "id": active_check.id,
+        "name": active_check.name,
+        "check_type": active_check.check_type,
+        "started_at": active_check.started_at.isoformat() if active_check.started_at else None,
+        "found": active_check.found,
+        "missing": active_check.missing,
+        "total_checked": active_check.total_checked,
+    })
+
+
+@router.get("/my-assets")
+async def get_my_assets_for_inventory(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Получить список активов пользователя для инвентаризации"""
+    # Получаем активы, где пользователь указан как ответственное лицо
+    assets = db.query(Asset).filter(
+        Asset.responsible_person == (current_user.full_name or current_user.username),
+        Asset.is_active == True
+    ).order_by(Asset.inventory_number).all()
+    
+    return JSONResponse(content=[{
+        "id": a.id,
+        "inventory_number": safe_str(a.inventory_number),
+        "name": safe_str(a.name),
+        "model": safe_str(a.model),
+        "location": safe_str(a.location_address),
+        "responsible": safe_str(a.responsible_person),
+        "last_inventory_date": a.last_inventory_date.isoformat() if a.last_inventory_date else None,
+        "last_inventory_confirmed": a.last_inventory_confirmed,
+    } for a in assets])
+
+
 @router.get("/{check_id}")
 async def get_inventory_check(
     check_id: int,
@@ -685,54 +733,6 @@ async def get_asset_check_status(
         "last_inventory_by_id": asset.last_inventory_by_id,
         "last_inventory_confirmed": asset.last_inventory_confirmed,
     })
-
-
-@router.get("/active")
-async def get_active_inventory_check(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Получить текущую активную инвентаризацию (если есть)"""
-    active_check = db.query(InventoryCheck).filter(
-        InventoryCheck.status == "in_progress"
-    ).order_by(InventoryCheck.created_at.desc()).first()
-
-    if not active_check:
-        return JSONResponse(content=None)
-
-    return JSONResponse(content={
-        "id": active_check.id,
-        "name": active_check.name,
-        "check_type": active_check.check_type,
-        "started_at": active_check.started_at.isoformat() if active_check.started_at else None,
-        "found": active_check.found,
-        "missing": active_check.missing,
-        "total_checked": active_check.total_checked,
-    })
-
-
-@router.get("/my-assets")
-async def get_my_assets_for_inventory(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Получить список активов пользователя для инвентаризации"""
-    # Получаем активы, где пользователь указан как ответственное лицо
-    assets = db.query(Asset).filter(
-        Asset.responsible_person == (current_user.full_name or current_user.username),
-        Asset.is_active == True
-    ).order_by(Asset.inventory_number).all()
-    
-    return JSONResponse(content=[{
-        "id": a.id,
-        "inventory_number": safe_str(a.inventory_number),
-        "name": safe_str(a.name),
-        "model": safe_str(a.model),
-        "location": safe_str(a.location_address),
-        "responsible": safe_str(a.responsible_person),
-        "last_inventory_date": a.last_inventory_date.isoformat() if a.last_inventory_date else None,
-        "last_inventory_confirmed": a.last_inventory_confirmed,
-    } for a in assets])
 
 
 @router.post("/{check_id}/scan-qr")

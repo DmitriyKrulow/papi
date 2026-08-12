@@ -1,6 +1,6 @@
 // frontend/src/pages/Home.tsx
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
 const Home: React.FC = () => {
@@ -31,18 +31,18 @@ const Home: React.FC = () => {
       </div>
       
       <div className="flex flex-col sm:flex-row gap-4">
-        <a
-          href="/login"
+        <Link
+          to="/login"
           className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition inline-block font-medium"
         >
           🔑 Войти
-        </a>
-        <a
-          href="/register"
+        </Link>
+        <Link
+          to="/register"
           className="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-100 px-8 py-3 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition inline-block font-medium"
         >
           📝 Зарегистрироваться
-        </a>
+        </Link>
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import LoginForm from '../components/forms/LoginForm';
 
@@ -58,16 +58,16 @@ const Login: React.FC = () => {
           <div className="pt-4 border-t border-gray-200 dark:border-white/10">
             <p className="text-center text-sm text-gray-600 dark:text-gray-300">
               Забыли пароль?{' '}
-              <a href="/password-reset" className="font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors duration-200">
+              <Link to="/password-reset" className="font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors duration-200">
                 Написать заявку
-              </a>
+              </Link>
             </p>
             
             <p className="text-center text-sm text-gray-600 dark:text-gray-300 mt-3">
               Нет учетной записи?{' '}
-              <a href="/register" className="font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors duration-200">
+              <Link to="/register" className="font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors duration-200">
                 Зарегистрируйтесь
-              </a>
+              </Link>
             </p>
           </div>
         </div>

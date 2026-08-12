@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useTheme } from '../../hooks/useTheme';
-import { Sun, Moon, Menu, X, ChevronDown } from 'lucide-react';
+import { Sun, Moon, Menu, X, ChevronDown, UserCog, Shield } from 'lucide-react';
 import NotificationDropdown from '../notifications/NotificationDropdown';
 
 const Navbar: React.FC = () => {
@@ -13,22 +13,23 @@ const Navbar: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [adminMenuOpen, setAdminMenuOpen] = useState(false);
 
   const isActive = (path: string) => location.pathname === path;
 
   const navItems = [
-    { path: '/dashboard', label: '📊 Дашборд' },
-    { path: '/assets', label: '📦 Активы' },
-    { path: '/inventory', label: '📋 Инвентаризация' },
-    { path: '/marking', label: '🏷️ Маркировка' },
-    { path: '/reports', label: '📈 Отчеты' },
-    { path: '/repairs', label: '🔧 Ремонты' },
-    { path: '/notifications', label: '🔔 Уведомления' },
+    { path: '/dashboard', label: 'Дашборд', icon: '📊' },
+    { path: '/assets', label: 'Активы', icon: '📦' },
+    { path: '/inventory', label: 'Инвентаризация', icon: '📋' },
+    { path: '/marking', label: 'Маркировка', icon: '🏷️' },
+    { path: '/reports', label: 'Отчёты', icon: '📈' },
+    { path: '/repairs', label: 'Ремонты', icon: '🔧' },
+    { path: '/notifications', label: 'Уведомления', icon: '🔔' },
   ];
 
   const adminItems = [
-    { path: '/admin', label: '⚙️ Админка' },
-    { path: '/audit', label: '📜 Аудит' },
+    { path: '/admin', label: 'Панель управления', icon: '⚙️' },
+    { path: '/audit', label: 'Журнал аудита', icon: '📜' },
   ];
 
   const handleLogout = () => {
@@ -52,40 +53,68 @@ const Navbar: React.FC = () => {
             🏗️ PAPI
           </Link>
 
-{/* Desktop Navigation — только для авторизованных */}
+          {/* Desktop Navigation — responsive: иконки + подписи при широком экране */}
           {isAuthenticated && (
-            <div className="hidden lg:flex items-center space-x-2">
+            <div className="hidden lg:flex items-center space-x-1">
               {navItems.map((item) => (
                 <Link
                   key={item.path}
                   to={item.path}
-                  className={`px-3 py-2 rounded-lg transition text-sm ${
+                  className={`px-2 py-2 rounded-lg transition text-sm flex items-center gap-1.5 ${
                     isActive(item.path)
-                      ? 'bg-blue-700 dark:bg-gray-700 text-white'
-                      : 'hover:bg-blue-500 dark:hover:bg-gray-700'
+                      ? 'bg-blue-700 dark:bg-gray-700 text-white font-medium'
+                      : 'hover:bg-blue-500 dark:hover:bg-gray-700 text-blue-50'
                   }`}
+                  title={item.label}
                 >
-                  {item.label}
+                  <span className="text-base flex-shrink-0">{item.icon}</span>
+                  <span className="hidden xl:inline text-sm">{item.label}</span>
                 </Link>
               ))}
-              {isAdmin && adminItems.map((item) => (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={`px-3 py-2 rounded-lg transition text-sm ${
-                    isActive(item.path)
-                      ? 'bg-blue-700 dark:bg-gray-700 text-white'
-                      : 'hover:bg-blue-500 dark:hover:bg-gray-700'
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              ))}
+              
+              {isAdmin && (
+                <>
+                  <div className="w-px h-6 bg-blue-400 dark:bg-gray-600 mx-2" />
+                  <div className="relative">
+                    <button
+                      onClick={() => setAdminMenuOpen(!adminMenuOpen)}
+                      className="px-2 py-2 rounded-lg transition text-sm bg-blue-600/50 hover:bg-blue-500 dark:hover:bg-gray-700 text-blue-50 flex items-center gap-1"
+                      title="Администрирование"
+                    >
+                      <Shield className="w-4 h-4 flex-shrink-0" />
+                      <span className="hidden xl:inline text-sm">Админ</span>
+                      <ChevronDown className={`w-3 h-3 hidden xl:block transition-transform ${adminMenuOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    {adminMenuOpen && (
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => setAdminMenuOpen(false)} />
+                        <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 py-2">
+                          {adminItems.map((item) => (
+                            <Link
+                              key={item.path}
+                              to={item.path}
+                              onClick={() => setAdminMenuOpen(false)}
+                              className={`px-4 py-2.5 text-sm flex items-center gap-3 hover:bg-gray-100 dark:hover:bg-gray-700 transition ${
+                                isActive(item.path)
+                                  ? 'text-blue-600 dark:text-blue-400 font-medium bg-blue-50 dark:bg-gray-700/50'
+                                  : 'text-gray-700 dark:text-gray-300'
+                              }`}
+                            >
+                              <span className="text-base">{item.icon}</span>
+                              <span>{item.label}</span>
+                            </Link>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           )}
 
-          {/* Desktop Right Side */}
-          <div className="hidden lg:flex items-center space-x-3">
+          {/* Desktop Right Side — lg */}
+          <div className="hidden lg:flex items-center space-x-1">
             {isAuthenticated && <NotificationDropdown />}
             
             <button
@@ -105,7 +134,7 @@ const Navbar: React.FC = () => {
                 href="/docs"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hover:bg-blue-500 dark:hover:bg-gray-700 px-2 py-2 rounded-lg transition"
+                className="p-2 rounded-lg hover:bg-blue-500 dark:hover:bg-gray-700 transition"
                 title="📚 API"
               >
                 📚
@@ -113,23 +142,22 @@ const Navbar: React.FC = () => {
             )}
 
             {isAuthenticated && user ? (
-              <>
-                <Link to="/profile" className="hover:bg-blue-500 dark:hover:bg-gray-700 px-3 py-2 rounded-lg transition flex items-center gap-1">
-                  <span className="text-sm">👤</span>
-                  <span className="text-sm truncate max-w-[100px]">{user.username}</span>
+              <div className="flex items-center gap-1">
+                <Link 
+                  to="/profile" 
+                  className="p-2 rounded-lg hover:bg-blue-500 dark:hover:bg-gray-700 transition"
+                  title={user.username}
+                >
+                  <UserCog className="w-5 h-5" />
                 </Link>
-                {isAdmin && (
-                  <Link to="/admin" className="hover:bg-blue-500 dark:hover:bg-gray-700 px-3 py-2 rounded-lg transition text-sm">
-                    ⚙️
-                  </Link>
-                )}
                 <button
                   onClick={handleLogout}
-                  className="hover:bg-blue-500 dark:hover:bg-gray-700 px-3 py-2 rounded-lg transition text-sm"
+                  className="p-2 rounded-lg hover:bg-red-600 transition"
+                  title="Выйти"
                 >
-                  Выйти
+                  <X className="w-5 h-5" />
                 </button>
-              </>
+              </div>
             ) : (
               <>
                 <Link to="/login" className="hover:bg-blue-500 dark:hover:bg-gray-700 px-3 py-2 rounded-lg transition text-sm">
@@ -176,67 +204,73 @@ const Navbar: React.FC = () => {
                       key={item.path}
                       to={item.path}
                       onClick={closeMobileMenu}
-                      className={`px-3 py-3 rounded-lg transition text-sm ${
+                      className={`px-3 py-3 rounded-lg transition text-sm flex items-center gap-3 ${
                         isActive(item.path)
                           ? 'bg-blue-700 dark:bg-gray-700 text-white'
                           : 'hover:bg-blue-500 dark:hover:bg-gray-700'
                       }`}
                     >
-                      {item.label}
+                      <span className="text-lg">{item.icon}</span>
+                      <span>{item.label}</span>
                     </Link>
                   ))}
-                  {isAdmin && adminItems.map((item) => (
-                    <Link
-                      key={item.path}
-                      to={item.path}
-                      onClick={closeMobileMenu}
-                      className={`px-3 py-3 rounded-lg transition text-sm ${
-                        isActive(item.path)
-                          ? 'bg-blue-700 dark:bg-gray-700 text-white'
-                          : 'hover:bg-blue-500 dark:hover:bg-gray-700'
-                      }`}
-                    >
-                      {item.label}
-                    </Link>
-                  ))}
+                  
+                  {isAdmin && (
+                    <>
+                      <div className="border-t border-blue-400 dark:border-gray-600 my-2" />
+                      <div className="px-3 py-2 text-xs font-semibold text-blue-200 dark:text-gray-400 uppercase tracking-wider">
+                        Управление
+                      </div>
+                      {adminItems.map((item) => (
+                        <Link
+                          key={item.path}
+                          to={item.path}
+                          onClick={closeMobileMenu}
+                          className={`px-3 py-3 rounded-lg transition text-sm flex items-center gap-3 ${
+                            isActive(item.path)
+                              ? 'bg-blue-700 dark:bg-gray-700 text-white'
+                              : 'hover:bg-blue-500 dark:hover:bg-gray-700'
+                          }`}
+                        >
+                          <span className="text-lg">{item.icon}</span>
+                          <span>{item.label}</span>
+                        </Link>
+                      ))}
+                    </>
+                  )}
                 </>
               )}
               
               <div className="border-t border-blue-500 dark:border-gray-700 my-2 pt-2">
                 {isAuthenticated && user ? (
                   <>
-                    <div className="px-3 py-2 text-sm text-blue-200 dark:text-gray-400">
-                      👤 {user.username}
+                    <div className="px-3 py-2 text-sm text-blue-200 dark:text-gray-400 flex items-center gap-2">
+                      <UserCog className="w-4 h-4" />
+                      {user.username}
                     </div>
                     <Link
                       to="/profile"
                       onClick={closeMobileMenu}
-                      className="block px-3 py-3 rounded-lg hover:bg-blue-500 dark:hover:bg-gray-700 transition text-sm"
+                      className="block px-3 py-3 rounded-lg hover:bg-blue-500 dark:hover:bg-gray-700 transition text-sm flex items-center gap-3"
                     >
-                      👤 Личный кабинет
+                      <span>👤</span>
+                      <span>Личный кабинет</span>
                     </Link>
-                    {isAdmin && (
-                      <Link
-                        to="/admin"
-                        onClick={closeMobileMenu}
-                        className="block px-3 py-3 rounded-lg hover:bg-blue-500 dark:hover:bg-gray-700 transition text-sm"
-                      >
-                        ⚙️ Админ-панель
-                      </Link>
-                    )}
                     <a
                       href="/docs"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="block px-3 py-3 rounded-lg hover:bg-blue-500 dark:hover:bg-gray-700 transition text-sm"
+                      className="block px-3 py-3 rounded-lg hover:bg-blue-500 dark:hover:bg-gray-700 transition text-sm flex items-center gap-3"
                     >
-                      📚 API документация
+                      <span>📚</span>
+                      <span>API документация</span>
                     </a>
                     <button
                       onClick={handleLogout}
-                      className="w-full text-left px-3 py-3 rounded-lg hover:bg-blue-500 dark:hover:bg-gray-700 transition text-sm"
+                      className="w-full text-left px-3 py-3 rounded-lg hover:bg-red-600 transition text-sm flex items-center gap-3"
                     >
-                      🚪 Выйти
+                      <span>🚪</span>
+                      <span>Выйти</span>
                     </button>
                   </>
                 ) : (
@@ -244,16 +278,18 @@ const Navbar: React.FC = () => {
                     <Link
                       to="/login"
                       onClick={closeMobileMenu}
-                      className="block px-3 py-3 rounded-lg hover:bg-blue-500 dark:hover:bg-gray-700 transition text-sm"
+                      className="block px-3 py-3 rounded-lg hover:bg-blue-500 dark:hover:bg-gray-700 transition text-sm flex items-center gap-3"
                     >
-                      🔑 Вход
+                      <span>🔑</span>
+                      <span>Вход</span>
                     </Link>
                     <Link
                       to="/register"
                       onClick={closeMobileMenu}
-                      className="block px-3 py-3 rounded-lg hover:bg-blue-500 dark:hover:bg-gray-700 transition text-sm"
+                      className="block px-3 py-3 rounded-lg hover:bg-blue-500 dark:hover:bg-gray-700 transition text-sm flex items-center gap-3"
                     >
-                      📝 Регистрация
+                      <span>📝</span>
+                      <span>Регистрация</span>
                     </Link>
                   </>
                 )}
