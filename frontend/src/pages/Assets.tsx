@@ -935,7 +935,17 @@ const handleEditClick = (asset: Asset) => {
               {employeeDropdownOpen && (
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setEmployeeDropdownOpen(false)} />
-                  <div className="absolute z-20 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-hidden" style={{ top: '100%' }}>
+                  <div
+                    ref={employeeDropdownRef}
+                    className="absolute z-20 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-hidden"
+                    style={{ top: '100%' }}
+                    onBlur={(e) => {
+                      if (employeeDropdownRef.current && !employeeDropdownRef.current.contains(e.relatedTarget as Node)) {
+                        setEmployeeDropdownOpen(false);
+                        setEmployeeSearch('');
+                      }
+                    }}
+                  >
                     <div className="p-2 border-b border-gray-100 dark:border-gray-700">
                       <div className="relative">
                         <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
