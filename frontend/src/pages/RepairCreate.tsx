@@ -51,8 +51,8 @@ const RepairCreate: React.FC = () => {
 
   const filteredAssets = allAssets.filter((asset) => {
     const matchesSearch = !assetSearch ||
-      asset.name.toLowerCase().includes(assetSearch.toLowerCase()) ||
-      asset.inventory_number.toLowerCase().includes(assetSearch.toLowerCase()) ||
+      (asset.name || '').toLowerCase().includes(assetSearch.toLowerCase()) ||
+      (asset.inventory_number || '').toLowerCase().includes(assetSearch.toLowerCase()) ||
       (asset.model || '').toLowerCase().includes(assetSearch.toLowerCase()) ||
       (asset.responsible_person || '').toLowerCase().includes(assetSearch.toLowerCase());
     const matchesStatus = !assetStatusFilter || asset.status === assetStatusFilter;

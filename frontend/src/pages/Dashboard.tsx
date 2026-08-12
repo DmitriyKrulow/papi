@@ -247,7 +247,7 @@ const Dashboard: React.FC = () => {
                       <span className="text-xs text-gray-500 dark:text-gray-400">Начата</span>
                     </div>
                     <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                      {new Date(activeInventory.started_at).toLocaleDateString('ru-RU')}
+                      {activeInventory.started_at ? new Date(activeInventory.started_at).toLocaleDateString('ru-RU') : '—'}
                     </p>
                   </div>
 

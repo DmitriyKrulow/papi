@@ -171,7 +171,7 @@ async def create_inventory_check(
     })
 
 
-@router.get("/{check_id:int}")
+@router.get("/{check_id}")
 async def get_inventory_check(
     check_id: int,
     db: Session = Depends(get_db),
@@ -231,7 +231,7 @@ async def get_inventory_check(
     })
 
 
-@router.post("/{check_id:int}/start")
+@router.post("/{check_id}/start")
 async def start_inventory_check(
     check_id: int,
     db: Session = Depends(get_db),
@@ -312,7 +312,7 @@ async def start_inventory_check(
     })
 
 
-@router.post("/{check_id:int}/confirm/{asset_id:int}")
+@router.post("/{check_id}/confirm/{asset_id:int}")
 async def confirm_asset(
     check_id: int,
     asset_id: int,
@@ -374,7 +374,7 @@ async def confirm_asset(
     })
 
 
-@router.post("/{check_id:int}/complete")
+@router.post("/{check_id}/complete")
 async def complete_inventory_check(
     check_id: int,
     db: Session = Depends(get_db),
@@ -429,7 +429,7 @@ async def complete_inventory_check(
     })
 
 
-@router.post("/{check_id:int}/cancel")
+@router.post("/{check_id}/cancel")
 async def cancel_inventory_check(
     check_id: int,
     db: Session = Depends(get_db),
@@ -449,7 +449,7 @@ async def cancel_inventory_check(
     return JSONResponse(content={"message": "Инвентаризация отменена"})
 
 
-@router.delete("/{check_id:int}")
+@router.delete("/{check_id}")
 async def delete_inventory_check(
     check_id: int,
     db: Session = Depends(get_db),
@@ -466,7 +466,7 @@ async def delete_inventory_check(
     return JSONResponse(content={"message": "Инвентаризация удалена"})
 
 
-@router.post("/{check_id:int}/reset-asset/{asset_id:int}")
+@router.post("/{check_id}/reset-asset/{asset_id:int}")
 async def reset_asset_confirmation(
     check_id: int,
     asset_id: int,
@@ -507,7 +507,7 @@ async def reset_asset_confirmation(
 # QR-коды
 # ======================================================================
 
-@router.get("/{check_id:int}/qr-text")
+@router.get("/{check_id}/qr-text")
 async def get_inventory_qr_text(
     check_id: int,
     db: Session = Depends(get_db),
@@ -525,18 +525,18 @@ async def get_inventory_qr_text(
         "check_id": check_id,
         "check_name": inv_check.name,
         "check_date": inv_check.check_date.isoformat() if inv_check.check_date else None,
-        "url": f"{base_url}/inventory/{check_id:int}",
+        "url": f"{base_url}/inventory/{check_id}",
     }
 
     return JSONResponse(content={
         "qr_text": json.dumps(qr_data, ensure_ascii=False),
-        "qr_url": f"{base_url}/inventory/{check_id:int}",
+        "qr_url": f"{base_url}/inventory/{check_id}",
         "check_id": check_id,
         "check_name": inv_check.name,
     })
 
 
-@router.get("/{check_id:int}/qr/{asset_id:int}")
+@router.get("/{check_id}/qr/{asset_id:int}")
 async def get_asset_qr(
     check_id: int,
     asset_id: int,
@@ -574,7 +574,7 @@ async def get_asset_qr(
     })
 
 
-@router.get("/{check_id:int}/qr-image")
+@router.get("/{check_id}/qr-image")
 async def get_inventory_qr_image(
     check_id: int,
     db: Session = Depends(get_db),
@@ -595,7 +595,7 @@ async def get_inventory_qr_image(
         raise HTTPException(status_code=404, detail="Инвентаризация не найдена")
 
     base_url = "http://localhost:5173"
-    qr_text = f"{base_url}/inventory/{check_id:int}"
+    qr_text = f"{base_url}/inventory/{check_id}"
 
     qr = qrcode.QRCode(version=2, box_size=10, border=2)
     qr.add_data(qr_text)
@@ -610,7 +610,7 @@ async def get_inventory_qr_image(
         content=buf.getvalue(),
         media_type="image/png",
         headers={
-            "Content-Disposition": f'attachment; filename="inventory_{check_id:int}_qr.png"'
+            "Content-Disposition": f'attachment; filename="inventory_{check_id}_qr.png"'
         },
     )
 
@@ -662,8 +662,6 @@ async def get_scope_options(
                 }
                 for u in users
             ]
-        return []
-    except Exception as e:
         return []
     except Exception as e:
         return JSONResponse(content=[])
@@ -737,7 +735,7 @@ async def get_my_assets_for_inventory(
     } for a in assets])
 
 
-@router.post("/{check_id:int}/scan-qr")
+@router.post("/{check_id}/scan-qr")
 async def scan_qr_for_inventory(
     check_id: int,
     inventory_number: str = Query(..., description="Инвентарный номер актива"),

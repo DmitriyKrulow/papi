@@ -18,8 +18,8 @@ const AssetList: React.FC = () => {
   const filteredAssets = assets.filter((asset) => {
     if (!showHidden && !asset.is_active) return false;
     return (
-      asset.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      asset.inventory_number.toLowerCase().includes(searchTerm.toLowerCase())
+      (asset.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (asset.inventory_number || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
   });
 

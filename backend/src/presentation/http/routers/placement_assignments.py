@@ -124,7 +124,7 @@ async def get_available_employees(
     query = db.query(Employee).options(
         joinedload(Employee.department),
         joinedload(Employee.user)
-    ).join(User, isouter=True).filter(
+    ).outerjoin(User).filter(
         Employee.is_active == True,
         (User.role.in_(["admin", "responsible"])) | (User.id.is_(None))
     )

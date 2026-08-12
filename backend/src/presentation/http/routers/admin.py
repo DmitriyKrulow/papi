@@ -415,12 +415,12 @@ async def get_brute_force_stats(
     stats = (
         db.query(
             BruteForceLog.username,
-            func.count("*").label("total_failures"),
+            func.count().label("total_failures"),
             func.max(BruteForceLog.created_at).label("last_failure"),
         )
         .filter(BruteForceLog.is_success == 0)
         .group_by(BruteForceLog.username)
-        .order_by(func.count("*").desc())
+        .order_by(func.count().desc())
         .limit(20)
         .all()
     )

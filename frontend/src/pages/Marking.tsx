@@ -220,7 +220,7 @@ const Marking: React.FC = () => {
       return (
         asset.name.toLowerCase().includes(s) ||
         asset.inventory_number.toLowerCase().includes(s) ||
-        asset.responsible.toLowerCase().includes(s)
+        (asset.responsible || '').toLowerCase().includes(s)
       );
     }
     return true;

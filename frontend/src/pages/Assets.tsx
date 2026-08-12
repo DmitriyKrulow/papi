@@ -70,10 +70,13 @@ const Assets: React.FC = () => {
   const [deptDropdownOpen, setDeptDropdownOpen] = useState(false);
   const [activeInventory, setActiveInventory] = useState<any>(null);
 
-  // Refs для стабилизации dropdown-ов (чтобы фокус не слетал при вводе в search)
-  const deptDropdownRef = useRef<HTMLDivElement>(null);
-  const roomDropdownRef = useRef<HTMLDivElement>(null);
-  const employeeDropdownRef = useRef<HTMLDivElement>(null);
+  // Debounce для поиска внутри dropdown-ов (чтобы input не терял фокус)
+  const [debouncedRoomSearch, setDebouncedRoomSearch] = useState('');
+  const [debouncedDeptSearch, setDebouncedDeptSearch] = useState('');
+  const [debouncedEmployeeSearch, setDebouncedEmployeeSearch] = useState('');
+  const roomSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const deptSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const employeeSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Debounce для поиска — API вызывается только через 300мс после последнего ввода
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -98,10 +101,40 @@ const Assets: React.FC = () => {
     }
   });
 
-  // Очистка таймера при размонтировании
+  // Debounce для поиска по комнатам внутри dropdown
+  useEffect(() => {
+    if (roomSearchTimerRef.current) clearTimeout(roomSearchTimerRef.current);
+    roomSearchTimerRef.current = setTimeout(() => {
+      setDebouncedRoomSearch(roomSearch);
+    }, 200);
+    return () => { if (roomSearchTimerRef.current) clearTimeout(roomSearchTimerRef.current); };
+  }, [roomSearch]);
+
+  // Debounce для поиска по отделам внутри dropdown
+  useEffect(() => {
+    if (deptSearchTimerRef.current) clearTimeout(deptSearchTimerRef.current);
+    deptSearchTimerRef.current = setTimeout(() => {
+      setDebouncedDeptSearch(departmentSearch);
+    }, 200);
+    return () => { if (deptSearchTimerRef.current) clearTimeout(deptSearchTimerRef.current); };
+  }, [departmentSearch]);
+
+  // Debounce для поиска по сотрудникам внутри dropdown
+  useEffect(() => {
+    if (employeeSearchTimerRef.current) clearTimeout(employeeSearchTimerRef.current);
+    employeeSearchTimerRef.current = setTimeout(() => {
+      setDebouncedEmployeeSearch(employeeSearch);
+    }, 200);
+    return () => { if (employeeSearchTimerRef.current) clearTimeout(employeeSearchTimerRef.current); };
+  }, [employeeSearch]);
+
+  // Очистка таймеров при размонтировании
   useEffect(() => {
     return () => {
       if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+      if (roomSearchTimerRef.current) clearTimeout(roomSearchTimerRef.current);
+      if (deptSearchTimerRef.current) clearTimeout(deptSearchTimerRef.current);
+      if (employeeSearchTimerRef.current) clearTimeout(employeeSearchTimerRef.current);
     };
   }, []);
 
@@ -773,17 +806,7 @@ const handleEditClick = (asset: Asset) => {
               {deptDropdownOpen && (
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setDeptDropdownOpen(false)} />
-                  <div
-                    ref={deptDropdownRef}
-                    className="absolute z-20 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-hidden"
-                    style={{ top: '100%' }}
-                    onBlur={(e) => {
-                      if (deptDropdownRef.current && !deptDropdownRef.current.contains(e.relatedTarget as Node)) {
-                        setDeptDropdownOpen(false);
-                        setDepartmentSearch('');
-                      }
-                    }}
-                  >
+                  <div className="absolute z-20 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-hidden" style={{ top: '100%' }}>
                     <div className="p-2 border-b border-gray-100 dark:border-gray-700">
                       <div className="relative">
                         <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
@@ -799,10 +822,10 @@ const handleEditClick = (asset: Asset) => {
                     <div className="overflow-y-auto max-h-48">
                       {departments
                         .filter(dept =>
-                          !departmentSearch ||
-                          dept.full_name.toLowerCase().includes(departmentSearch.toLowerCase()) ||
-                          dept.code.toLowerCase().includes(departmentSearch.toLowerCase()) ||
-                          dept.name.toLowerCase().includes(departmentSearch.toLowerCase())
+                          !debouncedDeptSearch ||
+                          dept.full_name.toLowerCase().includes(debouncedDeptSearch.toLowerCase()) ||
+                          dept.code.toLowerCase().includes(debouncedDeptSearch.toLowerCase()) ||
+                          dept.name.toLowerCase().includes(debouncedDeptSearch.toLowerCase())
                         )
                         .map(dept => (
                           <button
@@ -815,10 +838,10 @@ const handleEditClick = (asset: Asset) => {
                           </button>
                         ))}
                       {departments.filter(dept =>
-                        !departmentSearch ||
-                        dept.full_name.toLowerCase().includes(departmentSearch.toLowerCase()) ||
-                        dept.code.toLowerCase().includes(departmentSearch.toLowerCase()) ||
-                        dept.name.toLowerCase().includes(departmentSearch.toLowerCase())
+                        !debouncedDeptSearch ||
+                        dept.full_name.toLowerCase().includes(debouncedDeptSearch.toLowerCase()) ||
+                        dept.code.toLowerCase().includes(debouncedDeptSearch.toLowerCase()) ||
+                        dept.name.toLowerCase().includes(debouncedDeptSearch.toLowerCase())
                       ).length === 0 && (
                         <div className="px-3 py-4 text-sm text-gray-400 text-center dark:text-gray-500">Ничего не найдено</div>
                       )}
@@ -852,17 +875,7 @@ const handleEditClick = (asset: Asset) => {
               {roomDropdownOpen && (
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setRoomDropdownOpen(false)} />
-                  <div
-                    ref={roomDropdownRef}
-                    className="absolute z-20 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-hidden"
-                    style={{ top: '100%' }}
-                    onBlur={(e) => {
-                      if (roomDropdownRef.current && !roomDropdownRef.current.contains(e.relatedTarget as Node)) {
-                        setRoomDropdownOpen(false);
-                        setRoomSearch('');
-                      }
-                    }}
-                  >
+                  <div className="absolute z-20 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-hidden" style={{ top: '100%' }}>
                     <div className="p-2 border-b border-gray-100 dark:border-gray-700">
                       <div className="relative">
                         <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
@@ -878,10 +891,10 @@ const handleEditClick = (asset: Asset) => {
                     <div className="overflow-y-auto max-h-48">
                       {rooms
                         .filter(room =>
-                          !roomSearch ||
-                          room.full_name.toLowerCase().includes(roomSearch.toLowerCase()) ||
-                          room.name.toLowerCase().includes(roomSearch.toLowerCase()) ||
-                          (room.department_name || '').toLowerCase().includes(roomSearch.toLowerCase())
+                          !debouncedRoomSearch ||
+                          room.full_name.toLowerCase().includes(debouncedRoomSearch.toLowerCase()) ||
+                          room.name.toLowerCase().includes(debouncedRoomSearch.toLowerCase()) ||
+                          (room.department_name || '').toLowerCase().includes(debouncedRoomSearch.toLowerCase())
                         )
                         .map(room => (
                           <button
@@ -899,9 +912,9 @@ const handleEditClick = (asset: Asset) => {
                         ))}
                       {rooms.filter(room =>
                         !roomSearch ||
-                        room.full_name.toLowerCase().includes(roomSearch.toLowerCase()) ||
-                        room.name.toLowerCase().includes(roomSearch.toLowerCase()) ||
-                        (room.department_name || '').toLowerCase().includes(roomSearch.toLowerCase())
+                        room.full_name.toLowerCase().includes(debouncedRoomSearch.toLowerCase()) ||
+                        room.name.toLowerCase().includes(debouncedRoomSearch.toLowerCase()) ||
+                        (room.department_name || '').toLowerCase().includes(debouncedRoomSearch.toLowerCase())
                       ).length === 0 && (
                         <div className="px-3 py-4 text-sm text-gray-400 text-center dark:text-gray-500">Ничего не найдено</div>
                       )}
@@ -935,17 +948,7 @@ const handleEditClick = (asset: Asset) => {
               {employeeDropdownOpen && (
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setEmployeeDropdownOpen(false)} />
-                  <div
-                    ref={employeeDropdownRef}
-                    className="absolute z-20 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-hidden"
-                    style={{ top: '100%' }}
-                    onBlur={(e) => {
-                      if (employeeDropdownRef.current && !employeeDropdownRef.current.contains(e.relatedTarget as Node)) {
-                        setEmployeeDropdownOpen(false);
-                        setEmployeeSearch('');
-                      }
-                    }}
-                  >
+                  <div className="absolute z-20 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-hidden" style={{ top: '100%' }}>
                     <div className="p-2 border-b border-gray-100 dark:border-gray-700">
                       <div className="relative">
                         <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
@@ -961,10 +964,10 @@ const handleEditClick = (asset: Asset) => {
                     <div className="overflow-y-auto max-h-48">
                       {employees
                         .filter(emp =>
-                          !employeeSearch ||
-                          emp.full_name.toLowerCase().includes(employeeSearch.toLowerCase()) ||
-                          (emp.position || '').toLowerCase().includes(employeeSearch.toLowerCase()) ||
-                          (emp.department_name || '').toLowerCase().includes(employeeSearch.toLowerCase())
+                          !debouncedEmployeeSearch ||
+                          emp.full_name.toLowerCase().includes(debouncedEmployeeSearch.toLowerCase()) ||
+                          (emp.position || '').toLowerCase().includes(debouncedEmployeeSearch.toLowerCase()) ||
+                          (emp.department_name || '').toLowerCase().includes(debouncedEmployeeSearch.toLowerCase())
                         )
                         .map(emp => (
                           <button
@@ -979,10 +982,10 @@ const handleEditClick = (asset: Asset) => {
                           </button>
                         ))}
                       {employees.filter(emp =>
-                        !employeeSearch ||
-                        emp.full_name.toLowerCase().includes(employeeSearch.toLowerCase()) ||
-                        (emp.position || '').toLowerCase().includes(employeeSearch.toLowerCase()) ||
-                        (emp.department_name || '').toLowerCase().includes(employeeSearch.toLowerCase())
+                        !debouncedEmployeeSearch ||
+                        emp.full_name.toLowerCase().includes(debouncedEmployeeSearch.toLowerCase()) ||
+                        (emp.position || '').toLowerCase().includes(debouncedEmployeeSearch.toLowerCase()) ||
+                        (emp.department_name || '').toLowerCase().includes(debouncedEmployeeSearch.toLowerCase())
                       ).length === 0 && (
                         <div className="px-3 py-4 text-sm text-gray-400 text-center dark:text-gray-500">Ничего не найдено</div>
                       )}

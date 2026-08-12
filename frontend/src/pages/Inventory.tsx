@@ -419,9 +419,9 @@ const CheckDetailView: React.FC<CheckDetailViewProps> = ({
     if (filter !== 'all' && item.result !== filter) return false;
     if (search) {
       const s = search.toLowerCase();
-      return item.inventory_number.toLowerCase().includes(s) ||
-             item.asset_name.toLowerCase().includes(s) ||
-             item.location.toLowerCase().includes(s);
+      return (item.inventory_number || '').toLowerCase().includes(s) ||
+             (item.asset_name || '').toLowerCase().includes(s) ||
+             (item.location || '').toLowerCase().includes(s);
     }
     return true;
   });
