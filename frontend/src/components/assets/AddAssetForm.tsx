@@ -382,6 +382,273 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
           </div>
         )}
 
+        {(selectedType === 'ventilation' || selectedType === 'electrical' || selectedType === 'plumbing') && (
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                Мощность (Вт)
+              </label>
+              <input
+                type="text"
+                {...register('power')}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="1500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                Следующая проверка
+              </label>
+              <input
+                type="date"
+                {...register('next_maintenance_date')}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+        )}
+
+        {(selectedType === 'it_network' || selectedType === 'multifunction' || selectedType === 'communication') && (
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                Серийный номер
+              </label>
+              <input
+                type="text"
+                {...register('serial_number')}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="SN-12345"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                MAC-адрес / IP
+              </label>
+              <input
+                type="text"
+                {...register('model')}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="00:1A:2B:3C:4D:5E"
+              />
+            </div>
+          </div>
+        )}
+
+        {selectedType === 'power_supply' && (
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                Мощность (Вт/кВА)
+              </label>
+              <input
+                type="text"
+                {...register('power')}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="1000"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                Время автономной работы (мин)
+              </label>
+              <input
+                type="number"
+                {...register('capacity')}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="30"
+              />
+            </div>
+          </div>
+        )}
+
+        {selectedType === 'security' && (
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                Серийный номер
+              </label>
+              <input
+                type="text"
+                {...register('serial_number')}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="SN-12345"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                Следующая проверка
+              </label>
+              <input
+                type="date"
+                {...register('next_maintenance_date')}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+        )}
+
+        {selectedType === 'tools' && (
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                Серийный номер
+              </label>
+              <input
+                type="text"
+                {...register('serial_number')}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="SN-12345"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                Вес (кг)
+              </label>
+              <input
+                type="text"
+                {...register('weight')}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="2.5"
+              />
+            </div>
+          </div>
+        )}
+
+        {selectedType === 'appliances' && (
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                Мощность (Вт)
+              </label>
+              <input
+                type="text"
+                {...register('power')}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="1000"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                Серийный номер
+              </label>
+              <input
+                type="text"
+                {...register('serial_number')}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="SN-12345"
+              />
+            </div>
+          </div>
+        )}
+
+        {(selectedType === 'furniture_server' || selectedType === 'furniture_storage') && (
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                Высота (RU)
+              </label>
+              <input
+                type="number"
+                {...register('capacity')}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="42"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                Вес (кг)
+              </label>
+              <input
+                type="text"
+                {...register('weight')}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="150"
+              />
+            </div>
+          </div>
+        )}
+
+        {selectedType === 'parking' && (
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                Емкость / Количество мест
+              </label>
+              <input
+                type="number"
+                {...register('capacity')}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="50"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                Площадь (м²)
+              </label>
+              <input
+                type="text"
+                {...register('weight')}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="500"
+              />
+            </div>
+          </div>
+        )}
+
+        {selectedType === 'doors_windows' && (
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                Количество (шт)
+              </label>
+              <input
+                type="number"
+                {...register('capacity')}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="1"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                Материал / Тип
+              </label>
+              <input
+                type="text"
+                {...register('model')}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Пластик, дерево, металл"
+              />
+            </div>
+          </div>
+        )}
+
+        {selectedType === 'ppe' && (
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                Размер
+              </label>
+              <input
+                type="text"
+                {...register('model')}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="M, L, XL"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                Срок замены
+              </label>
+              <input
+                type="date"
+                {...register('warranty_expiry')}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
@@ -522,7 +789,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
               ))}
             </select>
             {allRooms.length === 0 && !loadingOptions && (
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 dark:text-gray-500">Нет доступных кабинетов</p>
+              <p className="mt-1 text-xs text-gray-500">Нет доступных кабинетов</p>
             )}
           </div>
 
@@ -555,7 +822,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
               ))}
             </select>
             {responsibleOptions.length === 0 && !loadingOptions && (
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 dark:text-gray-500">Нет доступных сотрудников</p>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-500">Нет доступных сотрудников</p>
             )}
           </div>
 
@@ -580,7 +847,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
               ))}
             </select>
             {allEmployees.length === 0 && !loadingOptions && (
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 dark:text-gray-500">Нет доступных сотрудников</p>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-500">Нет доступных сотрудников</p>
             )}
           </div>
 

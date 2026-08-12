@@ -218,6 +218,22 @@ export const AssetTypeNames: Record<string, { label: string; icon: string; color
   printer: { label: 'Принтеры', icon: '🖨️', color: 'blue' },
   computer: { label: 'Компьютеры', icon: '💻', color: 'gray' },
   consumables: { label: 'Расходники', icon: '📦', color: 'green' },
+  ventilation: { label: 'Системы вентиляции и кондиционирования', icon: '❄️', color: 'cyan' },
+  electrical: { label: 'Электрооборудование', icon: '⚡', color: 'yellow' },
+  it_network: { label: 'Сетевое и серверное оборудование', icon: '🖧', color: 'blue' },
+  power_supply: { label: 'Источники питания', icon: '🔋', color: 'green' },
+  security: { label: 'Системы безопасности', icon: '🛡️', color: 'red' },
+  plumbing: { label: 'Сантехника и водоснабжение', icon: '🚿', color: 'blue' },
+  doors_windows: { label: 'Окна и двери', icon: '🚪', color: 'amber' },
+  tools: { label: 'Инструмент', icon: '🔧', color: 'orange' },
+  appliances: { label: 'Электроприборы', icon: '🔌', color: 'blue' },
+  multifunction: { label: 'МФУ и копировальная техника', icon: '🖥️', color: 'blue' },
+  furniture_server: { label: 'Серверные стойки и шкафы', icon: '🗄️', color: 'gray' },
+  furniture_storage: { label: 'Стеллажи и архивная мебель', icon: '📚', color: 'amber' },
+  parking: { label: 'Инфраструктура парковки', icon: '🅿️', color: 'green' },
+  communication: { label: 'Связь и телефония', icon: '📞', color: 'blue' },
+  ppe: { label: 'СИЗ и спецодежда', icon: '🦺', color: 'yellow' },
+  other: { label: 'Прочее', icon: '📋', color: 'gray' },
 };
 
 export const MaintenanceEventTypes: Record<string, { label: string; icon: string }> = {

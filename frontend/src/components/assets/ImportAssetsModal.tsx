@@ -133,7 +133,7 @@ const ImportAssetsModal: React.FC<ImportAssetsModalProps> = ({ isOpen, onClose, 
               <h3 className="text-lg font-medium text-gray-900">📤 Загрузка активов из файла</h3>
               <button
                 onClick={handleClose}
-                className="text-gray-400 dark:text-gray-500 dark:text-gray-400 hover:text-gray-500 dark:text-gray-400 focus:outline-none"
+                className="text-gray-400 hover:text-gray-500 focus:outline-none"
               >
                 <span className="sr-only">Закрыть</span>
                 <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -177,7 +177,7 @@ const ImportAssetsModal: React.FC<ImportAssetsModalProps> = ({ isOpen, onClose, 
                       <p className="text-gray-600 dark:text-gray-300">
                         Перетащите файл сюда или кликните для выбора
                       </p>
-                      <p className="text-sm text-gray-400 dark:text-gray-500 dark:text-gray-400 mt-1">
+                      <p className="text-sm text-gray-400 mt-1">
                         Поддерживаются файлы .xlsx, .xls (макс. 10 MB)
                       </p>
                       <input
