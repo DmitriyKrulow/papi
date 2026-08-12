@@ -152,6 +152,7 @@ export interface Employee {
   department_code?: string;
   user_id?: number;
   username?: string;
+  max_user_id?: string;
   hire_date?: string;
   termination_date?: string;
   is_active: boolean;

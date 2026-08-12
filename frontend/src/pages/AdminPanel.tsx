@@ -79,10 +79,12 @@ interface EmployeeFormData {
   last_name: string;
   middle_name: string;
   department_id: number;
+  user_id: number | null;
   position: string;
   phone: string;
   email: string;
   employee_number: string;
+  max_user_id: string;
 }
 
 interface RoomFormData {
@@ -127,7 +129,7 @@ const AdminPanel: React.FC = () => {
   const [showEmpForm, setShowEmpForm] = useState(false);
   const [editingEmp, setEditingEmp] = useState<Employee | null>(null);
   const [empFormData, setEmpFormData] = useState<EmployeeFormData>({
-    first_name: '', last_name: '', middle_name: '', department_id: 0, position: '', phone: '', email: '', employee_number: ''
+    first_name: '', last_name: '', middle_name: '', department_id: 0, user_id: null, position: '', phone: '', email: '', employee_number: '', max_user_id: ''
   });
 
   // Rooms state
@@ -223,6 +225,7 @@ const AdminPanel: React.FC = () => {
       fetchDeptOptions();
     }
     if (activeTab === 'employees') {
+      fetchUsers();
       fetchEmployees();
       fetchEmpOptions();
     }
@@ -799,21 +802,35 @@ const AdminPanel: React.FC = () => {
 
   // Employee handlers
   const handleCreateEmployee = async () => {
-    if (!empFormData.first_name || !empFormData.last_name || !empFormData.department_id) {
+    if (!empFormData.first_name || !empFormData.last_name || !empFormData.department_id || empFormData.department_id === 0) {
       toast.error('Имя, фамилия и подразделение обязательны');
       return;
     }
     try {
       const token = localStorage.getItem('token');
+      const body: Record<string, any> = {
+        first_name: empFormData.first_name,
+        last_name: empFormData.last_name,
+        middle_name: empFormData.middle_name || undefined,
+        department_id: empFormData.department_id,
+        position: empFormData.position || undefined,
+        phone: empFormData.phone || undefined,
+        email: empFormData.email || undefined,
+        employee_number: empFormData.employee_number || undefined,
+        max_user_id: empFormData.max_user_id || undefined,
+      };
+      if (empFormData.user_id) {
+        body.user_id = empFormData.user_id;
+      }
       const response = await fetch('/api/admin/employees', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(empFormData),
+        body: JSON.stringify(body),
       });
       if (response.ok) {
         toast.success('Сотрудник создан');
         setShowEmpForm(false);
-        setEmpFormData({ first_name: '', last_name: '', middle_name: '', department_id: 0, position: '', phone: '', email: '', employee_number: '' });
+        setEmpFormData({ first_name: '', last_name: '', middle_name: '', department_id: 0, user_id: null, position: '', phone: '', email: '', employee_number: '', max_user_id: '' });
         fetchEmployees();
       } else {
         const data = await response.json();
@@ -828,10 +845,26 @@ const AdminPanel: React.FC = () => {
     if (!editingEmp) return;
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`/api/admin/employees/${editingEmp.id}/`, {
+      const body: Record<string, any> = {
+        first_name: empFormData.first_name,
+        last_name: empFormData.last_name,
+        middle_name: empFormData.middle_name || undefined,
+        position: empFormData.position || undefined,
+        phone: empFormData.phone || undefined,
+        email: empFormData.email || undefined,
+        employee_number: empFormData.employee_number || undefined,
+        max_user_id: empFormData.max_user_id || undefined,
+      };
+      if (empFormData.department_id && empFormData.department_id !== 0) {
+        body.department_id = empFormData.department_id;
+      }
+      if (empFormData.user_id) {
+        body.user_id = empFormData.user_id;
+      }
+      const response = await fetch(`/api/admin/employees/${editingEmp.id}`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(empFormData),
+        body: JSON.stringify(body),
       });
       if (response.ok) {
         toast.success('Сотрудник обновлен');
@@ -1304,7 +1337,7 @@ const AdminPanel: React.FC = () => {
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Сотрудники</h2>
                   <button
-                    onClick={() => { setShowEmpForm(true); setEditingEmp(null); setEmpFormData({ first_name: '', last_name: '', middle_name: '', department_id: 0, position: '', phone: '', email: '', employee_number: '' }); }}
+                    onClick={() => { setShowEmpForm(true); setEditingEmp(null); setEmpFormData({ first_name: '', last_name: '', middle_name: '', department_id: 0, user_id: null, position: '', phone: '', email: '', employee_number: '', max_user_id: '' }); }}
                     className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition text-sm"
                   >
                     ➕ Добавить сотрудника
@@ -1322,10 +1355,15 @@ const AdminPanel: React.FC = () => {
                         <option value={0}>Выберите подразделение</option>
                         {deptTree.map(d => <option key={d.id} value={d.id}>{d.name} ({d.code})</option>)}
                       </select>
+                      <select value={empFormData.user_id ?? ''} onChange={(e) => setEmpFormData({...empFormData, user_id: e.target.value ? Number(e.target.value) : null})} className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">
+                        <option value="">Пользователь (необязательно)</option>
+                        {users.filter(u => u.is_active).map(u => <option key={u.id} value={u.id}>{u.full_name || u.username}</option>)}
+                      </select>
                       <input type="text" placeholder="Должность" value={empFormData.position} onChange={(e) => setEmpFormData({...empFormData, position: e.target.value})} className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100" />
                       <input type="text" placeholder="Телефон" value={empFormData.phone} onChange={(e) => setEmpFormData({...empFormData, phone: e.target.value})} className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100" />
                       <input type="email" placeholder="Email" value={empFormData.email} onChange={(e) => setEmpFormData({...empFormData, email: e.target.value})} className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100" />
                       <input type="text" placeholder="Табельный номер" value={empFormData.employee_number} onChange={(e) => setEmpFormData({...empFormData, employee_number: e.target.value})} className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100" />
+                      <input type="text" placeholder="ID для MAX (уведомления)" value={empFormData.max_user_id} onChange={(e) => setEmpFormData({...empFormData, max_user_id: e.target.value})} className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100" />
                     </div>
                     <div className="flex gap-2 mt-3">
                       <button onClick={editingEmp ? handleUpdateEmployee : handleCreateEmployee} className="bg-blue-600 text-white px-4 py-1.5 rounded text-sm hover:bg-blue-700 transition">{editingEmp ? 'Сохранить' : 'Создать'}</button>
@@ -1373,13 +1411,13 @@ const AdminPanel: React.FC = () => {
                         ) : (
                           employees.map((emp) => (
                             <tr key={emp.id} className="hover:bg-gray-50 dark:hover:bg-gray-750 transition">
-                              <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{emp.first_name} {emp.last_name}{emp.middle_name ? ` ${emp.middle_name}` : ''}</td>
+                              <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{emp.last_name} {emp.first_name}{emp.middle_name ? ` ${emp.middle_name}` : ''}</td>
                               <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400">{emp.position || '—'}</td>
                               <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400">{emp.department_name || emp.department_code || '—'}</td>
                               <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400">{emp.phone || '—'}</td>
                               <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400">{emp.email || '—'}</td>
                               <td className="px-4 py-2 text-right text-sm">
-                                <button onClick={() => { setEditingEmp(emp); setEmpFormData({ first_name: emp.first_name, last_name: emp.last_name, middle_name: emp.middle_name || '', department_id: emp.department_id || 0, position: emp.position || '', phone: emp.phone || '', email: emp.email || '', employee_number: emp.employee_number || '' }); setShowEmpForm(true); }} className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 mr-3">✏️</button>
+                                <button onClick={() => { setEditingEmp(emp); setEmpFormData({ first_name: emp.first_name, last_name: emp.last_name, middle_name: emp.middle_name || '', department_id: emp.department_id || 0, user_id: emp.user_id || null, position: emp.position || '', phone: emp.phone || '', email: emp.email || '', employee_number: emp.employee_number || '', max_user_id: emp.max_user_id || '' }); setShowEmpForm(true); }} className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 mr-3">✏️</button>
                                 <button onClick={() => handleDeleteEmployee(emp.id)} className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300">🗑️</button>
                               </td>
                             </tr>

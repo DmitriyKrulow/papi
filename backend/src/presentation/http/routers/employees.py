@@ -7,6 +7,7 @@ from datetime import datetime, date
 from src.infrastructure.db.init_db import get_db
 from src.infrastructure.db.models.employee import Employee
 from src.infrastructure.db.models.department import Department
+from src.infrastructure.db.models.user import User
 from src.presentation.http.dependencies.auth import get_current_admin
 
 router = APIRouter(prefix="/admin/employees", tags=["employees"])
@@ -40,6 +41,7 @@ def employee_to_dict(emp):
     user = getattr(emp, 'user', None)
     user_id = user.id if user else None
     username = user.username if user else None
+    max_user_id = user.max_user_id if user else None
     
     full_name = f"{emp.last_name} {emp.first_name} {emp.middle_name}".strip() if emp.middle_name else f"{emp.last_name} {emp.first_name}".strip()
     
@@ -59,6 +61,7 @@ def employee_to_dict(emp):
         "department_code": dept_code,
         "user_id": user_id,
         "username": username,
+        "max_user_id": safe_str(max_user_id),
         "hire_date": safe_isoformat(getattr(emp, 'hire_date', None)),
         "termination_date": safe_isoformat(getattr(emp, 'termination_date', None)),
         "is_active": getattr(emp, 'is_active', True),
@@ -124,7 +127,7 @@ async def get_employee_options(
     return [
         {
             "id": e.id,
-            "full_name": f"{e.last_name} {e.first_name} {e.middle_name}".strip() if e.middle_name else f"{e.last_name} {e.first_name}".strip(),
+            "full_name": f"{e.last_name} {e.first_name} {e.middle_name}".strip() if e.middle_name else f"{e.last_name} {e.first_name}".strip(),  # type: ignore[operator]
             "position": e.position or "",
             "department_name": e.department.name if e.department else "",
             "department_code": e.department.code if e.department else "",
@@ -173,6 +176,19 @@ async def create_employee(
         if existing:
             raise HTTPException(status_code=400, detail="User is already assigned as an employee")
     
+    # Сохраняем max_user_id если передан
+    max_user_id = data.get("max_user_id")
+    if max_user_id:
+        user = None
+        if user_id:
+            user = db.query(User).filter(User.id == user_id).first()
+        elif data.get("email"):
+            user = db.query(User).filter(User.email == data["email"]).first()
+        elif data.get("phone"):
+            user = db.query(User).filter(User.phone == data["phone"]).first()
+        if user:
+            user.max_user_id = max_user_id  # type: ignore[assignment]
+    
     emp = Employee(
         department_id=department_id,
         user_id=user_id,
@@ -194,9 +210,9 @@ async def create_employee(
     hire_date = data.get("hire_date")
     if hire_date:
         try:
-            emp.hire_date = datetime.strptime(hire_date, "%Y-%m-%d").date()
+            emp.hire_date = datetime.strptime(hire_date, "%Y-%m-%d").date()  # type: ignore[assignment]
         except:
-            emp.hire_date = date.fromisoformat(hire_date)
+            emp.hire_date = date.fromisoformat(hire_date)  # type: ignore[assignment]
     
     db.add(emp)
     db.commit()
@@ -242,31 +258,44 @@ async def update_employee(
     if "employee_number" in data:
         emp.employee_number = data["employee_number"]
     if "user_id" in data:
-        emp.user_id = data["user_id"]
+        emp.user_id = data["user_id"]  # type: ignore[assignment]
     if "is_active" in data:
         emp.is_active = data["is_active"]
+    
+    # Обновляем max_user_id если передан — ищем пользователя по user_id, email или phone
+    if "max_user_id" in data and data["max_user_id"]:
+        max_user_id = data["max_user_id"]
+        user = None
+        if emp.user_id:  # type: ignore[operator]
+            user = db.query(User).filter(User.id == emp.user_id).first()
+        if not user and emp.email:  # type: ignore[operator]
+            user = db.query(User).filter(User.email == emp.email).first()
+        if not user and emp.phone:  # type: ignore[operator]
+            user = db.query(User).filter(User.phone == emp.phone).first()
+        if user:
+            user.max_user_id = max_user_id  # type: ignore[assignment]
     
     if "hire_date" in data:
         hire_date = data["hire_date"]
         if hire_date:
             try:
-                emp.hire_date = datetime.strptime(hire_date, "%Y-%m-%d").date()
+                emp.hire_date = datetime.strptime(hire_date, "%Y-%m-%d").date()  # type: ignore[assignment]
             except:
-                emp.hire_date = date.fromisoformat(hire_date)
+                emp.hire_date = date.fromisoformat(hire_date)  # type: ignore[assignment]
         else:
-            emp.hire_date = None
+            emp.hire_date = None  # type: ignore[assignment]
     
     if "termination_date" in data:
         term_date = data["termination_date"]
         if term_date:
             try:
-                emp.termination_date = datetime.strptime(term_date, "%Y-%m-%d").date()
+                emp.termination_date = datetime.strptime(term_date, "%Y-%m-%d").date()  # type: ignore[assignment]
             except:
-                emp.termination_date = date.fromisoformat(term_date)
+                emp.termination_date = date.fromisoformat(term_date)  # type: ignore[assignment]
         else:
-            emp.termination_date = None
+            emp.termination_date = None  # type: ignore[assignment]
     
-    emp.updated_at = datetime.now()
+    emp.updated_at = datetime.now()  # type: ignore[assignment]
     db.commit()
     db.refresh(emp)
     

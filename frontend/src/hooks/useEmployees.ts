@@ -14,6 +14,7 @@ interface Employee {
   position?: string;
   position_code?: string;
   employee_number?: string;
+  max_user_id?: string;
   hire_date?: string;
   termination_date?: string;
   is_active: boolean;
@@ -32,6 +33,7 @@ interface EmployeeCreate {
   position?: string;
   position_code?: string;
   employee_number?: string;
+  max_user_id?: string;
   hire_date?: string;
   termination_date?: string;
   is_active?: boolean;
@@ -48,6 +50,7 @@ interface EmployeeUpdate {
   position?: string;
   position_code?: string;
   employee_number?: string;
+  max_user_id?: string;
   hire_date?: string;
   termination_date?: string;
   is_active?: boolean;

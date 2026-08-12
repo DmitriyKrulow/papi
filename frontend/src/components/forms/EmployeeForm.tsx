@@ -20,6 +20,7 @@ const employeeSchema = z.object({
   position: z.string().max(255, 'Максимум 255 символов').optional(),
   position_code: z.string().max(50, 'Максимум 50 символов').optional(),
   employee_number: z.string().max(50, 'Максимум 50 символов').optional(),
+  max_user_id: z.string().max(100, 'Максимум 100 символов').optional(),
   hire_date: z.union([z.string(), z.date()]).optional(),
   termination_date: z.union([z.string(), z.date()]).optional(),
   is_active: z.boolean().optional(),
@@ -126,6 +127,17 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, defaultValue, loa
             control={control}
             render={({ field }) => (
               <input {...field} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
+            )}
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-1">ID для MAX</label>
+          <Controller
+            name="max_user_id"
+            control={control}
+            render={({ field }) => (
+              <input {...field} placeholder="ID пользователя в MAX chat" className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
             )}
           />
         </div>
