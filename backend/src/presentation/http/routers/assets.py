@@ -63,29 +63,24 @@ def asset_to_dict(asset, db: Optional[Session] = None):
         asset_type_value = asset.asset_type_config.code
     
     department_name = None
-    employee_name = None
     assigned_employee_name = None
     
     if getattr(asset, 'employee_id', None) and db is not None:
         emp = db.query(Employee).filter(Employee.id == asset.employee_id).first()
         if emp:
             assigned_employee_name = f"{emp.last_name} {emp.first_name}"
-    
-    if db and getattr(asset, 'department_code', None):
+            # Получаем подразделение назначенного сотрудника
+            if db is not None:
+                dept = db.query(Department).filter(Department.id == emp.department_id).first()
+                if dept:
+                    department_name = f"{dept.name} ({dept.code})"
+    elif db and getattr(asset, 'department_code', None):
         dept = db.query(Department).filter(
             (Department.code == asset.department_code) | (Department.name == asset.department_code),
             Department.is_active == True
         ).first()
         if dept:
             department_name = f"{dept.name} ({dept.code})"
-            if not assigned_employee_name:
-                employees = db.query(Employee).filter(
-                    Employee.department_id == dept.id,
-                    Employee.is_active == True
-                ).order_by(Employee.last_name, Employee.first_name).all()
-                if employees:
-                    emp_names = [f"{e.last_name} {e.first_name}" for e in employees]
-                    employee_name = ", ".join(emp_names[:5])
 
     return {
         "id": getattr(asset, 'id', None),
@@ -101,7 +96,7 @@ def asset_to_dict(asset, db: Optional[Session] = None):
         "department_code": safe_str(getattr(asset, 'department_code', None)),
         "department_name": safe_str(department_name),
         "responsible_person": safe_str(getattr(asset, 'responsible_person', None)),
-        "employee_name": safe_str(assigned_employee_name or employee_name),
+        "employee_name": safe_str(assigned_employee_name),
         "assigned_employee_id": getattr(asset, 'employee_id', None),
         "location_address": safe_str(getattr(asset, 'location_address', None)),
         "manufacturer_code": safe_str(getattr(asset, 'manufacturer_code', None)),
