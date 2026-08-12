@@ -51,15 +51,39 @@ class AuditEntry:
             old_val = self.old_values.get(key)
             new_val = self.new_values.get(key)
             if old_val != new_val:
-                changed_fields.append(f"{key}: {old_val} → {new_val}")
+                # Преобразуем значения в более читаемый формат
+                old_display = self._format_value(key, old_val)
+                new_display = self._format_value(key, new_val)
+                changed_fields.append(f"{key}: {old_display} → {new_display}")
 
         if not changed_fields:
             return None
 
-        summary = ", ".join(changed_fields[:3])  # максимум 3 поля
-        if len(changed_fields) > 3:
-            summary += f" (+{len(changed_fields) - 3} more)"
-        return summary[:500]
+        summary = ", ".join(changed_fields[:5])  # максимум 5 полей
+        if len(changed_fields) > 5:
+            summary += f" (+{len(changed_fields) - 5} more)"
+        return summary[:1000]  # Увеличил лимит с 500 до 1000
+    
+    @staticmethod
+    def _format_value(key: str, value: Any) -> str:
+        """Форматирует значение для отображения в diff."""
+        if value is None:
+            return "пусто"
+        if isinstance(value, bool):
+            return "да" if value else "нет"
+        if isinstance(value, (list, dict)):
+            return str(value)
+        # Преобразуем коды в имена для некоторых полей
+        field_map = {
+            "status": {"active": "Активен", "maintenance": "На ремонте", "reserved": "В резерве", 
+                       "decommissioned": "Выведен", "lost": "Утерян", "written_off": "Списан"},
+            "asset_type": {"furniture": "Мебель", "printer": "Принтер", "computer": "Компьютер",
+                          "consumables": "Расходники", "fire_extinguisher": "Огнетушитель",
+                          "crypto_token": "Криптотокен", "other": "Прочее"},
+        }
+        if key in field_map and str(value) in field_map[key]:
+            return field_map[key][str(value)]
+        return str(value)
 
     def to_dict(self) -> Dict[str, Any]:
         """Конвертация в словарь для сохранения в БД."""

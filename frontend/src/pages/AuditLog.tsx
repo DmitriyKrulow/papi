@@ -15,6 +15,9 @@ import {
   Loader2,
   BarChart3,
   RefreshCw,
+  X,
+  ChevronsUpDown,
+  Info,
 } from 'lucide-react';
 
 interface AuditEntry {
@@ -28,6 +31,11 @@ interface AuditEntry {
   action: string;
   diff_summary: string | null;
   comment: string | null;
+  entity_name?: string;
+  action_label?: string;
+  entity_label?: string;
+  old_values?: Record<string, any> | null;
+  new_values?: Record<string, any> | null;
 }
 
 interface AuditSummary {
@@ -43,6 +51,31 @@ interface AuditStats {
   last_30_days: number;
   top_active_users_today: Array<{ user_id: number; actions: number }>;
 }
+
+// Словарь для перевода статусов
+const STATUS_LABELS: Record<string, string> = {
+  active: 'Активен',
+  maintenance: 'На ремонте',
+  reserved: 'В резерве',
+  decommissioned: 'Выведен',
+  lost: 'Утерян',
+  written_off: 'Списан',
+};
+
+// Словарь для перевода типов активов
+const ASSET_TYPE_LABELS: Record<string, string> = {
+  furniture: 'Мебель',
+  printer: 'Принтер',
+  computer: 'Компьютер',
+  consumables: 'Расходники',
+  fire_extinguisher: 'Огнетушитель',
+  crypto_token: 'Криптотокен',
+  ventilation: 'Вентиляция',
+  electrical: 'Электрооборудование',
+  tools: 'Инструмент',
+  appliances: 'Электроприбор',
+  other: 'Прочее',
+};
 
 const ACTION_LABELS: Record<string, string> = {
   create: 'Создание',
@@ -81,6 +114,12 @@ const ENTITY_LABELS: Record<string, string> = {
   InventoryCheck: 'Инвентаризация',
 };
 
+interface DiffDetail {
+  field: string;
+  old_value: any;
+  new_value: any;
+}
+
 const AuditLogPage: React.FC = () => {
   const { isAuthenticated, user } = useAuth();
   const [entries, setEntries] = useState<AuditEntry[]>([]);
@@ -96,6 +135,9 @@ const AuditLogPage: React.FC = () => {
   const [entityType, setEntityType] = useState('');
   const [action, setAction] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Детали записи
+  const [selectedEntry, setSelectedEntry] = useState<AuditEntry | null>(null);
 
   const isAdmin = user?.role === 'admin';
 
@@ -130,6 +172,43 @@ const AuditLogPage: React.FC = () => {
   }, [isAuthenticated, isAdmin, fetchData]);
 
   const totalPages = Math.ceil(total / limit);
+
+  // Форматирует значение для отображения в diff
+  const formatValue = (field: string, value: any): string => {
+    if (value === null || value === undefined) return 'пусто';
+    if (typeof value === 'boolean') return value ? 'да' : 'нет';
+    if (typeof value === 'object') return JSON.stringify(value, null, 2);
+    
+    // Преобразуем коды в имена
+    if (field === 'status' && STATUS_LABELS[value]) {
+      return STATUS_LABELS[value];
+    }
+    if (field === 'asset_type' && ASSET_TYPE_LABELS[value]) {
+      return ASSET_TYPE_LABELS[value];
+    }
+    
+    return String(value);
+  };
+
+  // Получает список изменённых полей
+  const getDiffDetails = (entry: AuditEntry): DiffDetail[] => {
+    if (!entry.old_values && !entry.new_values) return [];
+    
+    const oldVals = entry.old_values || {};
+    const newVals = entry.new_values || {};
+    const allKeys = new Set([...Object.keys(oldVals), ...Object.keys(newVals)]);
+    
+    const diffs: DiffDetail[] = [];
+    for (const key of Array.from(allKeys).sort()) {
+      const oldVal = oldVals[key];
+      const newVal = newVals[key];
+      if (oldVal !== newVal) {
+        diffs.push({ field: key, old_value: oldVal, new_value: newVal });
+      }
+    }
+    
+    return diffs;
+  };
 
   if (!isAuthenticated || !isAdmin) {
     return (
@@ -423,9 +502,32 @@ const AuditLogPage: React.FC = () => {
                           </span>
                         </td>
                         <td className="px-4 py-3 max-w-xs">
-                          <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
-                            {entry.diff_summary || entry.comment || '—'}
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm text-gray-600 dark:text-gray-400 truncate flex-1">
+                              {entry.entity_name ? (
+                                <span className="font-medium text-gray-900 dark:text-gray-100">
+                                  {entry.entity_name}
+                                </span>
+                              ) : (
+                                <span className="text-gray-400 dark:text-gray-500">#{entry.entity_id}</span>
+                              )}
+                              {entry.diff_summary && (
+                                <>
+                                  <span className="text-gray-400 dark:text-gray-500 mx-1">·</span>
+                                  <span className="truncate">{entry.diff_summary}</span>
+                                </>
+                              )}
+                            </p>
+                            {(entry.old_values || entry.new_values) && (
+                              <button
+                                onClick={() => setSelectedEntry(entry)}
+                                className="flex-shrink-0 p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition"
+                                title="Показать детали изменений"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-3 hidden sm:table-cell">
                           <span className="text-xs font-mono text-gray-500 dark:text-gray-400">
@@ -470,6 +572,168 @@ const AuditLogPage: React.FC = () => {
             </>
           )}
         </div>
+
+        {/* Модальное окно с деталями */}
+        {selectedEntry && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                    {ACTION_ICONS[selectedEntry.action] || '📌'} {selectedEntry.action_label || ACTION_LABELS[selectedEntry.action] || selectedEntry.action}
+                  </h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    {selectedEntry.entity_label || ENTITY_LABELS[selectedEntry.entity_type] || selectedEntry.entity_type}
+                    {selectedEntry.entity_name && (
+                      <span className="ml-2 font-medium text-gray-900 dark:text-gray-100">
+                        {selectedEntry.entity_name}
+                      </span>
+                    )}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setSelectedEntry(null)}
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition"
+                >
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                {/* Основная информация */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
+                    <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-2">
+                      <User className="w-4 h-4" />
+                      <span>Пользователь</span>
+                    </div>
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                      {selectedEntry.user_name || '—'}
+                    </p>
+                  </div>
+                  <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
+                    <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-2">
+                      <Calendar className="w-4 h-4" />
+                      <span>Дата и время</span>
+                    </div>
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                      {new Date(selectedEntry.created_at).toLocaleString('ru-RU')}
+                    </p>
+                  </div>
+                  {selectedEntry.ip_address && (
+                    <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
+                      <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-2">
+                        <Info className="w-4 h-4" />
+                        <span>IP-адрес</span>
+                      </div>
+                      <p className="text-sm font-mono text-gray-900 dark:text-gray-100">
+                        {selectedEntry.ip_address}
+                      </p>
+                    </div>
+                  )}
+                  {selectedEntry.method && (
+                    <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
+                      <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-2">
+                        <ArrowUpDown className="w-4 h-4" />
+                        <span>HTTP метод</span>
+                      </div>
+                      <p className="text-sm font-mono text-gray-900 dark:text-gray-100">
+                        {selectedEntry.method}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Комментарий */}
+                {selectedEntry.comment && (
+                  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                    <div className="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300 mb-2 font-medium">
+                      <Info className="w-4 h-4" />
+                      <span>Комментарий</span>
+                    </div>
+                    <p className="text-sm text-blue-900 dark:text-blue-100">
+                      {selectedEntry.comment}
+                    </p>
+                  </div>
+                )}
+
+                {/* Детали изменений */}
+                {(selectedEntry.old_values || selectedEntry.new_values) && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                      <ChevronsUpDown className="w-4 h-4" />
+                      Изменённые поля
+                    </h3>
+                    <div className="space-y-3">
+                      {getDiffDetails(selectedEntry).map((diff, idx) => (
+                        <div
+                          key={idx}
+                          className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden"
+                        >
+                          <div className="bg-gray-50 dark:bg-gray-900/50 px-4 py-2 border-b border-gray-200 dark:border-gray-700">
+                            <span className="text-xs font-mono font-medium text-gray-700 dark:text-gray-300 uppercase">
+                              {diff.field}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 divide-x divide-gray-200 dark:divide-gray-700">
+                            <div className="p-3">
+                              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Было</div>
+                              <pre className="text-xs font-mono text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20 p-2 rounded whitespace-pre-wrap break-words">
+                                {formatValue(diff.field, diff.old_value)}
+                              </pre>
+                            </div>
+                            <div className="p-3">
+                              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Стало</div>
+                              <pre className="text-xs font-mono text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-900/20 p-2 rounded whitespace-pre-wrap break-words">
+                                {formatValue(diff.field, diff.new_value)}
+                              </pre>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Полный JSON old_values */}
+                {selectedEntry.old_values && Object.keys(selectedEntry.old_values).length > 0 && (
+                  <details className="bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <summary className="px-4 py-3 cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition">
+                      Показать полные старые значения (JSON)
+                    </summary>
+                    <pre className="p-4 text-xs font-mono text-gray-700 dark:text-gray-300 overflow-x-auto whitespace-pre-wrap break-words border-t border-gray-200 dark:border-gray-700">
+                      {JSON.stringify(selectedEntry.old_values, null, 2)}
+                    </pre>
+                  </details>
+                )}
+
+                {/* Полный JSON new_values */}
+                {selectedEntry.new_values && Object.keys(selectedEntry.new_values).length > 0 && (
+                  <details className="bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <summary className="px-4 py-3 cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition">
+                      Показать полные новые значения (JSON)
+                    </summary>
+                    <pre className="p-4 text-xs font-mono text-gray-700 dark:text-gray-300 overflow-x-auto whitespace-pre-wrap break-words border-t border-gray-200 dark:border-gray-700">
+                      {JSON.stringify(selectedEntry.new_values, null, 2)}
+                    </pre>
+                  </details>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="p-6 border-t border-gray-200 dark:border-gray-700 flex justify-end">
+                <button
+                  onClick={() => setSelectedEntry(null)}
+                  className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition text-sm font-medium"
+                >
+                  Закрыть
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
