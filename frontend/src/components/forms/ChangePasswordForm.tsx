@@ -56,12 +56,12 @@ const ChangePasswordForm: React.FC<ChangePasswordFormProps> = ({ onSubmit, loadi
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label className="block text-sm font-medium mb-1">Старый пароль</label>
+        <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Старый пароль</label>
         <input
           name="oldPassword"
           value={formData.oldPassword}
           onChange={handleChange}
-          className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600 placeholder-gray-400 dark:placeholder-gray-500"
           placeholder="Введите старый пароль"
           type="password"
         />
@@ -71,12 +71,12 @@ const ChangePasswordForm: React.FC<ChangePasswordFormProps> = ({ onSubmit, loadi
       </div>
 
       <div>
-        <label className="block text-sm font-medium mb-1">Новый пароль</label>
+        <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Новый пароль</label>
         <input
           name="newPassword"
           value={formData.newPassword}
           onChange={handleChange}
-          className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600 placeholder-gray-400 dark:placeholder-gray-500"
           placeholder="Введите новый пароль"
           type="password"
         />
@@ -86,12 +86,12 @@ const ChangePasswordForm: React.FC<ChangePasswordFormProps> = ({ onSubmit, loadi
       </div>
 
       <div>
-        <label className="block text-sm font-medium mb-1">Подтвердите новый пароль</label>
+        <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Подтвердите новый пароль</label>
         <input
           name="confirmPassword"
           value={formData.confirmPassword}
           onChange={handleChange}
-          className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600 placeholder-gray-400 dark:placeholder-gray-500"
           placeholder="Повторите новый пароль"
           type="password"
         />

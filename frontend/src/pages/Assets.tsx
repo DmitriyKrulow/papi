@@ -27,7 +27,7 @@ interface PaginatedResponse {
 }
 
 type SortDirection = 'asc' | 'desc' | null;
-type SortColumn = 'inventory_number' | 'name' | 'status' | 'current_value' | 'department_name' | 'responsible_person' | 'location_address';
+type SortColumn = 'inventory_number' | 'name' | 'status' | 'current_value' | 'department_name' | 'responsible_person' | 'location_address' | 'employee_name' | 'asset_type';
 
 interface SortConfig {
   column: SortColumn | null;
@@ -164,58 +164,13 @@ const Assets: React.FC = () => {
   };
 
   const getSortedAndFilteredAssets = useMemo(() => {
-    let result = [...assets];
-
-    if (filterStatus) result = result.filter(a => a.status === filterStatus);
-    if (filterAssetType) result = result.filter(a => a.asset_type === filterAssetType);
-    if (filterDepartment) result = result.filter(a =>
-      (a.department_name || '').toLowerCase().includes(filterDepartment.toLowerCase()) ||
-      (a.department_code || '').toLowerCase().includes(filterDepartment.toLowerCase())
-    );
-    if (filterLocation) result = result.filter(a =>
-      (a.location_address || '').toLowerCase().includes(filterLocation.toLowerCase())
-    );
-    if (filterEmployee) result = result.filter(a =>
-      (a.employee_name || '').toLowerCase().includes(filterEmployee.toLowerCase()) ||
-      (a.responsible_person || '').toLowerCase().includes(filterEmployee.toLowerCase())
-    );
-
-    if (sortConfig.column && sortConfig.direction) {
-      result.sort((a, b) => {
-        const aVal = a[sortConfig.column as keyof Asset];
-        const bVal = b[sortConfig.column as keyof Asset];
-        if (aVal == null && bVal == null) return 0;
-        if (aVal == null) return 1;
-        if (bVal == null) return -1;
-        const comparison = String(aVal).localeCompare(String(bVal), 'ru');
-        return sortConfig.direction === 'asc' ? comparison : -comparison;
-      });
-    }
-
-    return result;
-  }, [assets, filterStatus, filterAssetType, filterDepartment, filterLocation, filterEmployee, sortConfig]);
+    // Фильтрация и сортировка теперь выполняются на сервере
+    return assets;
+  }, [assets]);
 
   const activeFilterCount = [filterStatus, filterAssetType, filterDepartment, filterLocation, filterEmployee].filter(Boolean).length;
 
-  const totalFiltered = useMemo(() => {
-    let filtered = [...assets];
-    if (filterStatus) filtered = filtered.filter(a => a.status === filterStatus);
-    if (filterAssetType) filtered = filtered.filter(a => a.asset_type === filterAssetType);
-    if (filterDepartment) filtered = filtered.filter(a =>
-      (a.department_name || '').toLowerCase().includes(filterDepartment.toLowerCase()) ||
-      (a.department_code || '').toLowerCase().includes(filterDepartment.toLowerCase())
-    );
-    if (filterLocation) filtered = filtered.filter(a =>
-      (a.location_address || '').toLowerCase().includes(filterLocation.toLowerCase())
-    );
-    if (filterEmployee) filtered = filtered.filter(a =>
-      (a.employee_name || '').toLowerCase().includes(filterEmployee.toLowerCase()) ||
-      (a.responsible_person || '').toLowerCase().includes(filterEmployee.toLowerCase())
-    );
-    return filtered.length;
-  }, [assets, filterStatus, filterAssetType, filterDepartment, filterLocation, filterEmployee]);
-
-const getToken = async () => localStorage.getItem('token') || '';
+  const getToken = async () => localStorage.getItem('token') || '';
   
   const getUserRole = () => {
     const token = localStorage.getItem('token');
@@ -545,9 +500,17 @@ const handleEditClick = (asset: Asset) => {
         limit: String(pageSize),
       });
       if (debouncedSearchTerm) params.set('search', debouncedSearchTerm);
- if (filterStatus) params.set('status', filterStatus);
+      if (filterStatus) params.set('status', filterStatus);
+      if (filterAssetType) params.set('asset_type', filterAssetType);
       if (filterDepartment) params.set('department', filterDepartment);
+      if (filterLocation) params.set('location', filterLocation);
+      if (filterEmployee) params.set('employee', filterEmployee);
       if (showHidden) params.set('include_hidden', 'true');
+      // Передаём сортировку на сервер
+      if (sortConfig.column && sortConfig.direction) {
+        params.set('sort_by', sortConfig.column);
+        params.set('sort_dir', sortConfig.direction);
+      }
 
       const token = await getToken();
       const response = await fetch(`/api/assets/?${params}`, {
@@ -573,7 +536,7 @@ const handleEditClick = (asset: Asset) => {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, pageSize, debouncedSearchTerm, filterStatus, filterDepartment, showHidden]);
+  }, [currentPage, pageSize, debouncedSearchTerm, filterStatus, filterAssetType, filterDepartment, filterLocation, filterEmployee, showHidden, sortConfig]);
 
   useEffect(() => {
     loadAssets();
@@ -1016,7 +979,9 @@ const handleEditClick = (asset: Asset) => {
                       </button>
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-r border-gray-100 dark:border-gray-600">
-                      Тип
+                      <button onClick={() => handleSort('asset_type')} className="flex items-center hover:text-gray-700 dark:hover:text-gray-300 transition">
+                        Тип <SortIcon column="asset_type" />
+                      </button>
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-r border-gray-100 dark:border-gray-600">
                       <button onClick={() => handleSort('current_value')} className="flex items-center hover:text-gray-700 dark:hover:text-gray-300 transition">
@@ -1032,7 +997,9 @@ const handleEditClick = (asset: Asset) => {
                       </button>
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-r border-gray-100 dark:border-gray-600">
-                      Сотрудник
+                      <button onClick={() => handleSort('employee_name')} className="flex items-center hover:text-gray-700 dark:hover:text-gray-300 transition">
+                        Сотрудник <SortIcon column="employee_name" />
+                      </button>
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-r border-gray-100 dark:border-gray-600">
                       <button onClick={() => handleSort('location_address')} className="flex items-center hover:text-gray-700 dark:hover:text-gray-300 transition">
@@ -1238,7 +1205,7 @@ const handleEditClick = (asset: Asset) => {
                     <option key={size} value={size}>{size}</option>
                   ))}
                 </select>
-                <span>из {totalFiltered} записей</span>
+                <span>из {totalAssets} записей</span>
               </div>
               <div className="flex items-center gap-1">
                 <button
@@ -1260,14 +1227,14 @@ const handleEditClick = (asset: Asset) => {
                 </span>
                 <button
                   onClick={() => setCurrentPage(p => p + 1)}
-                  disabled={currentPage * pageSize >= totalFiltered}
+                  disabled={currentPage * pageSize >= totalAssets}
                   className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed text-gray-700 dark:text-gray-300"
                 >
                   ›
                 </button>
                 <button
                   onClick={() => setCurrentPage(p => p + 1)}
-                  disabled={currentPage * pageSize >= totalFiltered}
+                  disabled={currentPage * pageSize >= totalAssets}
                   className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed text-gray-700 dark:text-gray-300"
                 >
                   ››

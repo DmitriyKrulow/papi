@@ -67,12 +67,12 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ onSubmit, loading = false, us
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label className="block text-sm font-medium mb-1">Имя пользователя</label>
+        <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Имя пользователя</label>
         <input
           name="username"
           value={formData.username}
           onChange={handleChange}
-          className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600 placeholder-gray-400 dark:placeholder-gray-500"
           placeholder="Введите имя пользователя"
           type="text"
         />
@@ -82,12 +82,12 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ onSubmit, loading = false, us
       </div>
 
       <div>
-        <label className="block text-sm font-medium mb-1">Email</label>
+        <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Email</label>
         <input
           name="email"
           value={formData.email}
           onChange={handleChange}
-          className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600 placeholder-gray-400 dark:placeholder-gray-500"
           placeholder="Введите email"
           type="email"
         />
@@ -97,24 +97,24 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ onSubmit, loading = false, us
       </div>
 
       <div>
-        <label className="block text-sm font-medium mb-1">ФИО</label>
+        <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">ФИО</label>
         <input
           name="full_name"
           value={formData.full_name || ''}
           onChange={handleChange}
-          className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600 placeholder-gray-400 dark:placeholder-gray-500"
           placeholder="Иванов Иван Иванович"
           type="text"
         />
       </div>
 
       <div>
-        <label className="block text-sm font-medium mb-1">Телефон</label>
+        <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Телефон</label>
         <input
           name="phone"
           value={formData.phone || ''}
           onChange={handleChange}
-          className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600 placeholder-gray-400 dark:placeholder-gray-500"
           placeholder="+7 (999) 123-45-67"
           type="tel"
         />

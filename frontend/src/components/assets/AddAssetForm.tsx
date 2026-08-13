@@ -788,7 +788,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
               ))}
             </select>
             {allRooms.length === 0 && !loadingOptions && (
-              <p className="mt-1 text-xs text-gray-500">Нет доступных кабинетов</p>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Нет доступных кабинетов</p>
             )}
           </div>
 
@@ -821,7 +821,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
               ))}
             </select>
             {responsibleOptions.length === 0 && !loadingOptions && (
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-500">Нет доступных сотрудников</p>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Нет доступных сотрудников</p>
             )}
           </div>
 
@@ -846,7 +846,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
               ))}
             </select>
             {allEmployees.length === 0 && !loadingOptions && (
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-500">Нет доступных сотрудников</p>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Нет доступных сотрудников</p>
             )}
           </div>
 

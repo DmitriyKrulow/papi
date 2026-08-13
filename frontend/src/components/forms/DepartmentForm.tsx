@@ -48,82 +48,82 @@ const DepartmentForm: React.FC<DepartmentFormProps> = ({
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium mb-1">Название</label>
+          <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Название</label>
           <Controller
             name="name"
             control={control}
             render={({ field }) => (
-              <input {...field} className="w-full px-3 py-2 border rounded-md" />
+              <input {...field} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
             )}
           />
           {errors.name && <p className="text-red-500 text-xs">{errors.name.message}</p>}
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Код</label>
+          <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Код</label>
           <Controller
             name="code"
             control={control}
             render={({ field }) => (
-              <input {...field} className="w-full px-3 py-2 border rounded-md" />
+              <input {...field} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
             )}
           />
           {errors.code && <p className="text-red-500 text-xs">{errors.code.message}</p>}
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Руководитель</label>
+          <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Руководитель</label>
           <Controller
             name="head"
             control={control}
             render={({ field }) => (
-              <input {...field} className="w-full px-3 py-2 border rounded-md" />
+              <input {...field} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
             )}
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Телефон</label>
+          <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Телефон</label>
           <Controller
             name="phone"
             control={control}
             render={({ field }) => (
-              <input {...field} type="tel" className="w-full px-3 py-2 border rounded-md" />
+              <input {...field} type="tel" className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
             )}
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Email</label>
+          <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Email</label>
           <Controller
             name="email"
             control={control}
             render={({ field }) => (
-              <input {...field} type="email" className="w-full px-3 py-2 border rounded-md" />
+              <input {...field} type="email" className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
             )}
           />
           {errors.email && <p className="text-red-500 text-xs">{errors.email.message}</p>}
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Местоположение</label>
+          <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Местоположение</label>
           <Controller
             name="location"
             control={control}
             render={({ field }) => (
-              <input {...field} className="w-full px-3 py-2 border rounded-md" />
+              <input {...field} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
             )}
           />
         </div>
       </div>
 
       <div>
-        <label className="block text-sm font-medium mb-1">Описание</label>
+        <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Описание</label>
         <Controller
           name="description"
           control={control}
           render={({ field }) => (
-            <textarea {...field} className="w-full px-3 py-2 border rounded-md" rows={3} />
+            <textarea {...field} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" rows={3} />
           )}
         />
       </div>

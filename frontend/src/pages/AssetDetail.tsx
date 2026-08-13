@@ -23,7 +23,7 @@ const AssetDetail: React.FC = () => {
   }, [assets, loading, id, navigate]);
 
   if (loading) return <div>Загрузка...</div>;
-  if (error) return <div className="text-red-500">Ошибка: {error}</div>;
+  if (error) return <div className="text-red-500 dark:text-red-400">Ошибка: {error}</div>;
   if (!asset) return <div>Актив не найден</div>;
 
   return (
@@ -41,7 +41,7 @@ const AssetDetail: React.FC = () => {
         <div className="px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700">
           <div className="flex justify-between items-center">
             <div>
-              <h3 className="text-lg leading-6 font-medium text-gray-900">{asset.name}</h3>
+              <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-gray-100">{asset.name}</h3>
               <p className="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">
                 Инвентарный номер: {asset.inventory_number}
               </p>
@@ -59,8 +59,8 @@ const AssetDetail: React.FC = () => {
                   asset.status === 'active'
                     ? 'bg-green-100 text-green-800 dark:text-green-200'
                     : asset.status === 'written_off'
-                    ? 'bg-red-100 text-red-800'
-                    : 'bg-yellow-100 text-yellow-800'
+                    ? 'bg-red-100 text-red-800 dark:text-red-200'
+                    : 'bg-yellow-100 text-yellow-800 dark:text-yellow-200'
                 }`}
               >
                 {asset.status}
@@ -73,23 +73,23 @@ const AssetDetail: React.FC = () => {
           <dl className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
             <div className="sm:col-span-1">
               <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Модель</dt>
-              <dd className="mt-1 text-sm text-gray-900">{asset.model || 'Не указано'}</dd>
+              <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">{asset.model || 'Не указано'}</dd>
             </div>
             <div className="sm:col-span-1">
               <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Производитель</dt>
-              <dd className="mt-1 text-sm text-gray-900">
+              <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
                 {asset.manufacturer_name || 'Не указано'}
               </dd>
             </div>
             <div className="sm:col-span-1">
               <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Страна</dt>
-              <dd className="mt-1 text-sm text-gray-900">
+              <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
                 {asset.country_of_origin || 'Не указано'}
               </dd>
             </div>
             <div className="sm:col-span-1">
               <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Цена покупки</dt>
-              <dd className="mt-1 text-sm text-gray-900">
+              <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
                 {asset.purchase_price
                   ? new Intl.NumberFormat('ru-RU', {
                       style: 'currency',
@@ -100,7 +100,7 @@ const AssetDetail: React.FC = () => {
             </div>
             <div className="sm:col-span-1">
               <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Текущая стоимость</dt>
-              <dd className="mt-1 text-sm text-gray-900">
+              <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
                 {asset.current_value
                   ? new Intl.NumberFormat('ru-RU', {
                       style: 'currency',
@@ -111,37 +111,37 @@ const AssetDetail: React.FC = () => {
             </div>
             <div className="sm:col-span-1">
               <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Ставка амортизации</dt>
-              <dd className="mt-1 text-sm text-gray-900">
+              <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
                 {asset.depreciation_rate ? `${asset.depreciation_rate}%` : 'Не указано'}
               </dd>
             </div>
             <div className="sm:col-span-1">
               <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Подразделение</dt>
-              <dd className="mt-1 text-sm text-gray-900">
+              <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
                 {asset.department_code || 'Не указано'}
               </dd>
             </div>
             <div className="sm:col-span-1">
               <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Ответственный</dt>
-              <dd className="mt-1 text-sm text-gray-900">
+              <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
                 {asset.responsible_person || 'Не указано'}
               </dd>
             </div>
             <div className="sm:col-span-1">
               <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Телефон</dt>
-              <dd className="mt-1 text-sm text-gray-900">
+              <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
                 {asset.responsible_phone || 'Не указано'}
               </dd>
             </div>
             <div className="sm:col-span-1">
               <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Адрес</dt>
-              <dd className="mt-1 text-sm text-gray-900">
+              <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
                 {asset.location_address || 'Не указано'}
               </dd>
             </div>
             <div className="sm:col-span-1">
               <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Дата покупки</dt>
-              <dd className="mt-1 text-sm text-gray-900">
+              <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
                 {asset.purchase_date
                   ? new Date(asset.purchase_date).toLocaleDateString('ru-RU')
                   : 'Не указано'}
@@ -149,7 +149,7 @@ const AssetDetail: React.FC = () => {
             </div>
             <div className="sm:col-span-1">
               <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Дата ввода в эксплуатацию</dt>
-              <dd className="mt-1 text-sm text-gray-900">
+              <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
                 {asset.commissioning_date
                   ? new Date(asset.commissioning_date).toLocaleDateString('ru-RU')
                   : 'Не указано'}
@@ -157,7 +157,7 @@ const AssetDetail: React.FC = () => {
             </div>
             <div className="sm:col-span-1">
               <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Гарантия</dt>
-              <dd className="mt-1 text-sm text-gray-900">
+              <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
                 {asset.warranty_expiry
                   ? new Date(asset.warranty_expiry).toLocaleDateString('ru-RU')
                   : 'Не указано'}
@@ -165,7 +165,7 @@ const AssetDetail: React.FC = () => {
             </div>
             <div className="sm:col-span-1">
               <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Последнее ТО</dt>
-              <dd className="mt-1 text-sm text-gray-900">
+              <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
                 {asset.last_maintenance_date
                   ? new Date(asset.last_maintenance_date).toLocaleDateString('ru-RU')
                   : 'Не указано'}
@@ -173,7 +173,7 @@ const AssetDetail: React.FC = () => {
             </div>
             <div className="sm:col-span-1">
               <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Списание</dt>
-              <dd className="mt-1 text-sm text-gray-900">
+              <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
                 {asset.decommissioning_date
                   ? new Date(asset.decommissioning_date).toLocaleDateString('ru-RU')
                   : 'Не указано'}
@@ -181,13 +181,13 @@ const AssetDetail: React.FC = () => {
             </div>
             <div className="sm:col-span-2">
               <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Описание</dt>
-              <dd className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">
+              <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
                 {asset.description || 'Нет описания'}
               </dd>
             </div>
             <div className="sm:col-span-2">
               <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Примечания</dt>
-              <dd className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">
+              <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
                 {asset.notes || 'Нет примечаний'}
               </dd>
             </div>

@@ -129,16 +129,20 @@ async def list_assets(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=10000),
     status: Optional[str] = None,
+    asset_type: Optional[str] = None,
     search: Optional[str] = None,
     location: Optional[str] = None,
     department: Optional[str] = None,
     responsible: Optional[str] = None,
     employee: Optional[str] = None,
     include_hidden: bool = False,
+    sort_by: Optional[str] = Query(None, regex="^(inventory_number|name|status|current_value|department_name|responsible_person|location_address|employee_name|asset_type)$"),
+    sort_dir: Optional[str] = Query(None, regex="^(asc|desc)$"),
     db: Session = Depends(get_db),
 ):
     """
     Получить список активов с пагинацией и фильтрацией.
+    Фильтры и сортировка применяются на сервере ко ВСЕМ активам.
     """
     try:
         query = db.query(Asset).options(joinedload(Asset.asset_type_config))
@@ -148,6 +152,9 @@ async def list_assets(
         
         if status:
             query = query.filter(Asset.status == status)
+        
+        if asset_type:
+            query = query.filter(Asset.asset_type == asset_type)
         
         if search:
             search_pattern = f"%{search}%"
@@ -186,6 +193,22 @@ async def list_assets(
                 )
             else:
                 query = query.filter(text("0=1"))
+        
+        # Сортировка на сервере
+        if sort_by:
+            reverse = sort_dir == "desc"
+            sort_field = getattr(Asset, sort_by, None)
+            if sort_field is not None:
+                if reverse:
+                    query = query.order_by(sort_field.desc())
+                else:
+                    query = query.order_by(sort_field.asc())
+            else:
+                # Fallback: сортировка по inventory_number
+                if reverse:
+                    query = query.order_by(Asset.inventory_number.desc())
+                else:
+                    query = query.order_by(Asset.inventory_number.asc())
         
         total = query.count()
         assets = query.offset(skip).limit(limit).all()

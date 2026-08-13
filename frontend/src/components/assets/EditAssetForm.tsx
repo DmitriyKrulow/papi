@@ -906,7 +906,7 @@ const handleSubmitForm = async (data: any) => {
             ))}
           </select>
           {allRooms.length === 0 && !loadingOptions && (
-            <p className="mt-1 text-xs text-gray-500">Нет доступных кабинетов</p>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Нет доступных кабинетов</p>
           )}
         </div>
 
@@ -939,7 +939,7 @@ const handleSubmitForm = async (data: any) => {
             ))}
           </select>
           {responsibleOptions.length === 0 && !loadingOptions && (
-            <p className="mt-1 text-xs text-gray-500">Нет доступных сотрудников</p>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Нет доступных сотрудников</p>
           )}
         </div>
 
@@ -964,7 +964,7 @@ const handleSubmitForm = async (data: any) => {
             ))}
           </select>
           {allEmployees.length === 0 && !loadingOptions && (
-            <p className="mt-1 text-xs text-gray-500">Нет доступных сотрудников</p>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Нет доступных сотрудников</p>
           )}
         </div>
       </div>

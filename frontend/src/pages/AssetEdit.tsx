@@ -105,7 +105,7 @@ const AssetEdit: React.FC = () => {
   };
 
   if (loading && !asset) return <div>Загрузка...</div>;
-  if (error && !asset) return <div className="text-red-500">Ошибка: {error}</div>;
+  if (error && !asset) return <div className="text-red-500 dark:text-red-400">Ошибка: {error}</div>;
   if (!asset || !formData) return <div>Актив не найден</div>;
 
   return (
@@ -126,7 +126,7 @@ const AssetEdit: React.FC = () => {
         <div className="px-4 py-5 sm:p-6">
           <AssetForm onSubmit={handleSubmit} defaultValue={formData} loading={loading} />
           {error && (
-            <div className="mt-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
+            <div className="mt-4 bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-600 text-red-700 dark:text-red-300 px-4 py-3 rounded relative">
               {error}
             </div>
           )}
