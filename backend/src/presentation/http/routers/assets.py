@@ -136,8 +136,16 @@ async def list_assets(
     responsible: Optional[str] = None,
     employee: Optional[str] = None,
     include_hidden: bool = False,
-    sort_by: Optional[str] = Query(None, regex="^(inventory_number|name|status|current_value|department_name|responsible_person|location_address|employee_name|asset_type)$"),
-    sort_dir: Optional[str] = Query(None, regex="^(asc|desc)$"),
+    sort_by: Optional[str] = Query(None, pattern="^(inventory_number|name|status|current_value|department_name|responsible_person|location_address|employee_name|asset_type)$"),
+    sort_dir: Optional[str] = Query(None, pattern="^(asc|desc)$"),
+    # Фильтры по пустым полям
+    empty_department: bool = Query(False),
+    empty_location: bool = Query(False),
+    empty_responsible: bool = Query(False),
+    empty_serial_number: bool = Query(False),
+    empty_model: bool = Query(False),
+    empty_purchase_date: bool = Query(False),
+    empty_warranty_expiry: bool = Query(False),
     db: Session = Depends(get_db),
 ):
     """
@@ -193,6 +201,38 @@ async def list_assets(
                 )
             else:
                 query = query.filter(text("0=1"))
+        
+        # Фильтры по пустым полям — ищем записи где поле IS NULL или пустая строка
+        if empty_department:
+            query = query.filter(
+                (Asset.department_code.is_(None)) | (Asset.department_code == '')
+            )
+        
+        if empty_location:
+            query = query.filter(
+                (Asset.location_address.is_(None)) | (Asset.location_address == '')
+            )
+        
+        if empty_responsible:
+            query = query.filter(
+                (Asset.responsible_person.is_(None)) | (Asset.responsible_person == '')
+            )
+        
+        if empty_serial_number:
+            query = query.filter(
+                (Asset.serial_number.is_(None)) | (Asset.serial_number == '')
+            )
+        
+        if empty_model:
+            query = query.filter(
+                (Asset.model.is_(None)) | (Asset.model == '')
+            )
+        
+        if empty_purchase_date:
+            query = query.filter(Asset.purchase_date.is_(None))
+        
+        if empty_warranty_expiry:
+            query = query.filter(Asset.warranty_expiry.is_(None))
         
         # Сортировка на сервере
         if sort_by:

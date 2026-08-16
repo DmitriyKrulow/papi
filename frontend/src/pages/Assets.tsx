@@ -53,6 +53,14 @@ const Assets: React.FC = () => {
   const [filterDepartment, setFilterDepartment] = useState('');
   const [filterLocation, setFilterLocation] = useState('');
   const [filterEmployee, setFilterEmployee] = useState('');
+  // Фильтры по пустым полям
+  const [emptyDepartment, setEmptyDepartment] = useState(false);
+  const [emptyLocation, setEmptyLocation] = useState(false);
+  const [emptyResponsible, setEmptyResponsible] = useState(false);
+  const [emptySerialNumber, setEmptySerialNumber] = useState(false);
+  const [emptyModel, setEmptyModel] = useState(false);
+  const [emptyPurchaseDate, setEmptyPurchaseDate] = useState(false);
+  const [emptyWarrantyExpiry, setEmptyWarrantyExpiry] = useState(false);
   const [currentAsset, setCurrentAsset] = useState<Asset | null>(null);
   const [assetTypeConfigs, setAssetTypeConfigs] = useState<AssetTypeConfig[]>([]);
   const [departments, setDepartments] = useState<Array<{id: number; name: string; code: string; location: string; full_name: string}>>([]);
@@ -506,6 +514,13 @@ const handleEditClick = (asset: Asset) => {
       if (filterLocation) params.set('location', filterLocation);
       if (filterEmployee) params.set('employee', filterEmployee);
       if (showHidden) params.set('include_hidden', 'true');
+      if (emptyDepartment) params.set('empty_department', 'true');
+      if (emptyLocation) params.set('empty_location', 'true');
+      if (emptyResponsible) params.set('empty_responsible', 'true');
+      if (emptySerialNumber) params.set('empty_serial_number', 'true');
+      if (emptyModel) params.set('empty_model', 'true');
+      if (emptyPurchaseDate) params.set('empty_purchase_date', 'true');
+      if (emptyWarrantyExpiry) params.set('empty_warranty_expiry', 'true');
       // Передаём сортировку на сервер
       if (sortConfig.column && sortConfig.direction) {
         params.set('sort_by', sortConfig.column);
@@ -536,7 +551,7 @@ const handleEditClick = (asset: Asset) => {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, pageSize, debouncedSearchTerm, filterStatus, filterAssetType, filterDepartment, filterLocation, filterEmployee, showHidden, sortConfig]);
+  }, [currentPage, pageSize, debouncedSearchTerm, filterStatus, filterAssetType, filterDepartment, filterLocation, filterEmployee, showHidden, sortConfig, emptyDepartment, emptyLocation, emptyResponsible, emptySerialNumber, emptyModel, emptyPurchaseDate, emptyWarrantyExpiry]);
 
   useEffect(() => {
     loadAssets();
@@ -714,7 +729,7 @@ const handleEditClick = (asset: Asset) => {
           </button>
           {activeFilterCount > 0 && (
             <button
-              onClick={() => { setFilterStatus(''); setFilterAssetType(''); setFilterDepartment(''); setFilterLocation(''); setFilterEmployee(''); setCurrentPage(1); }}
+              onClick={() => { setFilterStatus(''); setFilterAssetType(''); setFilterDepartment(''); setFilterLocation(''); setFilterEmployee(''); setCurrentPage(1); setEmptyDepartment(false); setEmptyLocation(false); setEmptyResponsible(false); setEmptySerialNumber(false); setEmptyModel(false); setEmptyPurchaseDate(false); setEmptyWarrantyExpiry(false); }}
               className="px-3 py-2 text-sm text-blue-600 hover:text-blue-800 border border-blue-200 rounded-lg hover:bg-blue-50 transition whitespace-nowrap dark:text-blue-400 dark:hover:text-blue-300 dark:border-blue-700 dark:hover:bg-blue-900"
             >
               Сбросить
@@ -956,6 +971,75 @@ const handleEditClick = (asset: Asset) => {
                   </div>
                 </>
               )}
+            </div>
+            {/* Empty fields filters */}
+            <div className="sm:col-span-3 pt-2 border-t border-gray-100 dark:border-gray-700">
+              <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Показать активы:</p>
+              <div className="flex flex-wrap gap-3">
+                <label className="inline-flex items-center gap-1.5 cursor-pointer text-sm text-gray-700 dark:text-gray-300">
+                  <input
+                    type="checkbox"
+                    checked={emptyDepartment}
+                    onChange={(e) => { setEmptyDepartment(e.target.checked); setCurrentPage(1); }}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  Без подразделения
+                </label>
+                <label className="inline-flex items-center gap-1.5 cursor-pointer text-sm text-gray-700 dark:text-gray-300">
+                  <input
+                    type="checkbox"
+                    checked={emptyLocation}
+                    onChange={(e) => { setEmptyLocation(e.target.checked); setCurrentPage(1); }}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  Без помещения
+                </label>
+                <label className="inline-flex items-center gap-1.5 cursor-pointer text-sm text-gray-700 dark:text-gray-300">
+                  <input
+                    type="checkbox"
+                    checked={emptyResponsible}
+                    onChange={(e) => { setEmptyResponsible(e.target.checked); setCurrentPage(1); }}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  Без ответственного
+                </label>
+                <label className="inline-flex items-center gap-1.5 cursor-pointer text-sm text-gray-700 dark:text-gray-300">
+                  <input
+                    type="checkbox"
+                    checked={emptySerialNumber}
+                    onChange={(e) => { setEmptySerialNumber(e.target.checked); setCurrentPage(1); }}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  Без серийного номера
+                </label>
+                <label className="inline-flex items-center gap-1.5 cursor-pointer text-sm text-gray-700 dark:text-gray-300">
+                  <input
+                    type="checkbox"
+                    checked={emptyModel}
+                    onChange={(e) => { setEmptyModel(e.target.checked); setCurrentPage(1); }}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  Без модели
+                </label>
+                <label className="inline-flex items-center gap-1.5 cursor-pointer text-sm text-gray-700 dark:text-gray-300">
+                  <input
+                    type="checkbox"
+                    checked={emptyPurchaseDate}
+                    onChange={(e) => { setEmptyPurchaseDate(e.target.checked); setCurrentPage(1); }}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  Без даты покупки
+                </label>
+                <label className="inline-flex items-center gap-1.5 cursor-pointer text-sm text-gray-700 dark:text-gray-300">
+                  <input
+                    type="checkbox"
+                    checked={emptyWarrantyExpiry}
+                    onChange={(e) => { setEmptyWarrantyExpiry(e.target.checked); setCurrentPage(1); }}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  Без гарантии
+                </label>
+              </div>
             </div>
           </div>
         )}
