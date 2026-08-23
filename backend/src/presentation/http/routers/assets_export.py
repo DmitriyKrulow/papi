@@ -36,17 +36,25 @@ def _format_money(value) -> float:
 
 @router.get("/assets")
 async def export_assets_excel(
-    status: str = None,
-    search: str = None,
-    location: str = None,
-    department: str = None,
-    responsible: str = None,
-    employee: str = None,
+    status: str | None = None,
+    search: str | None = None,
+    location: str | None = None,
+    department: str | None = None,
+    responsible: str | None = None,
+    employee: str | None = None,
+    asset_type: str | None = None,
     active_only: bool = True,
     include_hidden: bool = False,
+    empty_department: bool = False,
+    empty_location: bool = False,
+    empty_responsible: bool = False,
+    empty_serial_number: bool = False,
+    empty_model: bool = False,
+    empty_purchase_date: bool = False,
+    empty_warranty_expiry: bool = False,
     db: Session = Depends(get_db),
 ):
-    """Экспорт активов в Excel файл (.xlsx)"""
+    """Экспорт активов в Excel файл (.xlsx) с учётом фильтров"""
     try:
         query = db.query(Asset).options(joinedload(Asset.asset_type_config))
 
@@ -70,11 +78,28 @@ async def export_assets_excel(
             query = query.filter(Asset.responsible_person.ilike(f"%{responsible}%"))
         if employee:
             query = query.filter(Asset.responsible_person.ilike(f"%{employee}%"))
+        if asset_type:
+            query = query.filter(Asset.asset_type == asset_type)
+        if empty_department:
+            query = query.filter(Asset.department_code == None)
+        if empty_location:
+            query = query.filter(Asset.location_address == None)
+        if empty_responsible:
+            query = query.filter(Asset.responsible_person == None)
+        if empty_serial_number:
+            query = query.filter(Asset.serial_number == None)
+        if empty_model:
+            query = query.filter(Asset.model == None)
+        if empty_purchase_date:
+            query = query.filter(Asset.purchase_date == None)
+        if empty_warranty_expiry:
+            query = query.filter(Asset.warranty_expiry == None)
 
         assets = query.all()
 
         wb = Workbook()
         ws = wb.active
+        assert ws is not None
         ws.title = "Активы"
 
         header_font = Font(name='Calibri', bold=True, size=11, color='FFFFFF')

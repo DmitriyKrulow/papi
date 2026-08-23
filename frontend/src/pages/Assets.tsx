@@ -229,7 +229,23 @@ fetch('/api/asset-types/', { headers })
   const handleExport = async () => {
     try {
       const token = await getToken();
-      const response = await fetch('/api/export/assets', {
+      const params = new URLSearchParams();
+      if (debouncedSearchTerm) params.set('search', debouncedSearchTerm);
+      if (filterStatus) params.set('status', filterStatus);
+      if (filterAssetType) params.set('asset_type', filterAssetType);
+      if (filterDepartment) params.set('department', filterDepartment);
+      if (filterLocation) params.set('location', filterLocation);
+      if (filterEmployee) params.set('employee', filterEmployee);
+      params.set('include_hidden', showHidden ? 'true' : 'false');
+      if (emptyDepartment) params.set('empty_department', 'true');
+      if (emptyLocation) params.set('empty_location', 'true');
+      if (emptyResponsible) params.set('empty_responsible', 'true');
+      if (emptySerialNumber) params.set('empty_serial_number', 'true');
+      if (emptyModel) params.set('empty_model', 'true');
+      if (emptyPurchaseDate) params.set('empty_purchase_date', 'true');
+      if (emptyWarrantyExpiry) params.set('empty_warranty_expiry', 'true');
+
+      const response = await fetch(`/api/export/assets?${params}`, {
         headers: { 'Authorization': token ? `Bearer ${token}` : '' },
       });
       if (response.ok) {
