@@ -3,7 +3,7 @@ import hashlib
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, File, Query
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
@@ -42,11 +42,11 @@ async def upload_asset_photo(
     asset_id: int,
     file: UploadFile = File(...),
     stage: str = "other",
-    photo_category: Optional[str] = None,
-    description: Optional[str] = None,
-    is_before: bool = False,
-    is_after: bool = False,
-    sort_order: int = 0,
+    photo_category: Optional[str] = Form(None),
+    description: Optional[str] = Form(None),
+    is_before: bool = Form(False),
+    is_after: bool = Form(False),
+    sort_order: int = Form(0),
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user),
 ):

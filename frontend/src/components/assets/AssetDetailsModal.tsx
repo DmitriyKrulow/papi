@@ -28,6 +28,7 @@ const AssetDetailsModal: React.FC<AssetDetailsModalProps> = ({ asset, onClose, o
   const [loadingRepairs, setLoadingRepairs] = useState(false);
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const [printPhotos, setPrintPhotos] = useState<string[]>([]);
+  const [printPhotosMeta, setPrintPhotosMeta] = useState<any[]>([]);
   const [isPreparingPrint, setIsPreparingPrint] = useState(false);
   const { photos: assetPhotos } = useAssetPhotos(asset?.id ?? 0);
   const [newEvent, setNewEvent] = useState({
@@ -76,15 +77,15 @@ useEffect(() => {
     if (!asset) return;
     setIsPreparingPrint(true);
     try {
-      // Собираем фотографии как data URL, чтобы они попали в печать (без необходимости авторизации для <img>)
+      // Собираем фотографии как data URL с метаданными для печати
       const dataUrls: string[] = [];
+      const photosMeta: any[] = [];
       let loadErrors = 0;
       
       for (const photo of assetPhotos) {
         try {
           const res = await api.get(`/asset-photos/${photo.id}/download`, { 
             responseType: 'blob',
-            // Прямой токен, так как api.get может не добавить его для blob
             headers: localStorage.getItem('token') 
               ? { Authorization: `Bearer ${localStorage.getItem('token')}` } 
               : {}
@@ -96,6 +97,11 @@ useEffect(() => {
             reader.readAsDataURL(res.data as Blob);
           });
           dataUrls.push(dataUrl);
+          photosMeta.push({
+            category: photo.photo_category,
+            description: photo.description,
+            stage: photo.stage,
+          });
         } catch (err) {
           loadErrors++;
           console.error(`Не удалось загрузить фото ${photo.id} для печати:`, err);
@@ -109,6 +115,7 @@ useEffect(() => {
       }
       
       setPrintPhotos(dataUrls);
+      setPrintPhotosMeta(photosMeta);
       
       // Ждём рендер печатного блока и загрузку изображений
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -209,12 +216,26 @@ const getStatusColor = (status: string): string => {
     </div>
   );
 
-  const printRow = (label: string, value?: string | number | null) => (
-    <div style={{ display: 'flex', padding: '3px 0', fontSize: '13px' }}>
-      <span style={{ width: '220px', fontWeight: 'bold', color: '#000' }}>{label}</span>
-      <span>{value !== undefined && value !== null && String(value).trim() !== '' ? value : '—'}</span>
-    </div>
-  );
+  const printRow = (label: string, value?: string | number | null) => {
+    if (value === undefined || value === null || String(value).trim() === '') return null;
+    return (
+      <div style={{ display: 'flex', padding: '3px 0', fontSize: '13px' }}>
+        <span style={{ width: '220px', fontWeight: 'bold', color: '#000' }}>{label}</span>
+        <span>{value}</span>
+      </div>
+    );
+  };
+
+  const printSection = (title: string, rows: React.ReactNode[]) => {
+    const hasContent = rows.some(r => r !== null && r !== undefined);
+    if (!hasContent) return null;
+    return (
+      <div className="print-section">
+        <h2 style={{ fontSize: '14px', borderBottom: '2px solid #000', paddingBottom: '4px', margin: '0 0 8px' }}>{title}</h2>
+        {rows}
+      </div>
+    );
+  };
 
 return (
     <div className="space-y-6">
@@ -611,56 +632,51 @@ return (
               {' • '}{statusInfo?.label || asset.status}
             </div>
 
-            <div className="print-section">
-              <h2 style={{ fontSize: '14px', borderBottom: '2px solid #000', paddingBottom: '4px', margin: '0 0 8px' }}>Основная информация</h2>
-              {printRow('Инвентарный номер', asset.inventory_number)}
-              {printRow('Название', asset.name)}
-              {printRow('Описание', asset.description)}
-              {printRow('Модель', asset.model)}
-              {printRow('Тип актива', assetTypeInfo ? `${assetTypeInfo.icon} ${assetTypeInfo.label}` : asset.asset_type)}
-              {printRow('Статус', statusInfo?.label || asset.status)}
-              {printRow('Производитель', asset.manufacturer_name)}
-              {printRow('Код производителя', asset.manufacturer_code)}
-              {printRow('Серийный номер', asset.serial_number)}
-              {printRow('Количество', asset.quantity)}
-              {printRow('Срок амортизации', asset.depreciation_years != null ? `${asset.depreciation_years} лет` : undefined)}
-              {printRow('Объём', asset.capacity != null ? `${asset.capacity} л` : undefined)}
-              {printRow('Мощность', asset.power != null ? `${asset.power} Вт` : undefined)}
-              {printRow('Вес', asset.weight != null ? `${asset.weight}` : undefined)}
-              {printRow('Тип расходника', asset.consumable_type)}
-              {printRow('Имя пользователя / Логин', asset.crypto_wallet_address)}
-              {printRow('Серийный номер / Идентификатор', asset.crypto_token_symbol)}
-            </div>
+            {printSection('Основная информация', [
+              printRow('Инвентарный номер', asset.inventory_number),
+              printRow('Название', asset.name),
+              printRow('Описание', asset.description),
+              printRow('Модель', asset.model),
+              printRow('Тип актива', assetTypeInfo ? `${assetTypeInfo.icon} ${assetTypeInfo.label}` : asset.asset_type),
+              printRow('Статус', statusInfo?.label || asset.status),
+              printRow('Производитель', asset.manufacturer_name),
+              printRow('Код производителя', asset.manufacturer_code),
+              printRow('Серийный номер', asset.serial_number),
+              printRow('Количество', asset.quantity),
+              printRow('Срок амортизации', asset.depreciation_years != null ? `${asset.depreciation_years} лет` : undefined),
+              printRow('Объём', asset.capacity != null ? `${asset.capacity} л` : undefined),
+              printRow('Мощность', asset.power != null ? `${asset.power} Вт` : undefined),
+              printRow('Вес', asset.weight != null ? `${asset.weight}` : undefined),
+              printRow('Тип расходника', asset.consumable_type),
+              printRow('Имя пользователя / Логин', asset.crypto_wallet_address),
+              printRow('Серийный номер / Идентификатор', asset.crypto_token_symbol),
+            ])}
 
-            <div className="print-section">
-              <h2 style={{ fontSize: '14px', borderBottom: '2px solid #000', paddingBottom: '4px', margin: '0 0 8px' }}>Финансы</h2>
-              {printRow('Стоимость покупки', asset.purchase_price != null ? formatMoney(asset.purchase_price) : undefined)}
-              {printRow('Текущая стоимость', asset.current_value != null ? formatMoney(asset.current_value) : undefined)}
-            </div>
+            {printSection('Финансы', [
+              printRow('Стоимость покупки', asset.purchase_price != null ? formatMoney(asset.purchase_price) : undefined),
+              printRow('Текущая стоимость', asset.current_value != null ? formatMoney(asset.current_value) : undefined),
+            ])}
 
-            <div className="print-section">
-              <h2 style={{ fontSize: '14px', borderBottom: '2px solid #000', paddingBottom: '4px', margin: '0 0 8px' }}>Даты</h2>
-              {printRow('Создан', formatDate(asset.created_at))}
-              {printRow('Обновлён', formatDate(asset.updated_at))}
-              {printRow('Дата покупки', asset.purchase_date ? formatDate(asset.purchase_date) : undefined)}
-              {printRow('Дата ввода в эксплуатацию', asset.commissioning_date ? formatDate(asset.commissioning_date) : undefined)}
-              {printRow('Гарантия до', asset.warranty_expiry ? formatDate(asset.warranty_expiry) : undefined)}
-              {printRow('Следующее обслуживание', asset.next_maintenance_date ? formatDate(asset.next_maintenance_date) : undefined)}
-            </div>
+            {printSection('Даты', [
+              printRow('Создан', formatDate(asset.created_at)),
+              printRow('Обновлён', formatDate(asset.updated_at)),
+              printRow('Дата покупки', asset.purchase_date ? formatDate(asset.purchase_date) : undefined),
+              printRow('Дата ввода в эксплуатацию', asset.commissioning_date ? formatDate(asset.commissioning_date) : undefined),
+              printRow('Гарантия до', asset.warranty_expiry ? formatDate(asset.warranty_expiry) : undefined),
+              printRow('Следующее обслуживание', asset.next_maintenance_date ? formatDate(asset.next_maintenance_date) : undefined),
+            ])}
 
-            <div className="print-section">
-              <h2 style={{ fontSize: '14px', borderBottom: '2px solid #000', paddingBottom: '4px', margin: '0 0 8px' }}>Местоположение и ответственность</h2>
-              {printRow('Адрес', asset.location_address)}
-              {printRow('Подразделение', asset.department_name || asset.department_code)}
-              {printRow('Ответственное лицо', asset.responsible_person || asset.employee_name)}
-            </div>
+            {printSection('Местоположение и ответственность', [
+              printRow('Адрес', asset.location_address),
+              printRow('Подразделение', asset.department_name || asset.department_code),
+              printRow('Ответственное лицо', asset.responsible_person || asset.employee_name),
+            ])}
 
-            <div className="print-section">
-              <h2 style={{ fontSize: '14px', borderBottom: '2px solid #000', paddingBottom: '4px', margin: '0 0 8px' }}>Проверка наличия</h2>
-              {printRow('Статус', asset.last_inventory_confirmed ? 'Подтверждён' : asset.last_inventory_date ? 'Ожидает' : 'Не проверен')}
-              {printRow('Дата проверки', asset.last_inventory_date ? formatDate(asset.last_inventory_date) : undefined)}
-              {printRow('Проверял (ID)', asset.last_inventory_by_id != null ? String(asset.last_inventory_by_id) : undefined)}
-            </div>
+            {printSection('Проверка наличия', [
+              printRow('Статус', asset.last_inventory_confirmed ? 'Подтверждён' : asset.last_inventory_date ? 'Ожидает' : 'Не проверен'),
+              printRow('Дата проверки', asset.last_inventory_date ? formatDate(asset.last_inventory_date) : undefined),
+              printRow('Проверял (ID)', asset.last_inventory_by_id != null ? String(asset.last_inventory_by_id) : undefined),
+            ])}
 
             {printPhotos.length > 0 && (
               <div className="print-section">
@@ -671,6 +687,23 @@ return (
                   {printPhotos.map((src, i) => (
                     <div key={i} className="print-photo">
                       <img src={src} alt={`Фото ${i + 1}`} />
+                      <div style={{ fontSize: '10px', marginTop: '4px', color: '#333' }}>
+                        {printPhotosMeta[i]?.category && (
+                          <span style={{ fontWeight: 'bold', marginRight: '6px' }}>
+                            {printPhotosMeta[i].category === 'general_view' && '📷 Общий вид'}
+                            {printPhotosMeta[i].category === 'placement' && '📍 Место размещения'}
+                            {printPhotosMeta[i].category === 'inventory_number' && '🔢 Инвентарный номер'}
+                            {printPhotosMeta[i].category === 'current_location' && '🗺️ Текущее местоположение'}
+                            {printPhotosMeta[i].category === 'condition' && '🔍 Состояние'}
+                            {printPhotosMeta[i].category === 'malfunction' && '⚠️ Неисправность'}
+                            {printPhotosMeta[i].category === 'general_condition' && '📋 Общее состояние'}
+                            {!['general_view', 'placement', 'inventory_number', 'current_location', 'condition', 'malfunction', 'general_condition'].includes(printPhotosMeta[i].category) && printPhotosMeta[i].category}
+                          </span>
+                        )}
+                        {printPhotosMeta[i]?.description && (
+                          <span style={{ color: '#555' }}>{printPhotosMeta[i].description}</span>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>

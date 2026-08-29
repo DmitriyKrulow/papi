@@ -281,10 +281,6 @@
     page-break-inside: avoid;
     margin-bottom: 16px;
   }
-  /* Скрываем пустые секции — только заголовок без контента */
-  .print-area .print-section:has(> h2:not(:empty)) {
-    margin-bottom: 12px;
-  }
   .print-area .print-photos {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -302,9 +298,11 @@
     border: 1px solid #ccc;
     display: block;
   }
-  /* Скрываем строки с пустыми значениями (только "—") */
-  .print-area .print-section > div:has(> span:nth-child(2):empty) {
-    display: none !important;
+  .print-area .print-photo > div {
+    font-size: 9px;
+    line-height: 1.2;
+    color: #333;
+    margin-top: 4px;
   }
   @page {
     margin: 1.5cm;
