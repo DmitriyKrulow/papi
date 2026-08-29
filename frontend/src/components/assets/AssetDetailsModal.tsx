@@ -78,9 +78,17 @@ useEffect(() => {
     try {
       // Собираем фотографии как data URL, чтобы они попали в печать (без необходимости авторизации для <img>)
       const dataUrls: string[] = [];
+      let loadErrors = 0;
+      
       for (const photo of assetPhotos) {
         try {
-          const res = await api.get(`/asset-photos/${photo.id}/download`, { responseType: 'blob' });
+          const res = await api.get(`/asset-photos/${photo.id}/download`, { 
+            responseType: 'blob',
+            // Прямой токен, так как api.get может не добавить его для blob
+            headers: localStorage.getItem('token') 
+              ? { Authorization: `Bearer ${localStorage.getItem('token')}` } 
+              : {}
+          });
           const dataUrl: string = await new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = () => resolve(reader.result as string);
@@ -89,14 +97,39 @@ useEffect(() => {
           });
           dataUrls.push(dataUrl);
         } catch (err) {
-          console.error('Не удалось загрузить фото для печати:', err);
+          loadErrors++;
+          console.error(`Не удалось загрузить фото ${photo.id} для печати:`, err);
         }
       }
+      
+      if (loadErrors > 0 && dataUrls.length === 0) {
+        toast.error(`Не удалось загрузить фотографии для печати (${loadErrors} ошибок)`);
+      } else if (loadErrors > 0) {
+        toast.success(`Фотографии подготовлены (${loadErrors} фото не удалось загрузить)`);
+      }
+      
       setPrintPhotos(dataUrls);
-      // Ждём рендера печатного блока
-      setTimeout(() => {
-        window.print();
-      }, 100);
+      
+      // Ждём рендер печатного блока и загрузку изображений
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Дополнительная защита: ждём пока все img элементы загрузятся
+      const printSection = document.querySelector('.print-area');
+      if (printSection) {
+        const images = printSection.querySelectorAll('img');
+        let allLoaded = true;
+        images.forEach((img) => {
+          if (!(img as HTMLImageElement).complete || (img as HTMLImageElement).naturalHeight === 0) {
+            allLoaded = false;
+          }
+        });
+        
+        if (!allLoaded) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+      
+      window.print();
     } finally {
       setIsPreparingPrint(false);
     }

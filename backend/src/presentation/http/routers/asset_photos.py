@@ -48,10 +48,11 @@ async def upload_asset_photo(
     is_after: bool = False,
     sort_order: int = 0,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """
     Загружает фотографию для актива.
+    Авторизация опциональна — позволяет загружать миниатюры через <img>.
     """
     # Проверяем существование актива
     asset = db.query(Asset).filter(Asset.id == asset_id).first()
@@ -78,6 +79,11 @@ async def upload_asset_photo(
 
     mime_type = file.content_type or _guess_mime_type(extension)
 
+    # Логирование для диагностики
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"[Upload] asset_id={asset_id}, stage={stage}, photo_category={photo_category}, description={description}")
+
     # Генерируем уникальное имя файла
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     safe_filename = f"{timestamp}_{filename}"
@@ -102,7 +108,7 @@ async def upload_asset_photo(
         entity_type="asset",
         title=description or filename,
         description=description,
-        uploaded_by=current_user.id,
+        uploaded_by=current_user.id if current_user else 0,
         uploaded_at=datetime.now(),
         is_primary=False,
         sort_order=sort_order,
@@ -115,7 +121,7 @@ async def upload_asset_photo(
     photo = AssetPhotoModel(
         asset_id=asset_id,
         document_id=document.id,
-        uploaded_by=current_user.id,
+        uploaded_by=current_user.id if current_user else 0,
         stage=stage,
         photo_category=photo_category,
         description=description,
@@ -187,7 +193,7 @@ def list_asset_photos(
             "is_before": photo.is_before,
             "is_after": photo.is_after,
             "sort_order": photo.sort_order,
-            "uploaded_at": photo.uploaded_at.isoformat() if photo.uploaded_at else None,
+            "uploaded_at": photo.uploaded_at.isoformat() if photo.uploaded_at else None,  # type: ignore[operator]
             "filename": doc.filename if doc else None,
             "file_size": doc.file_size if doc else None,
             "mime_type": doc.mime_type if doc else None,
@@ -222,7 +228,7 @@ def get_asset_photo(
         "is_before": photo.is_before,
         "is_after": photo.is_after,
         "sort_order": photo.sort_order,
-        "uploaded_at": photo.uploaded_at.isoformat() if photo.uploaded_at else None,
+        "uploaded_at": photo.uploaded_at.isoformat() if photo.uploaded_at else None,  # type: ignore[operator]
         "filename": doc.filename if doc else None,
         "file_size": doc.file_size if doc else None,
         "mime_type": doc.mime_type if doc else None,
@@ -233,10 +239,11 @@ def get_asset_photo(
 async def download_asset_photo(
     photo_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """
     Скачивает/просматривает файл фотографии.
+    Авторизация опциональна — позволяет загружать миниатюры через <img>.
     """
     photo = db.query(AssetPhotoModel).filter(AssetPhotoModel.id == photo_id).first()
     if not photo:
@@ -246,13 +253,14 @@ async def download_asset_photo(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    if not os.path.exists(doc.file_path):
+    file_path = str(doc.file_path)
+    if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found on server")
 
     return FileResponse(
-        path=doc.file_path,
-        filename=doc.filename,
-        media_type=doc.mime_type,
+        path=file_path,
+        filename=str(doc.filename),
+        media_type=str(doc.mime_type),
     )
 
 
@@ -272,8 +280,10 @@ def delete_asset_photo(
     doc = db.query(Document).filter(Document.id == photo.document_id).first()
 
     # Удаляем файл с диска
-    if doc and os.path.exists(doc.file_path):
-        os.remove(doc.file_path)
+    if doc:
+        file_path = str(doc.file_path)
+        if os.path.exists(file_path):
+            os.remove(file_path)
 
     # Удаляем записи из БД
     if doc:
