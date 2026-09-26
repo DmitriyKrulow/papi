@@ -14,16 +14,53 @@ logger = logging.getLogger(__name__)
 class NotificationService:
     """Сервис отправки уведомлений через email и MAX chat"""
     
-    def __init__(self):
-        self.smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
-        self.smtp_port = int(os.getenv("SMTP_PORT", "587"))
-        self.smtp_user = os.getenv("SMTP_USER", "")
-        self.smtp_password = os.getenv("SMTP_PASSWORD", "")
-        self.sender_email = os.getenv("SENDER_EMAIL", self.smtp_user)
+    def __init__(
+        self,
+        smtp_host: Optional[str] = None,
+        smtp_port: Optional[int] = None,
+        smtp_user: Optional[str] = None,
+        smtp_password: Optional[str] = None,
+        sender_email: Optional[str] = None,
+        use_tls: Optional[bool] = None,
+        use_ssl: Optional[bool] = None,
+    ):
+        # Приоритет: переданные параметры > env vars > дефолты
+        # Поддерживаем два варианта имён: SMTP_* и MAIL_*
+        self.smtp_host = smtp_host or os.getenv("SMTP_HOST") or os.getenv("MAIL_SERVER", "smtp.gmail.com")
+        self.smtp_port = smtp_port or int(os.getenv("SMTP_PORT") or os.getenv("MAIL_PORT", "587"))
+        self.smtp_user = smtp_user or os.getenv("SMTP_USER") or os.getenv("MAIL_USERNAME", "")
+        self.smtp_password = smtp_password or os.getenv("SMTP_PASSWORD") or os.getenv("MAIL_PASSWORD", "")
+        self.sender_email = sender_email or os.getenv("SENDER_EMAIL") or os.getenv("MAIL_DEFAULT_SENDER", self.smtp_user)
+        
+        # TLS/SSL настройки (по умолчанию TLS для порта 587, SSL для порта 465)
+        env_use_tls = os.getenv("MAIL_USE_TLS", "true")
+        env_use_ssl = os.getenv("MAIL_USE_SSL", "false")
+        
+        if use_tls is not None:
+            self.use_tls = use_tls
+        elif "MAIL_USE_TLS" in os.environ:
+            self.use_tls = env_use_tls.lower() in ("true", "1", "yes")
+        else:
+            self.use_tls = self.smtp_port == 587
+        
+        if use_ssl is not None:
+            self.use_ssl = use_ssl
+        elif "MAIL_USE_SSL" in os.environ:
+            self.use_ssl = env_use_ssl.lower() in ("true", "1", "yes")
+        else:
+            self.use_ssl = self.smtp_port == 465
+        
         self.max_api_url = os.getenv("MAX_API_URL", "http://localhost:8080/api/notify")
         self.max_api_token = os.getenv("MAX_API_TOKEN", "")
     
-    def send_email(self, to_email: str, subject: str, body: str) -> bool:
+    def send_email(
+        self,
+        to_email: str,
+        subject: str,
+        body: str,
+        use_tls: Optional[bool] = None,
+        use_ssl: Optional[bool] = None,
+    ) -> bool:
         """Отправка email уведомления"""
         try:
             msg = MIMEMultipart()
@@ -32,8 +69,19 @@ class NotificationService:
             msg['Subject'] = subject
             msg.attach(MIMEText(body, 'plain', 'utf-8'))
             
-            server = smtplib.SMTP(self.smtp_host, self.smtp_port)
-            server.starttls()
+            # Определяем TLS/SSL для этого конкретного вызова
+            local_use_tls = use_tls if use_tls is not None else self.use_tls
+            local_use_ssl = use_ssl if use_ssl is not None else self.use_ssl
+            
+            if local_use_ssl:
+                # Используем SSL
+                server = smtplib.SMTP_SSL(self.smtp_host, self.smtp_port)
+            else:
+                # Используем STARTTLS
+                server = smtplib.SMTP(self.smtp_host, self.smtp_port)
+                if local_use_tls:
+                    server.starttls()
+            
             server.login(self.smtp_user, self.smtp_password)
             server.send_message(msg)
             server.quit()

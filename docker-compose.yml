@@ -1,0 +1,79 @@
+# PAPI — Docker Compose
+#
+# Все пароли и секретные значения берутся из файла .env (лежит в корне проекта).
+# Шаблон: .env.example  ->  скопируйте в .env и заполните своими значениями.
+#
+# Запуск:                       docker compose up -d --build
+# Логи:                         docker compose logs -f backend
+# Остановка:                    docker compose down
+# Остановка + удаление данных:  docker compose down -v
+
+name: papi
+
+services:
+  # ---------------------------------------------------------------- database
+  db:
+    image: postgres:16-alpine
+    container_name: papi-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env}
+    ports:
+      # Доступ к БД с хоста (только с localhost). Уберите, если не нужен.
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # ---------------------------------------------------------------- backend
+  backend:
+    build:
+      context: ./backend
+    container_name: papi-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # URL внутри docker-сети: хост БД — это сервис "db" (пароль из .env).
+      # Переопределяет DATABASE_URL из .env, который используется для локальной разработки.
+      # Драйвер +psycopg2 указан явно: SQLAlchemy 2 без него берёт psycopg v3, которого нет в requirements.
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    volumes:
+      # Загружаемые файлы (документы, фото, отчёты, Excel) сохраняются в named volume
+      - uploads_data:/app/uploads
+    ports:
+      # Прямой доступ к API с хоста для отладки (только с localhost). Уберите, если не нужен.
+      - "127.0.0.1:${BACKEND_PORT:-8888}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/docs')"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # --------------------------------------------------------------- frontend
+  frontend:
+    build:
+      context: ./frontend
+    container_name: papi-frontend
+    restart: unless-stopped
+    ports:
+      # Публичный адрес приложения (SPA + прокси /api на backend)
+      - "${APP_PORT:-80}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  uploads_data:

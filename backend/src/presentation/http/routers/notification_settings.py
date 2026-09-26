@@ -35,13 +35,15 @@ async def get_notification_config(
         db.refresh(settings)
     
     return {
-        "smtp_host": settings.smtp_host or os.getenv("SMTP_HOST", ""),
-        "smtp_port": settings.smtp_port or int(os.getenv("SMTP_PORT", "587")),
-        "smtp_user": settings.smtp_user or os.getenv("SMTP_USER", ""),
-        "sender_email": settings.sender_email or os.getenv("SENDER_EMAIL", ""),
+        "smtp_host": settings.smtp_host or os.getenv("SMTP_HOST") or os.getenv("MAIL_SERVER", ""),
+        "smtp_port": settings.smtp_port or int(os.getenv("SMTP_PORT") or os.getenv("MAIL_PORT", "587")),
+        "smtp_user": settings.smtp_user or os.getenv("SMTP_USER") or os.getenv("MAIL_USERNAME", ""),
+        "sender_email": settings.sender_email or os.getenv("SENDER_EMAIL") or os.getenv("MAIL_DEFAULT_SENDER", ""),
         "max_api_url": settings.max_api_url or os.getenv("MAX_API_URL", ""),
         "enable_email": bool(settings.enable_email),
         "enable_max": bool(settings.enable_max),
+        "mail_use_tls": bool(settings.mail_use_tls) if settings.mail_use_tls is not None else True,
+        "mail_use_ssl": bool(settings.mail_use_ssl) if settings.mail_use_ssl is not None else False,
     }
 
 
@@ -67,6 +69,10 @@ async def save_notification_config(
     settings.max_api_token = config.get("max_api_token")  # Сохраняем токен
     settings.enable_email = 1 if config.get("enable_email") else 0
     settings.enable_max = 1 if config.get("enable_max") else 0
+    
+    # TLS/SSL настройки
+    settings.mail_use_tls = 1 if config.get("mail_use_tls", True) else 0
+    settings.mail_use_ssl = 1 if config.get("mail_use_ssl", False) else 0
     
     db.commit()
     db.refresh(settings)
@@ -221,3 +227,84 @@ async def get_active_users(
         }
         for u in users
     ]
+
+
+@router.post("/test-email")
+async def send_test_email(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin),
+):
+    """
+    Отправить тестовое email-сообщение на указанную почту.
+    
+    Payload:
+    {
+        "to_email": "admin@example.com",  # Email получателя (обязательно)
+        "subject": "Тестовое сообщение",   # Тема (опционально)
+        "message": "Это тестовое сообщение" # Текст (опционально)
+    }
+    """
+    from src.core.services.notification_service import NotificationService
+    
+    to_email = payload.get("to_email", "").strip()
+    subject = payload.get("subject", "Тестовое сообщение от сервиса сверок").strip()
+    message = payload.get("message", "Это тестовое сообщение, подтверждающее корректную настройку SMTP-сервера.\n\nЕсли вы получили это письмо — email-рассылка работает исправно.").strip()
+    
+    if not to_email:
+        raise HTTPException(status_code=400, detail="Email получателя обязателен")
+    
+    # Получаем SMTP настройки из БД
+    settings = db.query(NotificationSettings).first()
+    
+    smtp_host = None
+    smtp_port = None
+    smtp_user = None
+    smtp_password = None
+    sender_email = None
+    use_tls = None
+    use_ssl = None
+    
+    if settings:
+        smtp_host = settings.smtp_host
+        smtp_port = settings.smtp_port
+        smtp_user = settings.smtp_user
+        smtp_password = settings.smtp_password
+        sender_email = settings.sender_email
+        
+        # Если в БД есть флаги TLS/SSL — используем их
+        if hasattr(settings, 'mail_use_tls'):
+            use_tls = bool(settings.mail_use_tls)
+        if hasattr(settings, 'mail_use_ssl'):
+            use_ssl = bool(settings.mail_use_ssl)
+    
+    # Отправляем тестовое письмо
+    service = NotificationService(
+        smtp_host=smtp_host,
+        smtp_port=smtp_port,
+        smtp_user=smtp_user,
+        smtp_password=smtp_password,
+        sender_email=sender_email,
+        use_tls=use_tls,
+        use_ssl=use_ssl,
+    )
+    
+    success = service.send_email(
+        to_email=to_email,
+        subject=subject,
+        body=message,
+        use_tls=use_tls,
+        use_ssl=use_ssl,
+    )
+    
+    if success:
+        logger.info(f"Test email sent to {to_email} by admin {current_user.username}")
+        return {
+            "message": f"Тестовое сообщение успешно отправлено на {to_email}",
+            "sent": True,
+        }
+    else:
+        raise HTTPException(
+            status_code=500,
+            detail="Не удалось отправить тестовое сообщение. Проверьте SMTP-настройки и логи.",
+        )

@@ -50,7 +50,50 @@ my_project/
 └── .env                           # Переменные окружения
 
 
-## Запуск проекта
+## Запуск проекта через Docker Compose (рекомендуется)
+
+Все пароли и секретные настройки хранятся в файле `.env` в корне проекта
+(он игнорируется git). Шаблон со всеми переменными и пояснениями — `.env.example`.
+
+1. Скопируйте шаблон и заполните своими значениями (как минимум
+   `POSTGRES_PASSWORD` и `SECRET_KEY`):
+   ```bash
+   copy .env.example .env        # Windows
+   cp .env.example .env          # Linux/macOS
+   ```
+
+   Сгенерируйте надёжный JWT-ключ:
+   ```bash
+   python -c "import secrets; print(secrets.token_urlsafe(64))"
+   ```
+
+2. Соберите и запустите стек (PostgreSQL + FastAPI + nginx с фронтендом):
+   ```bash
+   docker compose up -d --build
+   ```
+
+3. Откройте `http://localhost` (порт настраивается переменной `APP_PORT` в `.env`).
+   Первый запуск создаёт администратора: `admin` / `admin123` (смените пароль!).
+
+Полезные команды:
+
+| Команда | Действие |
+|---|---|
+| `docker compose logs -f backend` | логи бэкенда |
+| `docker compose ps` | статус сервисов |
+| `docker compose restart backend` | перезапуск бэкенда |
+| `docker compose down` | остановка (данные сохраняются) |
+| `docker compose down -v` | остановка + удаление томов с данными |
+
+Архитектура стека:
+
+- **db** — PostgreSQL 16, данные в named-томе `pgdata`, порт доступен только с localhost;
+- **backend** — FastAPI (uvicorn, порт 8000 внутри сети), загружаемые файлы в томе `uploads_data`;
+- **frontend** — собранная Vite-сборка за nginx; `/api/` проксируется на backend.
+
+---
+
+## Запуск проекта локально (без Docker)
 
 ### Требования
 

@@ -41,3 +41,8 @@ create_test_data.py
 # OS files
 .DS_Store
 Thumbs.db
+
+# Backups
+backups/
+*.dump
+*.sql.gz

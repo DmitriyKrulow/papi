@@ -46,6 +46,7 @@ def init_db():
     _ensure_notification_table()
     _ensure_notification_reference_key_column()
     _ensure_room_id_column()
+    _ensure_notification_settings_tls_columns()
 
 
 def _ensure_photo_category_column():
@@ -319,3 +320,22 @@ def _ensure_room_id_column():
                 db.close()
     except Exception as e:
         print(f"Could not check/add room_id column: {e}")
+
+
+def _ensure_notification_settings_tls_columns():
+    """Добавляет колонки mail_use_tls и mail_use_ssl в notification_settings, если их нет"""
+    from sqlalchemy import text, inspect
+    try:
+        inspector = inspect(engine)
+        columns = [c["name"] for c in inspector.get_columns("notification_settings")]
+        
+        if "mail_use_tls" not in columns or "mail_use_ssl" not in columns:
+            with engine.connect() as conn:
+                if "mail_use_tls" not in columns:
+                    conn.execute(text("ALTER TABLE notification_settings ADD COLUMN mail_use_tls INTEGER DEFAULT 1"))
+                if "mail_use_ssl" not in columns:
+                    conn.execute(text("ALTER TABLE notification_settings ADD COLUMN mail_use_ssl INTEGER DEFAULT 0"))
+                conn.commit()
+            print("Added mail_use_tls and mail_use_ssl columns to notification_settings table")
+    except Exception as e:
+        print(f"Could not check/add mail_use_tls/mail_use_ssl columns: {e}")

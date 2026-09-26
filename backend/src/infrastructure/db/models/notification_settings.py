@@ -33,6 +33,10 @@ class NotificationSettings(Base):
     enable_email = Column(Integer, nullable=False, default=1)
     enable_max = Column(Integer, nullable=False, default=0)
     
+    # TLS/SSL настройки для SMTP
+    mail_use_tls = Column(Integer, nullable=True, default=1)
+    mail_use_ssl = Column(Integer, nullable=True, default=0)
+    
     created_at = Column(DateTime, nullable=False, default=datetime.now)
     updated_at = Column(DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
 
