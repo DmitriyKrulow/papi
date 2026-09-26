@@ -20,9 +20,13 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env}
-    ports:
-      # Доступ к БД с хоста (только с localhost). Уберите, если не нужен.
-      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    # Доступ к БД нужен только из docker-сети: backend подключается на db:5432
+    # (см. DATABASE_URL ниже), публикация порта на хост не требуется.
+    # Порт 5432 на хосте занят локальным PostgreSQL — он нужен до переноса данных.
+    # Как вернуть доступ к контейнерной БД с хоста: раскомментировать блок ports
+    # и поставить в .env POSTGRES_PORT=5433 (чтобы не спорить с локальным postgres).
+    # ports:
+    #   - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
