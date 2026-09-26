@@ -25,7 +25,7 @@
 # ---------------------------------------------------------------------------
 # Автоматическое обновление из Git в 3:00 ночи (ежедневно)
 # ---------------------------------------------------------------------------
-0 3 * * * /path/to/papi/scripts/update_docker.sh >> /var/log/papi-docker-update.log 2>&1
+0 3 * * * /path/to/papi/update.sh >> /var/log/papi-update.log 2>&1
 
 # ---------------------------------------------------------------------------
 # Еженедельный полный бэкап в воскресенье в 1:00 ночи
@@ -35,8 +35,12 @@
 
 # ---------------------------------------------------------------------------
 # Мониторинг здоровья сервиса (каждые 5 минут)
+# Порт 80 отдаёт nginx из контейнера frontend, /api он проксирует на backend
 # ---------------------------------------------------------------------------
-*/5 * * * * curl -f http://localhost:8888/docs > /dev/null 2>&1 || echo "$(date) - Backend down" >> /var/log/papi-health.log
+*/5 * * * * curl -f http://localhost/ > /dev/null 2>&1 || echo "$(date) - Frontend (nginx) down" >> /var/log/papi-health.log
+
+# Состояние backend по docker healthcheck (unhealthy = приложение не поднялось)
+*/5 * * * * [ "$(docker inspect -f '{{.State.Health.Status}}' papi-backend 2>/dev/null)" = "unhealthy" ] && echo "$(date) - Backend unhealthy: $(docker logs --tail 5 papi-backend 2>&1)" >> /var/log/papi-health.log
 
 # ---------------------------------------------------------------------------
 # Очистка старых логов (ежемесячно в 4:00 утра 1-го числа)

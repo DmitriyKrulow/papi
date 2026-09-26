@@ -171,8 +171,12 @@ docker compose logs -f backend
 ### Вариант 1: Ручной запуск
 
 ```bash
-bash scripts/update_docker.sh
+bash update.sh
 ```
+
+Скрипт сам сделает бэкап БД, подтянет код из git, досоздаёт недостающие ключи
+в `.env`, пересоберёт образы, поднимет контейнеры (`db`, `backend`, `frontend`
+с nginx), отключит старые systemd-сервисы и проверит здоровье всех сервисов.
 
 ### Вариант 2: Автоматический запуск через cron
 
@@ -184,16 +188,20 @@ crontab -e
 Добавьте строку (ежедневное обновление в 3:00 ночи):
 
 ```cron
-0 3 * * * /opt/papi/scripts/update_docker.sh >> /var/log/papi-docker-update.log 2>&1
+0 3 * * * /opt/papi/update.sh >> /var/log/papi-update.log 2>&1
 ```
 
 ### Настройка переменных (опционально)
 
 ```bash
-# В начале скрипта update_docker.sh можно изменить:
+```bash
+# В начале скрипта update.sh можно изменить:
 GIT_REPO="origin"      # Имя remote репозитория
 GIT_BRANCH="main"      # Ветка для обновления
-LOG_FILE="/var/log/papi-docker-update.log"  # Файл логов
+```
+
+Лог пишется в `/var/log/papi-update.log`, если запись в `/var/log` доступна
+(иначе — в `logs/update.log` внутри проекта).
 ```
 
 ---
@@ -334,8 +342,11 @@ docker compose down -v
 # Восстановите БД из бэкапа
 PGPASSWORD=your-password psql -h localhost -U papi -d papiDB < backups/papi_backup_*.sql.gz
 
-# Запустите старый update.sh
-bash update.sh
+# Верните bare-metal: update.sh при переходе на Docker отключил systemd-сервисы
+sudo systemctl enable --now postgresql nginx papi-backend
+
+# Убедитесь, что контейнеры больше не держат порт 80 и БД
+docker compose down
 ```
 
 ---

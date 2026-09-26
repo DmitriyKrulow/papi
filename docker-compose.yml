@@ -3,6 +3,16 @@
 # Все пароли и секретные значения берутся из файла .env (лежит в корне проекта).
 # Шаблон: .env.example  ->  скопируйте в .env и заполните своими значениями.
 #
+# Сетевая схема: наружу открыто РОВНО ДВА порта - веб-интерфейс SPA (APP_PORT,
+# по умолчанию 80) и веб-интерфейс API (API_PORT, по умолчанию 8080).
+# PostgreSQL доступен только из внутренней docker-сети (backend -> db:5432).
+#
+# Автостарт после перезагрузки сервера обеспечивают:
+#   - restart: unless-stopped у каждого сервиса (контейнер поднимается вместе
+#     с docker-демоном, если не был остановлен вручную через `docker compose down`);
+#   - включённый автозапуск самого docker (см. deploy/ubuntu/install.sh или
+#     deploy/windows/install.ps1).
+#
 # Запуск:                       docker compose up -d --build
 # Логи:                         docker compose logs -f backend
 # Остановка:                    docker compose down
@@ -53,8 +63,9 @@ services:
       # Загружаемые файлы (документы, фото, отчёты, Excel) сохраняются в named volume
       - uploads_data:/app/uploads
     ports:
-      # Прямой доступ к API с хоста для отладки (только с localhost). Уберите, если не нужен.
-      - "127.0.0.1:${BACKEND_PORT:-8888}:8000"
+      # Веб-интерфейс API (Swagger /docs) наружу: только 8080.
+      # Наружу публикуются ровно два порта - APP_PORT (SPA) и API_PORT (API).
+      - "${API_PORT:-8080}:8000"
     depends_on:
       db:
         condition: service_healthy
@@ -66,17 +77,30 @@ services:
       start_period: 30s
 
   # --------------------------------------------------------------- frontend
+  # nginx: раздаёт собранный SPA и проксирует /api на backend. Единственный
+  # сервис с публичным портом, то есть «фасад» всей системы.
   frontend:
     build:
       context: ./frontend
     container_name: papi-frontend
     restart: unless-stopped
     ports:
-      # Публичный адрес приложения (SPA + прокси /api на backend)
+      # Веб-интерфейс приложения: SPA + прокси /api на backend внутри сети.
       - "${APP_PORT:-80}:80"
+    volumes:
+      # Конфиг nginx из репозитория вместо копии внутри образа: правка
+      # frontend/nginx.conf применяется перезапуском, без пересборки образа
+      - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       backend:
         condition: service_healthy
+    healthcheck:
+      # 200 от SPA означает, что nginx живой
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
 volumes:
   pgdata:

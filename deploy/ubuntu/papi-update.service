@@ -1,0 +1,27 @@
+[Unit]
+# Разовая задача: подтянуть код из git и пересобрать контейнеры.
+# Запускается таймером papi-update.timer, вручную - systemctl start papi-update.
+Description=PAPI: обновление из git и перезапуск контейнеров
+Documentation=https://github.com/ditri466/TEST
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/papi
+# Скрипт сам делает бэкап БД, git reset --hard, сборку образов,
+# docker compose up -d и проверку доступности сервисов.
+ExecStart=/usr/bin/bash /opt/papi/update.sh
+# git fetch + сборка образов при изменении зависимостей длятся дольше
+# стандартных 90 секунд.
+TimeoutStartSec=1800
+# Сеть на момент старта таймера может быть ещё не готова - ждём, а не падаем.
+Restart=no
+
+# Не пустить два обновления одновременно: если предыдущее ещё собирается,
+# systemd не станет запускать следующее.
+JobTimeoutSec=1800
+
+[Install]
+WantedBy=multi-user.target

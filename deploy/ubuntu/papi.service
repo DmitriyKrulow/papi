@@ -1,0 +1,31 @@
+[Unit]
+# Поднимает приложение PAPI при старте системы.
+#
+# Зачем этот юнит, если у контейнеров уже стоит restart: unless-stopped:
+# политика перезапуска срабатывает только для контейнеров, которые были
+# запущены в момент остановки докера. После `docker compose down` контейнеров
+# нет, и после перезагрузки сервера нечему стартовать. Этот юнит гарантирует,
+# что стек будет поднят в любом случае, и делает старт предсказуемым
+# (один лог в journalctl, порядок относительно docker.service).
+Description=PAPI (docker compose)
+Documentation=https://github.com/ditri466/TEST
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/papi
+# docker compose сам разберётся, что пересоздавать, а что оставить:
+# up -d идемпотентен и не трогает контейнеры с актуальной конфигурацией.
+ExecStart=/usr/bin/docker compose -f /opt/papi/docker-compose.yml up -d
+# Остановка сервиса (systemctl stop papi) штатно гасит контейнеры.
+# Данные при этом остаются в именованных томах.
+ExecStop=/usr/bin/docker compose -f /opt/papi/docker-compose.yml down
+# Первая сборка образов скачивает базовые образы и ставит зависимости:
+# стандартных 90 секунд на это не хватает.
+TimeoutStartSec=1800
+
+[Install]
+WantedBy=multi-user.target

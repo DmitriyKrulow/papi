@@ -87,9 +87,38 @@ my_project/
 
 Архитектура стека:
 
-- **db** — PostgreSQL 16, данные в named-томе `pgdata`, порт доступен только с localhost;
+- **db** — PostgreSQL 16, данные в named-томе `pgdata`; порт БД на хост не публикуется,
+  backend подключается по внутреннему имени сервиса `db:5432`;
 - **backend** — FastAPI (uvicorn, порт 8000 внутри сети), загружаемые файлы в томе `uploads_data`;
-- **frontend** — собранная Vite-сборка за nginx; `/api/` проксируется на backend.
+  сам backend наружу не публикуется — доступ к нему только через nginx;
+- **frontend** — собранная Vite-сборка за nginx; `/api/`, `/ws/`, `/docs`, `/openapi.json`
+  проксируются на backend. Наружу публикуются два порта: `APP_PORT` (интерфейс)
+  и `API_PORT` (то же приложение, но для обращений к API).
+
+
+---
+
+## Обновление проекта
+
+```bash
+sudo bash update.sh
+```
+
+Скрипт (запускать от root — нужны docker, systemctl и запись в `/var/log`):
+
+1. создаёт `.env` из `.env.example`, если файла нет, и дописывает недостающие
+   ключи (существующие значения не трогаются);
+2. отключает хостовые сервисы, которые держат наши порты: systemd-юнит
+   `papi-backend` и хостовой nginx с его сайтом;
+3. проверяет, что порты `APP_PORT` и `API_PORT` свободны;
+
+4. снимает дамп БД в `backups/pre_update_<дата>.sql.gz` (хранится 10 последних);
+5. обновляет код `git fetch` + `git reset --hard origin/main`;
+6. пересобирает образы и поднимает контейнеры;
+7. проверяет доступность бэкенда (`/docs`) и фронтенда, печатает `docker compose ps`.
+
+Лог — `/var/log/papi-update.log` (если прав не хватает — `logs/update.log` в проекте).
+Запуск по cron: `0 3 * * * /opt/papi/update.sh >> /var/log/papi-update.log 2>&1`.
 
 ---
 

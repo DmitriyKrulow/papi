@@ -83,20 +83,21 @@ backups/papi_full_backup_YYYYMMDD_HHMMSS/
 
 ---
 
-### 4. update_docker.sh — Обновление из Git
+### 4. update.sh — Обновление из Git (Docker-контур)
 
-Аналог `update.sh` для Docker-развёртывания.
+`update.sh` в корне проекта: бэкап БД, `git pull`, синхронизация `.env` с
+`.env.example`, пересборка образов, `docker compose up -d`, отключение старых
+systemd-сервисов (`papi-backend`, `nginx`) и проверка здоровья `db`,
+`backend`, `frontend` (nginx).
 
-**Автоматически:**
-1. Создаёт бэкап БД
-2. Обновляет код из Git
-3. Пересобирает контейнеры
-4. Проверяет здоровье сервисов
+`scripts/update.sh` — такая же обёртка для запуска из каталога `scripts/`
+(поднимается к корню проекта), а `scripts/update_docker.sh` — совместимость со
+старыми ссылками и cron-задачами. Все три варианта вызывают один и тот же код.
 
 **Использование:**
 
 ```bash
-bash scripts/update_docker.sh
+bash update.sh
 ```
 
 ---
@@ -118,7 +119,7 @@ crontab -e
 ### Ежедневное обновление в 3:00 ночи
 
 ```cron
-0 3 * * * cd /opt/papi && bash scripts/update_docker.sh >> /var/log/papi-docker-update.log 2>&1
+0 3 * * * cd /opt/papi && bash update.sh >> /var/log/papi-update.log 2>&1
 ```
 
 ### Полный пример (файл scripts/papi.cron.example)
