@@ -39,6 +39,7 @@ async def get_notification_config(
         "smtp_port": settings.smtp_port or int(os.getenv("SMTP_PORT") or os.getenv("MAIL_PORT", "587")),
         "smtp_user": settings.smtp_user or os.getenv("SMTP_USER") or os.getenv("MAIL_USERNAME", ""),
         "sender_email": settings.sender_email or os.getenv("SENDER_EMAIL") or os.getenv("MAIL_DEFAULT_SENDER", ""),
+        "system_name": settings.system_name or os.getenv("SYSTEM_NAME") or "PAPI Система",
         "max_api_url": settings.max_api_url or os.getenv("MAX_API_URL", ""),
         "enable_email": bool(settings.enable_email),
         "enable_max": bool(settings.enable_max),
@@ -65,6 +66,7 @@ async def save_notification_config(
     settings.smtp_user = config.get("smtp_user")
     settings.smtp_password = config.get("smtp_password")  # Сохраняем пароль
     settings.sender_email = config.get("sender_email")
+    settings.system_name = config.get("system_name")
     settings.max_api_url = config.get("max_api_url")
     settings.max_api_token = config.get("max_api_token")  # Сохраняем токен
     settings.enable_email = 1 if config.get("enable_email") else 0
@@ -254,7 +256,7 @@ async def send_test_email(
     if not to_email:
         raise HTTPException(status_code=400, detail="Email получателя обязателен")
     
-    # Получаем SMTP настройки из БД
+    # Получаем SMTP настройки из БД, если пустые — берём из .env
     settings = db.query(NotificationSettings).first()
     
     smtp_host = None
@@ -262,21 +264,47 @@ async def send_test_email(
     smtp_user = None
     smtp_password = None
     sender_email = None
+    system_name = None
     use_tls = None
     use_ssl = None
     
     if settings:
-        smtp_host = settings.smtp_host
-        smtp_port = settings.smtp_port
-        smtp_user = settings.smtp_user
-        smtp_password = settings.smtp_password
-        sender_email = settings.sender_email
+        # Из БД (приоритет)
+        smtp_host = settings.smtp_host or None
+        smtp_port = settings.smtp_port or None
+        smtp_user = settings.smtp_user or None
+        smtp_password = settings.smtp_password or None
+        sender_email = settings.sender_email or None
+        system_name = settings.system_name or None
         
-        # Если в БД есть флаги TLS/SSL — используем их
         if hasattr(settings, 'mail_use_tls'):
             use_tls = bool(settings.mail_use_tls)
         if hasattr(settings, 'mail_use_ssl'):
             use_ssl = bool(settings.mail_use_ssl)
+    
+    # Если в БД пусто — берём из .env
+    if not smtp_host:
+        import os
+        smtp_host = os.getenv("SMTP_HOST") or os.getenv("MAIL_SERVER")
+    if not smtp_port:
+        import os
+        smtp_port = int(os.getenv("SMTP_PORT") or os.getenv("MAIL_PORT", "587"))
+    if not smtp_user:
+        import os
+        smtp_user = os.getenv("SMTP_USER") or os.getenv("MAIL_USERNAME")
+    if not smtp_password:
+        import os
+        smtp_password = os.getenv("SMTP_PASSWORD") or os.getenv("MAIL_PASSWORD")
+    if not sender_email:
+        import os
+        sender_email = os.getenv("SENDER_EMAIL") or os.getenv("MAIL_DEFAULT_SENDER") or smtp_user
+    if not system_name:
+        import os
+        system_name = os.getenv("SYSTEM_NAME") or "PAPI Система"
+    
+    # Yandex SMTP требует ТОЛЬКО email в From, без "Название <email>"
+    # system_name используется в заголовке сообщения (display name)
+    from_email = sender_email
     
     # Отправляем тестовое письмо
     service = NotificationService(
@@ -284,7 +312,8 @@ async def send_test_email(
         smtp_port=smtp_port,
         smtp_user=smtp_user,
         smtp_password=smtp_password,
-        sender_email=sender_email,
+        sender_email=from_email,
+        system_name=system_name,
         use_tls=use_tls,
         use_ssl=use_ssl,
     )
@@ -306,5 +335,5 @@ async def send_test_email(
     else:
         raise HTTPException(
             status_code=500,
-            detail="Не удалось отправить тестовое сообщение. Проверьте SMTP-настройки и логи.",
+            detail="SMTP-сервер временно недоступен (блокировка Yandex). Подождите 15-30 минут и попробуйте снова. Если ошибка повторяется — проверьте IMAP/SMTP настройки в https://mail.yandex.ru/settings?tab=other",
         )

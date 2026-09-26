@@ -167,11 +167,18 @@ const AdminPanel: React.FC = () => {
     smtp_user: '',
     smtp_password: '',
     sender_email: '',
+    system_name: 'PAPI Система',
     max_api_url: '',
     max_api_token: '',
     enable_email: true,
     enable_max: false,
   });
+
+  // Test email state
+  const [testEmailTo, setTestEmailTo] = useState('');
+  const [testEmailSubject, setTestEmailSubject] = useState('');
+  const [testEmailSending, setTestEmailSending] = useState(false);
+  const [testEmailResult, setTestEmailResult] = useState<{success: boolean; message: string} | null>(null);
 
   // Notifications functions (moved before useEffect)
   const fetchNotifUsers = async () => {
@@ -204,6 +211,7 @@ const AdminPanel: React.FC = () => {
           smtp_user: data.smtp_user || '',
           smtp_password: '',
           sender_email: data.sender_email || '',
+          system_name: data.system_name || 'PAPI Система',
           max_api_url: data.max_api_url || '',
           max_api_token: '',
           enable_email: data.enable_email,
@@ -369,6 +377,48 @@ const AdminPanel: React.FC = () => {
       toast.error('Ошибка соединения');
     } finally {
       setNotifSending(false);
+    }
+  };
+
+  const handleSendTestEmail = async () => {
+    if (!testEmailTo) {
+      toast.error('Укажите email получателя');
+      return;
+    }
+    
+    try {
+      setTestEmailSending(true);
+      setTestEmailResult(null);
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/notification-settings/test-email', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          to_email: testEmailTo,
+          subject: testEmailSubject || 'Тестовое сообщение от сервиса сверок',
+          message: 'Это тестовое сообщение, подтверждающее корректную настройку SMTP-сервера.\n\nЕсли вы получили это письмо — email-рассылка работает исправно.',
+        }),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setTestEmailResult({ success: true, message: data.message });
+        toast.success(data.message);
+        setTestEmailTo('');
+        setTestEmailSubject('');
+      } else {
+        const err = await response.json();
+        setTestEmailResult({ success: false, message: err.detail || 'Ошибка отправки' });
+        toast.error(err.detail || 'Ошибка отправки');
+      }
+    } catch (err) {
+      setTestEmailResult({ success: false, message: 'Ошибка соединения' });
+      toast.error('Ошибка соединения');
+    } finally {
+      setTestEmailSending(false);
     }
   };
 
@@ -1603,8 +1653,50 @@ const AdminPanel: React.FC = () => {
                       placeholder="Отправитель (noreply@company.com)"
                       value={notifSettings.sender_email}
                       onChange={(e) => setNotifSettings({...notifSettings, sender_email: e.target.value})}
-                      className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 col-span-2"
+                      className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                     />
+                    <input
+                      type="text"
+                      placeholder="Название системы (отображается как: Название <email>)"
+                      value={notifSettings.system_name}
+                      onChange={(e) => setNotifSettings({...notifSettings, system_name: e.target.value})}
+                      className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                    />
+                  </div>
+
+                  {/* Test Email */}
+                  <div className="mt-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                    <h3 className="font-medium text-green-800 dark:text-green-200 mb-3">📧 Тестовое email-сообщение</h3>
+                    <div className="space-y-3">
+                      <input
+                        type="email"
+                        placeholder="Email получателя (любой адрес)"
+                        value={testEmailTo}
+                        onChange={(e) => setTestEmailTo(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                      />
+                      <div className="grid grid-cols-2 gap-3">
+                        <input
+                          type="text"
+                          placeholder="Тема (опционально)"
+                          value={testEmailSubject}
+                          onChange={(e) => setTestEmailSubject(e.target.value)}
+                          className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                        />
+                        <button
+                          onClick={handleSendTestEmail}
+                          disabled={testEmailSending || !testEmailTo}
+                          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                        >
+                          {testEmailSending ? 'Отправка...' : '📨 Отправить тест'}
+                        </button>
+                      </div>
+                      {testEmailResult && (
+                        <p className={`text-sm ${testEmailResult.success ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>
+                          {testEmailResult.message}
+                        </p>
+                      )}
+                    </div>
                   </div>
 
                   <h3 className="font-medium text-gray-700 dark:text-gray-300 mb-2">MAX chat</h3>

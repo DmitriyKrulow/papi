@@ -3,6 +3,8 @@ import smtplib
 import os
 import json
 import logging
+import threading
+import time
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import List, Optional
@@ -11,8 +13,95 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 
+class SMTPConnectionPool:
+    """Кэш SMTP-соединений для избежания частых логин-аут."""
+    
+    def __init__(self, max_age: int = 300):
+        self.smtp_host = None
+        self.smtp_port = None
+        self.smtp_user = None
+        self.smtp_password = None
+        self.use_tls = True
+        self.use_ssl = False
+        self.connection = None
+        self.last_used = 0
+        self.max_age = max_age  # секунд жизни соединения
+        self._lock = threading.Lock()
+    
+    def get_connection(self, host, port, user, password, use_tls=True, use_ssl=False):
+        """Получить кэшированное или создать новое соединение."""
+        with self._lock:
+            # Проверяем, что параметры те же
+            same_params = (
+                self.smtp_host == host and
+                self.smtp_port == port and
+                self.smtp_user == user and
+                self.smtp_password == password and
+                self.use_tls == use_tls and
+                self.use_ssl == use_ssl
+            )
+            
+            # Проверяем срок жизни
+            expired = (time.time() - self.last_used) > self.max_age
+            
+            if same_params and self.connection and not expired:
+                logger.debug("Reusing cached SMTP connection")
+                try:
+                    self.connection.noop()  # Проверяем живость
+                    return self.connection
+                except Exception:
+                    # Соединение мёртвое — создаём новое
+                    self.connection = None
+            
+            # Закрываем старое соединение
+            if self.connection:
+                try:
+                    self.connection.quit()
+                except Exception:
+                    pass
+                self.connection = None
+            
+            # Создаём новое соединение
+            logger.info("Creating new SMTP connection")
+            conn = self._create_connection(host, port, user, password, use_tls, use_ssl)
+            self.smtp_host = host
+            self.smtp_port = port
+            self.smtp_user = user
+            self.smtp_password = password
+            self.use_tls = use_tls
+            self.use_ssl = use_ssl
+            self.connection = conn
+            self.last_used = time.time()
+            return conn
+    
+    def _create_connection(self, host, port, user, password, use_tls, use_ssl):
+        """Создаёт SMTP-соединение и выполняет логин."""
+        if use_ssl:
+            server = smtplib.SMTP_SSL(host, port, timeout=10)
+        else:
+            server = smtplib.SMTP(host, port, timeout=10)
+            if use_tls:
+                server.starttls()
+        server.login(user, password)
+        return server
+    
+    def close(self):
+        """Закрывает кэшированное соединение."""
+        with self._lock:
+            if self.connection:
+                try:
+                    self.connection.quit()
+                except Exception:
+                    pass
+                self.connection = None
+
+
 class NotificationService:
     """Сервис отправки уведомлений через email и MAX chat"""
+    
+    # Лимиты для избежания блокировок SMTP
+    MIN_INTERVAL_BETWEEN_EMAILS = 2.0  # секунд между отправками
+    MAX_EMAILS_PER_MINUTE = 10  # Yandex лимит ~100/час, ставим 10/мин для запаса
     
     def __init__(
         self,
@@ -21,18 +110,19 @@ class NotificationService:
         smtp_user: Optional[str] = None,
         smtp_password: Optional[str] = None,
         sender_email: Optional[str] = None,
+        system_name: Optional[str] = None,
         use_tls: Optional[bool] = None,
         use_ssl: Optional[bool] = None,
     ):
         # Приоритет: переданные параметры > env vars > дефолты
-        # Поддерживаем два варианта имён: SMTP_* и MAIL_*
         self.smtp_host = smtp_host or os.getenv("SMTP_HOST") or os.getenv("MAIL_SERVER", "smtp.gmail.com")
         self.smtp_port = smtp_port or int(os.getenv("SMTP_PORT") or os.getenv("MAIL_PORT", "587"))
         self.smtp_user = smtp_user or os.getenv("SMTP_USER") or os.getenv("MAIL_USERNAME", "")
         self.smtp_password = smtp_password or os.getenv("SMTP_PASSWORD") or os.getenv("MAIL_PASSWORD", "")
         self.sender_email = sender_email or os.getenv("SENDER_EMAIL") or os.getenv("MAIL_DEFAULT_SENDER", self.smtp_user)
+        self.system_name = system_name or os.getenv("SYSTEM_NAME") or "PAPI Система"
         
-        # TLS/SSL настройки (по умолчанию TLS для порта 587, SSL для порта 465)
+        # TLS/SSL настройки
         env_use_tls = os.getenv("MAIL_USE_TLS", "true")
         env_use_ssl = os.getenv("MAIL_USE_SSL", "false")
         
@@ -52,6 +142,42 @@ class NotificationService:
         
         self.max_api_url = os.getenv("MAX_API_URL", "http://localhost:8080/api/notify")
         self.max_api_token = os.getenv("MAX_API_TOKEN", "")
+        
+        # Пул SMTP-соединений
+        self._pool = SMTPConnectionPool(max_age=300)
+        
+        # Rate limiting
+        self._last_send_time = 0
+        self._emails_sent_in_window = []
+        self._lock = threading.Lock()
+    
+    def _enforce_rate_limit(self):
+        """Применяет rate limiting для избежания блокировок."""
+        now = time.time()
+        
+        with self._lock:
+            # Удаляем старые записи (старше 1 минуты)
+            self._emails_sent_in_window = [
+                t for t in self._emails_sent_in_window
+                if now - t < 60
+            ]
+            
+            # Если превысили лимит — ждём
+            if len(self._emails_sent_in_window) >= self.MAX_EMAILS_PER_MINUTE:
+                wait_time = 60 - (now - self._emails_sent_in_window[0])
+                if wait_time > 0:
+                    logger.warning(f"Rate limit reached, waiting {wait_time:.1f}s...")
+                    time.sleep(wait_time)
+                    self._emails_sent_in_window = []
+            
+            # Минимальная задержка между письмами
+            elapsed = now - self._last_send_time
+            if elapsed < self.MIN_INTERVAL_BETWEEN_EMAILS:
+                sleep_time = self.MIN_INTERVAL_BETWEEN_EMAILS - elapsed
+                time.sleep(sleep_time)
+            
+            self._emails_sent_in_window.append(time.time())
+            self._last_send_time = time.time()
     
     def send_email(
         self,
@@ -60,37 +186,79 @@ class NotificationService:
         body: str,
         use_tls: Optional[bool] = None,
         use_ssl: Optional[bool] = None,
+        max_retries: int = 2,
     ) -> bool:
-        """Отправка email уведомления"""
-        try:
-            msg = MIMEMultipart()
-            msg['From'] = self.sender_email
-            msg['To'] = to_email
-            msg['Subject'] = subject
-            msg.attach(MIMEText(body, 'plain', 'utf-8'))
-            
-            # Определяем TLS/SSL для этого конкретного вызова
-            local_use_tls = use_tls if use_tls is not None else self.use_tls
-            local_use_ssl = use_ssl if use_ssl is not None else self.use_ssl
-            
-            if local_use_ssl:
-                # Используем SSL
-                server = smtplib.SMTP_SSL(self.smtp_host, self.smtp_port)
-            else:
-                # Используем STARTTLS
-                server = smtplib.SMTP(self.smtp_host, self.smtp_port)
-                if local_use_tls:
-                    server.starttls()
-            
-            server.login(self.smtp_user, self.smtp_password)
-            server.send_message(msg)
-            server.quit()
-            
-            logger.info(f"Email sent to {to_email}: {subject}")
-            return True
-        except Exception as e:
-            logger.error(f"Failed to send email to {to_email}: {str(e)}")
-            return False
+        """Отправка email уведомления с retry и connection pooling."""
+        local_use_tls = use_tls if use_tls is not None else self.use_tls
+        local_use_ssl = use_ssl if use_ssl is not None else self.use_ssl
+        
+        for attempt in range(1, max_retries + 1):
+            try:
+                # Применяем rate limiting
+                self._enforce_rate_limit()
+                
+                # Получаем соединение из пула
+                server = self._pool.get_connection(
+                    host=self.smtp_host,
+                    port=self.smtp_port,
+                    user=self.smtp_user,
+                    password=self.smtp_password,
+                    use_tls=local_use_tls,
+                    use_ssl=local_use_ssl,
+                )
+                
+                # Формируем письмо
+                msg = MIMEMultipart()
+                # Yandex требует ТОЛЬКО email в From, display name в заголовке
+                msg['From'] = self.sender_email
+                msg['Reply-To'] = self.sender_email
+                msg['To'] = to_email
+                msg['Subject'] = subject
+                # Добавляем название системы как display name
+                if self.system_name and self.system_name != "PAPI Система":
+                    msg.add_header('X-System-Name', self.system_name)
+                msg.attach(MIMEText(body, 'plain', 'utf-8'))
+                
+                # Отправляем
+                server.send_message(msg)
+                
+                logger.info(f"Email sent to {to_email}: {subject}")
+                return True
+                
+            except smtplib.SMTPServerDisconnected:
+                logger.warning(f"SMTP connection lost (attempt {attempt}/{max_retries}), retrying...")
+                # Закрываем пул, чтобы создать новое соединение
+                self._pool.close()
+                if attempt < max_retries:
+                    time.sleep(3 ** attempt)  # экспоненциальная задержка 3s, 9s, 27s...
+                    continue
+                return False
+                
+            except smtplib.SMTPException as e:
+                error_str = str(e)
+                
+                # Временная ошибка (блокировка SMTP) — пробуем снова с большой задержкой
+                if "454" in error_str or "421" in error_str:
+                    logger.warning(f"Temporary SMTP error (attempt {attempt}/{max_retries}): {e}")
+                    self._pool.close()
+                    if attempt < max_retries:
+                        wait_time = 30 * attempt  # 30s, 60s, 90s...
+                        logger.warning(f"Yandex rate limit detected, waiting {wait_time}s before retry...")
+                        time.sleep(wait_time)
+                        continue
+                    # Все попытки исчерпаны — возвращаем понятную ошибку
+                    logger.error(f"SMTP rate limit exceeded after {max_retries} retries. Yandex may have temporarily blocked SMTP access.")
+                    return False
+                
+                # Постоянная ошибка — не retry
+                logger.error(f"SMTP error (no retry): {e}")
+                return False
+                
+            except Exception as e:
+                logger.error(f"Failed to send email to {to_email}: {str(e)}")
+                return False
+        
+        return False
     
     def send_max_notification(self, user_id: int, title: str, message: str) -> bool:
         """Отправка уведомления через MAX chat"""

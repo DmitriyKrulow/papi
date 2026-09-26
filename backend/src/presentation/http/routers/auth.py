@@ -10,7 +10,7 @@ from src.infrastructure.db.init_db import get_db
 from src.core.value_objects.password_hash import PasswordHash
 from src.infrastructure.db.models.user import User
 from ..schemas.auth import UserLogin as LoginRequest, UserCreate as RegisterRequest
-from ..schemas.auth import UserToken, UserResponse
+from ..schemas.auth import UserToken, UserResponse, ProfileUpdate
 from ..dependencies.auth import get_current_user
 from src.use_cases.auth.login_user import (
     LoginUser,
@@ -149,4 +149,57 @@ def get_me(current_user: User = Depends(get_current_user)):
         is_active=current_user.is_active,
         created_at=current_user.created_at,
         updated_at=current_user.updated_at,
+    )
+
+
+@router.put("/profile", response_model=UserResponse)
+def update_profile(
+    profile: ProfileUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Обновляет профиль текущего пользователя."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    # Загружаем пользователя заново в текущей сессии
+    user = db.query(User).filter(User.id == current_user.id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    
+    # Проверяем, не занят ли новый username
+    if profile.username and profile.username != user.username:
+        existing = db.query(User).filter(User.username == profile.username).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Username already taken")
+        user.username = profile.username
+        logger.info(f"[Auth] Username changed for user {user.id}")
+    
+    # Проверяем, не занят ли новый email
+    if profile.email and profile.email != user.email:
+        existing = db.query(User).filter(User.email == profile.email).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Email already taken")
+        user.email = profile.email
+        logger.info(f"[Auth] Email changed for user {user.id}")
+    
+    if profile.full_name is not None:
+        user.full_name = profile.full_name
+    if profile.phone is not None:
+        user.phone = profile.phone
+    
+    user.updated_at = datetime.now()
+    db.commit()
+    db.refresh(user)
+    
+    return UserResponse(
+        id=user.id,
+        username=user.username,
+        email=user.email,
+        full_name=user.full_name,
+        phone=user.phone,
+        role=user.role,
+        is_active=user.is_active,
+        created_at=user.created_at,
+        updated_at=user.updated_at,
     )

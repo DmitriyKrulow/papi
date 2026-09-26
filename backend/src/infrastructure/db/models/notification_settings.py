@@ -24,6 +24,7 @@ class NotificationSettings(Base):
     smtp_user = Column(String(255), nullable=True)
     smtp_password = Column(String(255), nullable=True)
     sender_email = Column(String(255), nullable=True)
+    system_name = Column(String(255), nullable=True)  # Название системы для отображения в отправителе
     
     # MAX chat настройки
     max_api_url = Column(String(500), nullable=True)

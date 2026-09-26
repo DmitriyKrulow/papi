@@ -283,6 +283,9 @@ async def import_all_data(
             "assets": {"imported": 0, "skipped": 0, "errors": []},
         }
         
+        # Маппинг: старый ID -> новый ID для подразделений
+        dept_id_map: Dict[int, int] = {}
+        
         # Очистка существующих данных (в обратном порядке зависимостей)
         logger.info("[DataImport] Clearing existing data...")
         from src.infrastructure.db.models.asset import Asset as AssetModel
@@ -310,6 +313,10 @@ async def import_all_data(
                     updated_at=datetime.fromisoformat(dept_data["updated_at"]) if dept_data.get("updated_at") else datetime.now(),
                 )
                 db.add(dept)
+                db.flush()  # Получаем новый ID
+                old_id = dept_data.get("id")
+                if old_id is not None:
+                    dept_id_map[old_id] = dept.id
                 stats["departments"]["imported"] += 1
             except Exception as e:
                 stats["departments"]["skipped"] += 1
@@ -317,12 +324,16 @@ async def import_all_data(
         
         db.commit()
         
-        # 2. Восстанавливаем помещения
+        # 2. Восстанавливаем помещения (с маппингом department_id)
         logger.info("[DataImport] Restoring rooms...")
         for room_data in data.get("rooms", []):
             try:
+                old_dept_id = room_data.get("department_id")
+                # Используем маппинг, если старый ID известен, иначе оставляем как есть
+                new_dept_id = dept_id_map.get(old_dept_id, old_dept_id) if old_dept_id is not None else None
+                
                 room = Room(
-                    department_id=room_data.get("department_id"),
+                    department_id=new_dept_id,
                     name=room_data.get("name", ""),
                     floor=room_data.get("floor"),
                     building=room_data.get("building"),
@@ -338,12 +349,18 @@ async def import_all_data(
         
         db.commit()
         
+        # Маппинг ID для сотрудников
+        emp_id_map: Dict[int, int] = {}
+        
         # 3. Восстанавливаем сотрудников
         logger.info("[DataImport] Restoring employees...")
         for emp_data in data.get("employees", []):
             try:
+                old_dept_id = emp_data.get("department_id")
+                new_dept_id = dept_id_map.get(old_dept_id, old_dept_id) if old_dept_id is not None else None
+                
                 emp = Employee(
-                    department_id=emp_data.get("department_id"),
+                    department_id=new_dept_id,
                     user_id=emp_data.get("user_id"),
                     first_name=emp_data.get("first_name", ""),
                     last_name=emp_data.get("last_name", ""),
@@ -352,7 +369,7 @@ async def import_all_data(
                     email=emp_data.get("email"),
                     position=emp_data.get("position"),
                     position_code=emp_data.get("position_code"),
-                    employee_number=emp_data.get("employee_number"),
+                    employee_number=emp_data.get("employee_number") or None,
                     hire_date=datetime.fromisoformat(emp_data["hire_date"]).date() if emp_data.get("hire_date") else None,
                     termination_date=datetime.fromisoformat(emp_data["termination_date"]).date() if emp_data.get("termination_date") else None,
                     is_active=emp_data.get("is_active", True),
@@ -360,12 +377,19 @@ async def import_all_data(
                     updated_at=datetime.fromisoformat(emp_data["updated_at"]) if emp_data.get("updated_at") else datetime.now(),
                 )
                 db.add(emp)
+                db.flush()
+                old_id = emp_data.get("id")
+                if old_id is not None:
+                    emp_id_map[old_id] = emp.id
                 stats["employees"]["imported"] += 1
             except Exception as e:
                 stats["employees"]["skipped"] += 1
                 stats["employees"]["errors"].append(f"Employee '{emp_data.get('last_name', '?')}': {str(e)}")
         
         db.commit()
+        
+        # Маппинг ID для помещений
+        room_id_map: Dict[int, int] = {}
         
         # 4. Восстанавливаем активы
         logger.info("[DataImport] Restoring assets...")
@@ -408,6 +432,13 @@ async def import_all_data(
                     except:
                         pass
                 
+                # Маппинг ID для employee и room
+                old_emp_id = asset_data.get("employee_id")
+                new_emp_id = emp_id_map.get(old_emp_id, old_emp_id) if old_emp_id is not None else None
+                
+                old_room_id = asset_data.get("room_id")
+                new_room_id = room_id_map.get(old_room_id, old_room_id) if old_room_id is not None else None
+                
                 from decimal import Decimal
                 asset = Asset(
                     inventory_number=asset_data.get("inventory_number", ""),
@@ -442,8 +473,8 @@ async def import_all_data(
                     last_inventory_date=last_inventory_date,
                     last_inventory_by_id=asset_data.get("last_inventory_by_id"),
                     last_inventory_confirmed=asset_data.get("last_inventory_confirmed", False),
-                    employee_id=asset_data.get("employee_id"),
-                    room_id=asset_data.get("room_id"),
+                    employee_id=new_emp_id,
+                    room_id=new_room_id,
                 )
                 db.add(asset)
                 stats["assets"]["imported"] += 1
