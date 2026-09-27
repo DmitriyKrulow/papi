@@ -220,9 +220,11 @@ fi
 # ---------------------------------------------------------------------------
 log "5/8. Systemd-юниты: старт при загрузке и автообновление"
 # ---------------------------------------------------------------------------
-# Размаскируем, если юнит уже существует и замаскирован
-systemctl unmask papi.service 2>/dev/null || true
+# Размаскируем и удаляем старый юнит (может быть symlink на /dev/null)
 systemctl stop papi.service 2>/dev/null || true
+rm -f /etc/systemd/system/papi.service
+rm -f /etc/systemd/system/papi-update.service
+rm -f /etc/systemd/system/papi-update.timer
 cp "$DEPLOY_DIR/papi.service" /etc/systemd/system/papi.service
 cp "$DEPLOY_DIR/papi-update.service" /etc/systemd/system/papi-update.service
 cp "$DEPLOY_DIR/papi-update.timer" /etc/systemd/system/papi-update.timer
