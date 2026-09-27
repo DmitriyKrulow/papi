@@ -44,8 +44,18 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 # ---------------------------------------------------------------------------
-log "1/8. Проверка Docker"
+log "1/8. Проверка Docker и Git"
 # ---------------------------------------------------------------------------
+# Git нужен для клонирования репозитория
+if command -v git >/dev/null 2>&1; then
+    log "Git уже установлен: $(git --version)"
+else
+    log "Git не найден - устанавливаю"
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update
+    apt-get install -y git
+fi
+
 if command -v docker >/dev/null 2>&1; then
     log "Docker уже установлен: $(docker --version)"
 else
