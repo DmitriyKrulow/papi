@@ -3,7 +3,6 @@
 DOMAIN="${LETSENCRYPT_DOMAIN:-}"
 EMAIL="${LETSENCRYPT_EMAIL:-}"
 ENABLE="${LETSENCRYPT_ENABLE:-true}"
-CERT_FILE="/etc/letsencrypt/live/${DOMAIN}/fullchain.pem"
 WEBROOT="/var/www/certbot"
 CHALLENGE_PORT=8888
 DEFAULT_CONF="/etc/nginx/conf.d/default.conf"
@@ -18,27 +17,22 @@ echo "================================================"
 # Функция конвертации домена в punycode (для IDN доменов типа мастербайт.рф)
 convert_to_punycode() {
     domain="$1"
-    punycode=$(python3 -c "
+    # Проверяем, содержит ли домен не-ASCII символы
+    if echo "$domain" | grep -qP '[^\x00-\x7F]'; then
+        # Конвертируем в punycode через python3
+        punycode=$(python3 -c "
 import sys
-try:
-    domain = sys.argv[1]
-    parts = domain.split('.')
-    punycode_parts = []
-    for part in parts:
-        try:
-            part.encode('ascii')
-            punycode_parts.append(part)
-        except UnicodeEncodeError:
-            punycode_parts.append(part.encode('idna').decode('ascii'))
-    print('.'.join(punycode_parts))
-except Exception as e:
-    print(domain, file=sys.stderr)
-    print(domain)
+domain = sys.argv[1]
+parts = domain.split('.')
+punycode_parts = []
+for part in parts:
+    try:
+        part.encode('ascii')
+        punycode_parts.append(part)
+    except UnicodeEncodeError:
+        punycode_parts.append(part.encode('idna').decode('ascii'))
+print('.'.join(punycode_parts))
 " "$domain" 2>/dev/null)
-    
-    if [ -n "$punycode" ]; then
-        echo "Конвертация домена в punycode..."
-        echo "  $domain -> $punycode"
         echo "$punycode"
     else
         echo "$domain"
@@ -173,17 +167,21 @@ stop_challenge_server() {
     fi
 }
 
-# Конвертируем домен в punycode если нужно
+# Конвертируем домен в punycode если нужно (для IDN доменов типа мастербайт.рф)
+PUNYCODE_DOMAIN=""
 if [ -n "$DOMAIN" ]; then
-    DOMAIN=$(convert_to_punycode "$DOMAIN")
-    CERT_FILE="/etc/letsencrypt/live/${DOMAIN}/fullchain.pem"
-    echo "Итоговый домен: $DOMAIN"
+    PUNYCODE_DOMAIN=$(convert_to_punycode "$DOMAIN")
+    if [ "$PUNYCODE_DOMAIN" != "$DOMAIN" ]; then
+        echo "Конвертируем домен в punycode: $DOMAIN -> $PUNYCODE_DOMAIN"
+    fi
+    DOMAIN="$PUNYCODE_DOMAIN"
 fi
 
 # HTTPS включён по умолчанию — проверяем сертификаты
 echo "HTTPS включён. Проверяем сертификаты..."
 
 HTTPS_OK=false
+CERT_FILE="/etc/letsencrypt/live/${DOMAIN}/fullchain.pem"
 
 if [ -f "$CERT_FILE" ]; then
     echo "Сертификаты найдены. Проверяем срок действия..."
@@ -220,6 +218,7 @@ else
     start_challenge_server
     sleep 2
     
+    # Используем punycode домен для certbot
     certbot certonly \
         --webroot \
         --webroot-path="$WEBROOT" \
