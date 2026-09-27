@@ -1,5 +1,20 @@
 # PAPI — Система управления активами
 
+PAPI — полнофункциональная система управления активами с веб-интерфейсом, REST API и автоматическим SSL.
+
+**Возможности:**
+- Веб-интерфейс на React + Vite
+- REST API на FastAPI (Python)
+- PostgreSQL 16 для хранения данных
+- Автоматическое получение SSL-сертификатов Let's Encrypt
+- Автообновление из git каждые 15 минут
+- Docker-контейнеризация всего стека
+
+**Доступ:**
+- Веб-приложение: `http://<IP>` или `https://<домен>` (после SSL)
+- API Swagger: `http://<IP>:8080/docs`
+- Администратор: `admin` / `admin123` (сразу смените пароль!)
+
 ## Запуск проекта через Docker Compose (рекомендуется)
 
 Все пароли и секретные настройки хранятся в файле `.env` в корне проекта
@@ -93,75 +108,146 @@ sudo bash update.sh
 
 ## Развёртывание на новом сервере
 
-### Ubuntu
+### Ubuntu / Debian
 
 ```bash
 wget -qO- https://api.github.com/repos/DmitriyKrulow/papi/contents/deploy/ubuntu/install.sh | python3 -c "import sys,base64,json; print(base64.b64decode(json.load(sys.stdin)['content']).decode())" | sudo bash
 ```
 
-Скрипт установит Git и Docker, клонирует репозиторий, сгенерирует `.env`,
-создаст systemd-юниты и настроит firewall.
+Скрипт делает всё автоматически:
 
-> **Примечание:** Для публичных репозиториев авторизация не нужна.
-> Для приватных — передайте токен:
-> ```bash
-> GITHUB_TOKEN=ghp_ваш_токен bash -
-> ```
+1. Устанавливает **Git, Python3, Docker Engine** с mirror-ами (для серверов в РФ)
+2. Клонирует репозиторий в `/opt/papi`
+3. Создаёт `.env` с сгенерированными паролями (если файла нет)
+4. Отключает конфликтующие сервисы (хостовой nginx, старый papi-backend)
+5. Устанавливает systemd-юниты: `papi.service` (стек при загрузке) и `papi-update.timer` (автообновление)
+6. Собирает Docker-образы и поднимает контейнеры
+7. Настраивает firewall: наружу доступны только 22 (SSH), 80 (HTTP), 8080 (API)
 
-#### После установки
+**Как работает HTTPS:**
+- Сайт сразу открывается по **HTTP** — без ожидания
+- В фоне (через 5 сек) начинается получение SSL-сертификата Let's Encrypt
+- После успешного получения — автоматический переход на **HTTPS** с редиректом
+- Сертификат автоматически обновляется за 30 дней до истечения
+- До 5 повторных попыток при ошибке (rate limit)
 
-1. **Проверьте статус сервисов:**
-   ```bash
-   systemctl status papi
-   docker compose ps
-   ```
+> **Примечание:** Для корректной работы HTTPS домен должен указывать на IP сервера (A-запись), а порт 80 — быть открытым в фаерволе.
 
-2. **Откройте веб-интерфейс:**
-   ```bash
-   echo "http://$(hostname -I | awk '{print $1}'):$APP_PORT_VALUE"
-   ```
-   По умолчанию: `http://<IP-сервера>:80`
+#### Параметры
 
-3. **Войдите под администратором:**
-   - Логин: `admin`
-   - Пароль: `admin123`
-   - **Сразу смените пароль в настройках!**
+```bash
+# Кастомный репозиторий
+REPO_URL=https://github.com/user/repo.git bash -
 
-4. **Настройте `.env` (при необходимости):**
-   ```bash
-   sudo nano /opt/papi/.env
-   ```
-   Основные параметры:
-   - `CORS_ORIGINS` — домены, которым разрешён CORS
-   - `FRONTEND_URL` — URL фронтенда
-   - `SMTP_*` — настройки почты (если нужны)
+# Кастомная ветка
+BRANCH=develop bash -
 
-   После изменений:
-   ```bash
-   sudo systemctl restart papi
-   ```
+# Другая директория
+PROJECT_DIR=/opt/myapp bash -
 
-5. **Проверьте логи:**
-   ```bash
-   docker compose logs -f backend   # логи бэкенда
-   docker compose logs -f frontend  # логи фронтенда
-   journalctl -u papi -f            # логи systemd
-   ```
+# Пропустить настройку firewall
+SKIP_FIREWALL=1 bash -
 
-6. **Обновление:**
-   ```bash
-   sudo bash /opt/papi/update.sh
-   ```
-   Или дождитесь автообновления (каждые 15 минут).
-
-### Windows
-
-```powershell
-powershell -ExecutionPolicy Bypass -File deploy\windows\install.ps1
+# Приватный репозиторий (с токеном)
+GITHUB_TOKEN=ghp_xxxx bash -
 ```
 
-Аналогичный сценарий для Windows: Docker Desktop, git, `.env`,
-планировщик задач для автозапуска и обновления.
+### Windows Server
+
+```powershell
+Set-ExecutionPolicy Bypass -Scope Process -Force
+powershell -File deploy\windows\install.ps1
+```
+
+Скрипт делает:
+1. Проверяет Docker Desktop (установите если нет)
+2. Клонирует репозиторий в `C:\papi`
+3. Создаёт `.env` с паролями
+4. Освобождает порт 80 (останавливает IIS если нужен)
+5. Регистрирует задачи планировщика: `PAPI-Start` (автостарт) и `PAPI-Update` (автообновление)
+6. Открывает порты 80 и 8080 в брандмауэре
+7. Собирает образы и поднимает контейнеры
+
+> **Примечание:** Docker Desktop должен быть установлен и работать. Для серверов без GUI — используйте Ubuntu.
+
+---
+
+## После установки
+
+### 1. Проверка
+
+```bash
+# Статус контейнеров
+docker compose ps
+
+# Логи
+docker compose logs -f frontend   # веб-интерфейс
+docker compose logs -f backend    # API
+```
+
+### 2. Вход в систему
+
+- **URL:** `http://<IP-сервера>` (HTTP работает сразу)
+- **Логин:** `admin`
+- **Пароль:** `admin123`
+- ⚠️ **Сразу смените пароль в настройках!**
+
+### 3. HTTPS
+
+Сайт автоматически переключится на HTTPS после получения сертификата Let's Encrypt (~1-2 минуты).
+
+**Условия для HTTPS:**
+- Домен настроен (A-запись на IP сервера)
+- Порт 80 открыт в фаерволе
+- Email для сертификата указан в `.env`: `LETSENCRYPT_EMAIL=your@email.com`
+
+### 4. Настройка `.env`
+
+```bash
+sudo nano /opt/papi/.env
+```
+
+Основные параметры:
+| Параметр | Описание |
+|---|---|
+| `APP_PORT` | Порт веб-интерфейса (по умолч. 80) |
+| `API_PORT` | Порт API (по умолч. 8080) |
+| `CORS_ORIGINS` | Домены для CORS (через запятую) |
+| `FRONTEND_URL` | URL фронтенда |
+| `LETSENCRYPT_EMAIL` | Email для SSL-сертификатов |
+| `SMTP_*` | Настройки отправки почты |
+
+После изменений: `sudo systemctl restart papi`
+
+### 5. Обновление
+
+```bash
+# Ручное обновление
+sudo bash /opt/papi/update.sh
+
+# Автообновление каждые 15 минут (по умолчанию)
+systemctl list-timers papi-update
+```
+
+### 6. Полезные команды
+
+```bash
+# Стек
+systemctl status papi                    # статус сервиса
+sudo systemctl restart papi              # перезапуск
+sudo systemctl stop papi                 # остановка
+
+# Контейнеры
+docker compose ps                        # статус
+docker compose logs -f backend           # логи API
+docker compose logs -f frontend          # логи веб
+docker compose down                      # остановить
+docker compose down -v                   # остановить + удалить данные
+
+# Автообновление
+systemctl list-timers papi-update        # расписание
+journalctl -u papi-update -f             # лог обновлений
+```
 
 ---
 

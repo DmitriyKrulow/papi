@@ -19,7 +19,7 @@
         powershell -File .\deploy\windows\install.ps1
 
 .PARAMETER RepoUrl
-    Git-репозиторий. По умолчанию https://github.com/ditri466/TEST.git
+    Git-репозиторий. По умолчанию https://github.com/DmitriyKrulow/papi.git
 
 .PARAMETER Branch
     Ветка. По умолчанию main
@@ -32,7 +32,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$RepoUrl    = 'https://github.com/ditri466/TEST.git',
+    [string]$RepoUrl    = 'https://github.com/DmitriyKrulow/papi.git',
     [string]$Branch     = 'main',
     [string]$ProjectDir = 'C:\papi',
     [switch]$SkipFirewall
