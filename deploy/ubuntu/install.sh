@@ -138,6 +138,42 @@ systemctl start docker
 log "Docker активен и включён в автозапуск"
 
 # ---------------------------------------------------------------------------
+# Настройка Docker: registry mirrors и отключение IPv6
+# ---------------------------------------------------------------------------
+# Для серверов в РФ и других регионах, где Docker Hub медленный/недоступен:
+# - registry-mirrors ускоряют загрузку образов
+# - отключение IPv6 предотвращает TLS handshake timeout
+log "Настраиваю Docker registry mirrors"
+mkdir -p /etc/docker
+cat > /etc/docker/daemon.json <<'DOCKERJSON'
+{
+  "registry-mirrors": [
+    "https://mirror.gcr.io",
+    "https://docker.mirrors.sjtcc.edu.cn",
+    "https://registry.docker-cn.com"
+  ],
+  "ipv6": false,
+  "fixed-cidr-v6": ""
+}
+DOCKERJSON
+systemctl daemon-reload
+systemctl restart docker
+# Ждём, пока Docker перезапустится
+for i in 1 2 3 4 5; do
+    if docker info >/dev/null 2>&1; then
+        log "Docker перезагружен с mirror-ами"
+        break
+    fi
+    log "Жду перезагрузку Docker... ($i/5)"
+    sleep 2
+done
+if ! docker info >/dev/null 2>&1; then
+    log "WARN: Docker не запустился после перезагрузки — откатываю настройки"
+    rm -f /etc/docker/daemon.json
+    systemctl restart docker
+fi
+
+# ---------------------------------------------------------------------------
 log "2/8. Код проекта в $PROJECT_DIR"
 # ---------------------------------------------------------------------------
 if [ -d "$PROJECT_DIR/.git" ]; then
@@ -261,7 +297,25 @@ log "papi-update.timer включён (автообновление из git к�
 log "6/8. Сборка и запуск контейнеров"
 # ---------------------------------------------------------------------------
 cd "$PROJECT_DIR"
-docker compose up -d --build
+# Retry up to 3 times with 30s delay — Docker Hub can be flaky
+MAX_RETRIES=3
+RETRY=0
+while [ $RETRY -lt $MAX_RETRIES ]; do
+    if docker compose up -d --build 2>&1; then
+        break
+    fi
+    RETRY=$((RETRY + 1))
+    if [ $RETRY -lt $MAX_RETRIES ]; then
+        log "Ошибка при запуске контейнеров (попытка $RETRY/$MAX_RETRIES) — жду 30 сек"
+        sleep 30
+    fi
+done
+if [ $RETRY -ge $MAX_RETRIES ]; then
+    log "ERROR: не удалось запустить контейнеры после $MAX_RETRIES попыток"
+    log "Проверьте сеть: docker pull postgres:16"
+    log "Логи: docker compose logs"
+    exit 1
+fi
 
 # ---------------------------------------------------------------------------
 log "7/8. Firewall: наружу только SSH, $APP_PORT_VALUE и $API_PORT_VALUE"
