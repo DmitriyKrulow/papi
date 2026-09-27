@@ -25,6 +25,9 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
 # Install certbot, openssl, and envsubst for SSL management
 RUN apk add --no-cache certbot openssl gettext
 
+# Copy HTTP config (used as fallback when SSL is not available)
+COPY nginx-http.conf /etc/nginx/nginx-http.conf
+
 # SPA + reverse-proxy config for the backend (HTTP only)
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 

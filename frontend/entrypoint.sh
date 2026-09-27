@@ -243,6 +243,54 @@ else
         HTTPS_OK=true
     else
         echo "ERROR: Не удалось получить сертификат (код: $CERTBOT_EXIT)."
+        echo "Система запущена в HTTP-режиме."
+    fi
+fi
+
+# Генерируем конфиг в зависимости от наличия HTTPS
+if [ "$HTTPS_OK" = true ] && [ -n "$DOMAIN" ]; then
+    generate_full_conf "$DOMAIN"
+    echo "HTTPS активирован — используем HTTPS-конфиг."
+else
+    echo "HTTPS не активирован — используем HTTP-конфиг."
+    # Копируем HTTP-конфиг
+    cp /etc/nginx/nginx-http.conf /etc/nginx/conf.d/default.conf
+fi
+    else
+        echo "Сертификат действителен."
+        HTTPS_OK=true
+    fi
+else
+    echo "Сертификаты не найдены. Получаем от Let's Encrypt..."
+    
+    mkdir -p "$WEBROOT/.well-known/acme-challenge"
+    
+    start_challenge_server
+    sleep 2
+    
+    certbot certonly \
+        --webroot \
+        --webroot-path="$WEBROOT" \
+        --email="$EMAIL" \
+        --agree-tos \
+        --no-eff-email \
+        --force-renewal \
+        --non-interactive \
+        --redirect \
+        --staple-ocsp \
+        --preferred-challenges="http" \
+        -d "$DOMAIN" \
+        -d "www.$DOMAIN" \
+        --key-type ecdsa
+    
+    stop_challenge_server
+    CERTBOT_EXIT=$?
+    
+    if [ $CERTBOT_EXIT -eq 0 ]; then
+        echo "Сертификаты успешно получены."
+        HTTPS_OK=true
+    else
+        echo "ERROR: Не удалось получить сертификат (код: $CERTBOT_EXIT)."
         echo "Попытка подключения к HTTPS не удалась. Переходим в HTTP-режим."
         echo "Для активации HTTPS:"
         echo "  1. Настройте DNS A-record для $DOMAIN на IP сервера"

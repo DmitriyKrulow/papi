@@ -97,9 +97,8 @@ services:
       # HTTPS порт (только если включен HTTPS)
       - "${HTTPS_PORT:-443}:443"
     volumes:
-      # Конфиг nginx из репозитория вместо копии внутри образа: правка
-      # frontend/nginx.conf применяется перезапуском, без пересборки образа
-      - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      # HTTP-конфиг по умолчанию (переопределяется entrypoint.sh при наличии SSL)
+      - ./frontend/nginx-http.conf:/etc/nginx/nginx-http.conf:ro
       # SSL-сертификаты (если включён HTTPS)
       - certdata:/etc/letsencrypt:rw
       # Challenge-директория для Let's Encrypt
