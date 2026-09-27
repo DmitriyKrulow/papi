@@ -79,29 +79,44 @@ services:
   # --------------------------------------------------------------- frontend
   # nginx: раздаёт собранный SPA и проксирует /api на backend. Единственный
   # сервис с публичным портом, то есть «фасад» всей системы.
+  # При первом запуске автоматически получает SSL-сертификаты (если включено).
   frontend:
     build:
       context: ./frontend
     container_name: papi-frontend
     restart: unless-stopped
+    environment:
+      # HTTPS настройки (передаются в entrypoint.sh)
+      # HTTPS включён по умолчанию — система автоматически получит сертификат
+      - LETSENCRYPT_DOMAIN=${LETSENCRYPT_DOMAIN:-}
+      - LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL:-}
+      - LETSENCRYPT_ENABLE=${LETSENCRYPT_ENABLE:-true}
     ports:
       # Веб-интерфейс приложения: SPA + прокси /api на backend внутри сети.
       - "${APP_PORT:-80}:80"
+      # HTTPS порт (только если включен HTTPS)
+      - "${HTTPS_PORT:-443}:443"
     volumes:
       # Конфиг nginx из репозитория вместо копии внутри образа: правка
       # frontend/nginx.conf применяется перезапуском, без пересборки образа
       - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      # SSL-сертификаты (если включён HTTPS)
+      - certdata:/etc/letsencrypt:rw
+      # Challenge-директория для Let's Encrypt
+      - webroot:/var/www/certbot:rw
     depends_on:
       backend:
         condition: service_healthy
     healthcheck:
-      # 200 от SPA означает, что nginx живой
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
-      interval: 30s
+      # /health возвращает 200 без редиректа (работает и с HTTP, и с HTTPS)
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1/health || exit 1"]
+      interval: 15s
       timeout: 5s
       retries: 3
-      start_period: 10s
+      start_period: 30s
 
 volumes:
   pgdata:
   uploads_data:
+  certdata:  # Для SSL-сертификатов Let's Encrypt
+  webroot:   # Для challenge-файлов Let's Encrypt

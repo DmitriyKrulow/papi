@@ -16,12 +16,20 @@ RUN npm run build
 # ---- Serve stage ----
 FROM nginx:1.27-alpine
 
-# SPA + reverse-proxy config for the backend
+# Install certbot, openssl, and envsubst for SSL management
+RUN apk add --no-cache certbot openssl gettext
+
+# SPA + reverse-proxy config for the backend (HTTP only)
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Built assets
 COPY --from=build /app/dist /usr/share/nginx/html
 
 EXPOSE 80
+EXPOSE 443
 
-CMD ["nginx", "-g", "daemon off;"]
+# Copy entrypoint script
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]

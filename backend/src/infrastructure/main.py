@@ -155,6 +155,7 @@ def register_routers():
     from src.presentation.http.routers.password_reset import admin_router as password_reset_admin_router
     from src.presentation.http.routers.notifications import router as notifications_router
     from src.presentation.http.routers.notification_settings import router as notification_settings_router
+    from src.presentation.http.routers.system_settings import router as system_settings_router
     from src.presentation.http.routers.audit import router as audit_router
     from src.presentation.http.routers.data_export import router as data_export_router
 
@@ -182,6 +183,7 @@ def register_routers():
     app.include_router(password_reset_admin_router, prefix="/api")
     app.include_router(notifications_router, prefix="/api")
     app.include_router(notification_settings_router, prefix="/api")
+    app.include_router(system_settings_router, prefix="/api")
     app.include_router(audit_router)
 
 

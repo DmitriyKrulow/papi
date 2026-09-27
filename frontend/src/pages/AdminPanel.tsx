@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import type { Department, Employee } from '../types';
+import HttpSettingsPage from './HttpSettings';
 
 interface TreeDepartment {
   id: number;
@@ -95,7 +96,7 @@ interface RoomFormData {
 
 const AdminPanel: React.FC = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'users' | 'placements' | 'employees' | 'password-requests' | 'notifications'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'placements' | 'employees' | 'password-requests' | 'notifications' | 'http-settings'>('users');
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -1004,6 +1005,12 @@ const AdminPanel: React.FC = () => {
                   >
                     📧 Уведомления
                   </button>
+                  <button
+                    onClick={() => setActiveTab('http-settings')}
+                    className={`px-4 py-2 font-medium text-sm rounded-t-lg transition ${activeTab === 'http-settings' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
+                  >
+                    🔒 HTTPS
+                  </button>
                 </div>
                 
                 {error && activeTab === 'users' && (
@@ -1855,8 +1862,13 @@ const AdminPanel: React.FC = () => {
                   </div>
                 </div>
               )}
-</>
-            )}
+            </>
+          )}
+
+          {/* HTTPS Settings Tab */}
+          {activeTab === 'http-settings' && (
+            <HttpSettingsPage />
+          )}
           </div>
         </div>
       </main>
