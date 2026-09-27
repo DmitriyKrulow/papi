@@ -171,58 +171,52 @@ stop_challenge_server() {
     fi
 }
 
-# Конвертируем домен в punycode если нужно (для IDN доменов типа мастербайт.рф)
-PUNYCODE_DOMAIN=""
-if [ -n "$DOMAIN" ]; then
-    PUNYCODE_DOMAIN=$(convert_to_punycode "$DOMAIN")
-    if [ "$PUNYCODE_DOMAIN" != "$DOMAIN" ]; then
-        echo "Конвертируем домен в punycode: $DOMAIN -> $PUNYCODE_DOMAIN"
-    fi
-    DOMAIN="$PUNYCODE_DOMAIN"
-fi
-
-# HTTPS включён по умолчанию — проверяем сертификаты
-echo "HTTPS включён. Проверяем сертификаты..."
-
-HTTPS_OK=false
-CERT_FILE="/etc/letsencrypt/live/${DOMAIN}/fullchain.pem"
-
-if [ -f "$CERT_FILE" ]; then
-    echo "Сертификаты найдены. Проверяем срок действия..."
-    EXPIRY=$(openssl x509 -in "$CERT_FILE" -noout -enddate 2>/dev/null | cut -d= -f2)
-    EXPIRY_EPOCH=$(date -d "$EXPIRY" +%s 2>/dev/null || echo "0")
-    NOW_EPOCH=$(date +%s)
-    DAYS_LEFT=$(( (EXPIRY_EPOCH - NOW_EPOCH) / 86400 ))
-    echo "Истекает: $EXPIRY ($DAYS_LEFT дней)"
-    
-    if [ "$DAYS_LEFT" -lt 30 ]; then
-        echo "Обновление сертификата (осталось < 30 дней)..."
-        start_challenge_server
-        
-        certbot renew --quiet --no-self-upgrade --deploy-hook "nginx -s reload"
-        
-        stop_challenge_server
-        
-        if [ $? -eq 0 ]; then
-            echo "Сертификат обновлён."
-            HTTPS_OK=true
-        else
-            echo "Предупреждение: обновление сертификата не удалось. Используем существующий."
-            HTTPS_OK=true
+# Функция получения сертификата
+obtain_certificate() {
+    # Конвертируем домен в punycode если нужно
+    if [ -n "$DOMAIN" ]; then
+        PUNYCODE_DOMAIN=$(convert_to_punycode "$DOMAIN")
+        if [ "$PUNYCODE_DOMAIN" != "$DOMAIN" ]; then
+            echo "Конвертируем домен в punycode: $DOMAIN -> $PUNYCODE_DOMAIN"
+            DOMAIN="$PUNYCODE_DOMAIN"
         fi
-    else
-        echo "Сертификат действителен."
-        HTTPS_OK=true
     fi
-else
-    echo "Сертификаты не найдены. Получаем от Let's Encrypt..."
+
+    CERT_FILE="/etc/letsencrypt/live/${DOMAIN}/fullchain.pem"
     
+    # Проверяем существующий сертификат
+    if [ -f "$CERT_FILE" ]; then
+        echo "Сертификаты найдены. Проверяем срок действия..."
+        EXPIRY=$(openssl x509 -in "$CERT_FILE" -noout -enddate 2>/dev/null | cut -d= -f2)
+        EXPIRY_EPOCH=$(date -d "$EXPIRY" +%s 2>/dev/null || echo "0")
+        NOW_EPOCH=$(date +%s)
+        DAYS_LEFT=$(( (EXPIRY_EPOCH - NOW_EPOCH) / 86400 ))
+        echo "Истекает: $EXPIRY ($DAYS_LEFT дней)"
+        
+        if [ "$DAYS_LEFT" -lt 30 ]; then
+            echo "Обновление сертификата (осталось < 30 дней)..."
+            start_challenge_server
+            certbot renew --quiet --no-self-upgrade --deploy-hook "nginx -s reload"
+            stop_challenge_server
+            if [ $? -eq 0 ]; then
+                echo "Сертификат обновлён."
+                return 0
+            else
+                echo "Предупреждение: обновление сертификата не удалось."
+                return 1
+            fi
+        else
+            echo "Сертификат действителен."
+            return 0
+        fi
+    fi
+    
+    echo "Сертификаты не найдены. Получаем от Let's Encrypt..."
     mkdir -p "$WEBROOT/.well-known/acme-challenge"
     
     start_challenge_server
     sleep 2
     
-    # Используем punycode домен для certbot
     certbot certonly \
         --webroot \
         --webroot-path="$WEBROOT" \
@@ -243,22 +237,45 @@ else
     
     if [ $CERTBOT_EXIT -eq 0 ]; then
         echo "Сертификаты успешно получены."
-        HTTPS_OK=true
+        return 0
     else
         echo "ERROR: Не удалось получить сертификат (код: $CERTBOT_EXIT)."
-        echo "Система запущена в HTTP-режиме."
+        return 1
     fi
-fi
+}
 
-# Генерируем конфиг в зависимости от наличия HTTPS
-if [ "$HTTPS_OK" = true ] && [ -n "$DOMAIN" ]; then
+# Функция переключения на HTTPS
+switch_to_https() {
+    echo "Переключаемся на HTTPS..."
     generate_full_conf "$DOMAIN"
-    echo "HTTPS активирован — используем HTTPS-конфиг."
-else
-    echo "HTTPS не активирован — используем HTTP-конфиг."
-    # Копируем HTTP-конфиг
-    cp /etc/nginx/nginx-http.conf /etc/nginx/conf.d/default.conf
-fi
+    nginx -s reload
+    echo "HTTPS активирован — nginx перезагружен."
+}
+
+# ============================================================================
+# ОСНОВНАЯ ЛОГИКА:
+# 1. Сначала запускаем nginx с HTTP-конфигом (сайт сразу работает)
+# 2. В фоне получаем сертификат
+# 3. После успеха — переключаем на HTTPS
+# ============================================================================
+
+echo "Шаг 1: Запускаем nginx с HTTP-конфигом..."
+cp /etc/nginx/nginx-http.conf /etc/nginx/conf.d/default.conf
+echo "Nginx запущен на HTTP порту 80"
+
+# Запускаем получение сертификата в фоне
+(
+    sleep 5
+    if obtain_certificate; then
+        switch_to_https
+    else
+        echo "HTTPS не активирован — сайт работает на HTTP."
+        echo "Для активации HTTPS:"
+        echo "  1. Убедитесь, что домен указывает на IP сервера"
+        echo "  2. Откройте порт 80 в фаерволе"
+        echo "  3. Перезапустите: docker compose up -d --build"
+    fi
+) &
 
 echo "Запускаем nginx..."
 exec nginx -g "daemon off;"
