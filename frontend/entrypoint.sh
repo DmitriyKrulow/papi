@@ -17,22 +17,26 @@ echo "================================================"
 # Функция конвертации домена в punycode (для IDN доменов типа мастербайт.рф)
 convert_to_punycode() {
     domain="$1"
-    # Проверяем, содержит ли домен не-ASCII символы
-    if echo "$domain" | grep -qP '[^\x00-\x7F]'; then
-        # Конвертируем в punycode через python3
-        punycode=$(python3 -c "
+    # Конвертируем через python3 (проверяем и конвертируем за один раз)
+    punycode=$(python3 -c "
 import sys
-domain = sys.argv[1]
-parts = domain.split('.')
-punycode_parts = []
-for part in parts:
-    try:
-        part.encode('ascii')
-        punycode_parts.append(part)
-    except UnicodeEncodeError:
-        punycode_parts.append(part.encode('idna').decode('ascii'))
-print('.'.join(punycode_parts))
+try:
+    domain = sys.argv[1]
+    # Пробуем encode в ascii — если не получается, значит есть не-ASCII
+    domain.encode('ascii')
+    print(domain)
+except UnicodeEncodeError:
+    parts = domain.split('.')
+    punycode_parts = []
+    for part in parts:
+        try:
+            part.encode('ascii')
+            punycode_parts.append(part)
+        except UnicodeEncodeError:
+            punycode_parts.append(part.encode('idna').decode('ascii'))
+    print('.'.join(punycode_parts))
 " "$domain" 2>/dev/null)
+    if [ -n "$punycode" ]; then
         echo "$punycode"
     else
         echo "$domain"
