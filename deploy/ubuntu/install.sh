@@ -115,14 +115,24 @@ if [ -d "$PROJECT_DIR/.git" ]; then
         git -C "$PROJECT_DIR" remote set-url origin "$RESOLVED_URL"
     fi
     git -C "$PROJECT_DIR" fetch origin "$BRANCH"
-    git -C "$PROJECT_DIR" reset --hard "origin/$BRANCH"
+    # Проверяем, существует ли remote-ветка
+    if git -C "$PROJECT_DIR" show-ref --verify --quiet "refs/remotes/origin/$BRANCH"; then
+        git -C "$PROJECT_DIR" reset --hard "origin/$BRANCH"
+    else
+        log "Remote-ветка origin/$BRANCH не найдена — используем FETCH_HEAD"
+        git -C "$PROJECT_DIR" reset --hard FETCH_HEAD
+    fi
 elif [ -d "$PROJECT_DIR" ] && [ -n "$(ls -A "$PROJECT_DIR" 2>/dev/null)" ]; then
     echo "Каталог $PROJECT_DIR непустой и не является git-репозиторием."
     echo "Освободите его или укажите другой каталог: PROJECT_DIR=/opt/papi2 sudo bash $0"
     exit 1
 else
     log "Клонирую $RESOLVED_URL ($BRANCH) в $PROJECT_DIR"
-    git clone --branch "$BRANCH" "$RESOLVED_URL" "$PROJECT_DIR"
+    # Сначала пробуем с --branch, если ветка не существует — без неё
+    if ! git clone --branch "$BRANCH" "$RESOLVED_URL" "$PROJECT_DIR" 2>/dev/null; then
+        log "Ветка $BRANCH не найдена — клонирую без указания ветки"
+        git clone "$RESOLVED_URL" "$PROJECT_DIR"
+    fi
 fi
 
 # Скрипты должны быть исполняемыми и с unix-переводами строк.
