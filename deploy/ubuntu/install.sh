@@ -221,9 +221,12 @@ fi
 log "5/8. Systemd-юниты: старт при загрузке и автообновление"
 # ---------------------------------------------------------------------------
 # Удаляем старые файлы (включая замаскированные — symlink на /dev/null)
-rm -f /etc/systemd/system/papi.service
-rm -f /etc/systemd/system/papi-update.service
-rm -f /etc/systemd/system/papi-update.timer
+for svc in papi.service papi-update.service papi-update.timer; do
+    if [ -L "/etc/systemd/system/$svc" ] && [ "$(readlink "/etc/systemd/system/$svc")" = "/dev/null" ]; then
+        log "Найден замаскированный $svc — удаляю"
+        rm -f "/etc/systemd/system/$svc"
+    fi
+done
 systemctl daemon-reload
 
 cp "$DEPLOY_DIR/papi.service" /etc/systemd/system/papi.service
@@ -235,7 +238,10 @@ if [ "$PROJECT_DIR" != "/opt/papi" ]; then
                                           /etc/systemd/system/papi-update.service
 fi
 systemctl daemon-reload
-systemctl enable papi.service papi-update.timer
+
+# Включаем по очереди
+log "Включаю papi.service"
+systemctl enable papi.service
 systemctl start papi-update.timer
 log "papi.service включён (старт стека при загрузке)"
 log "papi-update.timer включён (автообновление из git каждые 15 минут)"
