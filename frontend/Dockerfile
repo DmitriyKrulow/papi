@@ -5,6 +5,9 @@ FROM node:22-alpine AS build
 
 WORKDIR /app
 
+# Configure npm mirror for regions with restricted npm registry access
+RUN npm config set registry https://registry.npmmirror.com
+
 # Install dependencies (uses lockfile for reproducibility)
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -15,6 +18,9 @@ RUN npm run build
 
 # ---- Serve stage ----
 FROM nginx:1.27-alpine
+
+# Configure Alpine mirror for regions with restricted access
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories 2>/dev/null || true
 
 # Install certbot, openssl, and envsubst for SSL management
 RUN apk add --no-cache certbot openssl gettext
