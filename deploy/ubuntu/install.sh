@@ -56,12 +56,22 @@ if [ "$DEPLOY_FILES_MISSING" = "1" ]; then
     log "Скрипт запущен из stdin — скачиваю systemd-юниты из репозитория"
     TMP_DEPLOY=$(mktemp -d)
     for f in papi.service papi-update.service papi-update.timer; do
-        # Используем GitHub API — raw.githubusercontent.com может блокировать wget
-        download_url="https://api.github.com/repos/DmitriyKrulow/papi/contents/deploy/ubuntu/$f"
-        content=$(wget -qO- "$download_url" 2>/dev/null | python3 -c "import sys,base64,json; print(base64.b64decode(json.load(sys.stdin)['content']).decode())" 2>/dev/null)
-        if [ -n "$content" ]; then
-            echo "$content" > "$TMP_DEPLOY/$f"
-        else
+        # Пробуем несколько способов скачать
+        if command -v curl >/dev/null 2>&1; then
+            # curl + base64 (без python)
+            raw_url="https://raw.githubusercontent.com/DmitriyKrulow/papi/deploy/ubuntu/$f"
+            curl -sfL "$raw_url" -o "$TMP_DEPLOY/$f" 2>/dev/null || true
+        fi
+        # Если curl не сработал — пробуем wget + base64 decode
+        if [ ! -s "$TMP_DEPLOY/$f" ]; then
+            download_url="https://api.github.com/repos/DmitriyKrulow/papi/contents/deploy/ubuntu/$f"
+            if command -v python3 >/dev/null 2>&1; then
+                wget -qO- "$download_url" 2>/dev/null | python3 -c "import sys,base64,json; print(base64.b64decode(json.load(sys.stdin)['content']).decode())" > "$TMP_DEPLOY/$f" 2>/dev/null || true
+            elif command -v python >/dev/null 2>&1; then
+                wget -qO- "$download_url" 2>/dev/null | python -c "import sys,base64,json; print(base64.b64decode(json.load(sys.stdin)['content']).decode())" > "$TMP_DEPLOY/$f" 2>/dev/null || true
+            fi
+        fi
+        if [ ! -s "$TMP_DEPLOY/$f" ]; then
             log "WARN: не удалось скачать $f — пропущу"
         fi
     done
@@ -112,6 +122,16 @@ else
     export DEBIAN_FRONTEND=noninteractive
     apt-get update
     apt-get install -y git
+fi
+
+# Python3 нужен для декодирования base64 (GitHub API)
+if command -v python3 >/dev/null 2>&1; then
+    log "Python3 уже установлен: $(python3 --version)"
+else
+    log "Python3 не найден - устанавливаю"
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update
+    apt-get install -y python3
 fi
 
 if command -v docker >/dev/null 2>&1; then
@@ -199,6 +219,13 @@ elif [ -d "$PROJECT_DIR" ] && [ -n "$(ls -A "$PROJECT_DIR" 2>/dev/null)" ]; then
     exit 1
 else
     log "Клонирую $RESOLVED_URL ($BRANCH) в $PROJECT_DIR"
+    # Убедимся, что git может работать с HTTPS
+    if ! command -v curl >/dev/null 2>&1; then
+        log "Устанавливаю curl для HTTPS"
+        export DEBIAN_FRONTEND=noninteractive
+        apt-get update
+        apt-get install -y curl
+    fi
     # Сначала пробуем с --branch, если ветка не существует — без неё
     if ! git clone --branch "$BRANCH" "$RESOLVED_URL" "$PROJECT_DIR" 2>/dev/null; then
         log "Ветка $BRANCH не найдена — клонирую без указания ветки"
