@@ -56,11 +56,22 @@ if [ "$DEPLOY_FILES_MISSING" = "1" ]; then
     log "Скрипт запущен из stdin — скачиваю systemd-юниты из репозитория"
     TMP_DEPLOY=$(mktemp -d)
     for f in papi.service papi-update.service papi-update.timer; do
-        wget -q "https://raw.githubusercontent.com/DmitriyKrulow/papi/deploy/ubuntu/$f" -O "$TMP_DEPLOY/$f" 2>/dev/null || true
+        # Используем GitHub API — raw.githubusercontent.com может блокировать wget
+        download_url="https://api.github.com/repos/DmitriyKrulow/papi/contents/deploy/ubuntu/$f"
+        content=$(wget -qO- "$download_url" 2>/dev/null | python3 -c "import sys,base64,json; print(base64.b64decode(json.load(sys.stdin)['content']).decode())" 2>/dev/null)
+        if [ -n "$content" ]; then
+            echo "$content" > "$TMP_DEPLOY/$f"
+        else
+            log "WARN: не удалось скачать $f — пропущу"
+        fi
     done
-    if [ -f "$TMP_DEPLOY/papi.service" ]; then
+    if [ -f "$TMP_DEPLOY/papi.service" ] && [ -s "$TMP_DEPLOY/papi.service" ]; then
         DEPLOY_DIR="$TMP_DEPLOY"
         log "Юнит-файлы загружены во временную директорию"
+    else
+        log "ERROR: не удалось загрузить systemd-юниты. Запустите скрипт локально:"
+        log "  sudo bash deploy/ubuntu/install.sh"
+        exit 1
     fi
 fi
 
