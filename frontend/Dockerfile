@@ -28,9 +28,6 @@ RUN apk add --no-cache certbot openssl gettext
 # Copy HTTP config (used as fallback when SSL is not available)
 COPY nginx-http.conf /etc/nginx/nginx-http.conf
 
-# SPA + reverse-proxy config for the backend (HTTP only)
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-
 # Built assets
 COPY --from=build /app/dist /usr/share/nginx/html
 
