@@ -27,7 +27,7 @@
 
 set -e
 
-REPO_URL="${REPO_URL:-https://github.com/ditri466/TEST.git}"
+REPO_URL="${REPO_URL:-https://github.com/DmitriyKrulow/papi.git}"
 BRANCH="${BRANCH:-main}"
 PROJECT_DIR="${PROJECT_DIR:-/opt/papi}"
 SKIP_FIREWALL="${SKIP_FIREWALL:-0}"

@@ -96,11 +96,59 @@ sudo bash update.sh
 ### Ubuntu
 
 ```bash
-wget -qO- https://raw.githubusercontent.com/<repo>/deploy/ubuntu/install.sh | sudo bash
+wget -qO- https://api.github.com/repos/DmitriyKrulow/papi/contents/deploy/ubuntu/install.sh | python3 -c "import sys,base64,json; print(base64.b64decode(json.load(sys.stdin)['content']).decode())" | sudo bash
 ```
 
-Скрипт устанавливает Docker, клонирует репозиторий, генерирует `.env`,
+Скрипт устанавливает Git и Docker, клонирует репозиторий, генерирует `.env`,
 создаёт systemd-юниты и настраивает firewall.
+
+> **Примечание:** Если raw-URL отдаёт 404 (задержка кэша GitHub), используйте команду выше — она скачивает файл через GitHub API.
+
+#### После установки
+
+1. **Проверьте статус сервисов:**
+   ```bash
+   systemctl status papi
+   docker compose ps
+   ```
+
+2. **Откройте веб-интерфейс:**
+   ```bash
+   echo "http://$(hostname -I | awk '{print $1}'):$APP_PORT_VALUE"
+   ```
+   По умолчанию: `http://<IP-сервера>:80`
+
+3. **Войдите под администратором:**
+   - Логин: `admin`
+   - Пароль: `admin123`
+   - **Сразу смените пароль в настройках!**
+
+4. **Настройте `.env` (при необходимости):**
+   ```bash
+   sudo nano /opt/papi/.env
+   ```
+   Основные параметры:
+   - `CORS_ORIGINS` — домены, которым разрешён CORS
+   - `FRONTEND_URL` — URL фронтенда
+   - `SMTP_*` — настройки почты (если нужны)
+
+   После изменений:
+   ```bash
+   sudo systemctl restart papi
+   ```
+
+5. **Проверьте логи:**
+   ```bash
+   docker compose logs -f backend   # логи бэкенда
+   docker compose logs -f frontend  # логи фронтенда
+   journalctl -u papi -f            # логи systemd
+   ```
+
+6. **Обновление:**
+   ```bash
+   sudo bash /opt/papi/update.sh
+   ```
+   Или дождитесь автообновления (каждые 15 минут).
 
 ### Windows
 
