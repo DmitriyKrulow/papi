@@ -41,6 +41,30 @@ DEPLOY_DIR="$(cd "$(dirname "$0")" && pwd)"
 log() { echo "[$(date '+%H:%M:%S')] $*"; }
 
 # ---------------------------------------------------------------------------
+# Если скрипт запущен из stdin (wget -qO- ... | bash), DEPLOY_DIR будет
+# указывать на текущий каталог, а не на deploy/ubuntu/. Скачаем юнит-файлы.
+# ---------------------------------------------------------------------------
+DEPLOY_FILES_MISSING=0
+for f in papi.service papi-update.service papi-update.timer; do
+    if [ ! -f "$DEPLOY_DIR/$f" ]; then
+        DEPLOY_FILES_MISSING=1
+        break
+    fi
+done
+
+if [ "$DEPLOY_FILES_MISSING" = "1" ]; then
+    log "Скрипт запущен из stdin — скачиваю systemd-юниты из репозитория"
+    TMP_DEPLOY=$(mktemp -d)
+    for f in papi.service papi-update.service papi-update.timer; do
+        wget -q "https://raw.githubusercontent.com/DmitriyKrulow/papi/deploy/ubuntu/$f" -O "$TMP_DEPLOY/$f" 2>/dev/null || true
+    done
+    if [ -f "$TMP_DEPLOY/papi.service" ]; then
+        DEPLOY_DIR="$TMP_DEPLOY"
+        log "Юнит-файлы загружены во временную директорию"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
 # Определяем URL для git
 # ---------------------------------------------------------------------------
 # Если REPO_URL уже содержит токен — используем как есть
@@ -237,6 +261,11 @@ elif command -v ufw >/dev/null 2>&1 || apt-get install -y ufw >/dev/null 2>&1; t
     ufw status verbose | sed 's/^/    /'
 else
     log "Не удалось установить ufw - откройте порты вручную"
+fi
+
+# Очистка временной директории (если скачивали юнит-файлы)
+if [ -n "${TMP_DEPLOY:-}" ] && [ -d "${TMP_DEPLOY:-}" ]; then
+    rm -rf "$TMP_DEPLOY"
 fi
 
 # ---------------------------------------------------------------------------
