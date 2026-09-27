@@ -235,11 +235,17 @@ obtain_certificate() {
     stop_challenge_server
     CERTBOT_EXIT=$?
     
-    if [ $CERTBOT_EXIT -eq 0 ]; then
+    # Проверяем что сертификат действительно создан
+    if [ $CERTBOT_EXIT -eq 0 ] && [ -f "$CERT_FILE" ] && [ -s "$CERT_FILE" ]; then
         echo "Сертификаты успешно получены."
         return 0
     else
-        echo "ERROR: Не удалось получить сертификат (код: $CERTBOT_EXIT)."
+        echo "ERROR: Не удалось получить сертификат (код: $CERTBOT_EXIT, файл: $CERT_FILE)."
+        if [ -f "$CERT_FILE" ]; then
+            echo "  Файл есть, но пустой или повреждён."
+        else
+            echo "  Файл не найден: $CERT_FILE"
+        fi
         return 1
     fi
 }
@@ -255,7 +261,7 @@ switch_to_https() {
 # ============================================================================
 # ОСНОВНАЯ ЛОГИКА:
 # 1. Сначала запускаем nginx с HTTP-конфигом (сайт сразу работает)
-# 2. В фоне получаем сертификат
+# 2. В фоне получаем сертификат (до 5 попыток с интервалом)
 # 3. После успеха — переключаем на HTTPS
 # ============================================================================
 
@@ -263,10 +269,30 @@ echo "Шаг 1: Запускаем nginx с HTTP-конфигом..."
 cp /etc/nginx/nginx-http.conf /etc/nginx/conf.d/default.conf
 echo "Nginx запущен на HTTP порту 80"
 
+# Функция получения сертификата с retry
+obtain_certificate_with_retry() {
+    MAX_RETRIES=5
+    RETRY=0
+    while [ $RETRY -lt $MAX_RETRIES ]; do
+        RETRY=$((RETRY + 1))
+        echo "Попытка $RETRY/$MAX_RETRIES..."
+        if obtain_certificate; then
+            return 0
+        fi
+        if [ $RETRY -lt $MAX_RETRIES ]; then
+            WAIT_TIME=$((RETRY * 30))
+            echo "Ждём $WAIT_TIME сек перед повторной попыткой..."
+            sleep $WAIT_TIME
+        fi
+    done
+    echo "Не удалось получить сертификат после $MAX_RETRIES попыток."
+    return 1
+}
+
 # Запускаем получение сертификата в фоне
 (
     sleep 5
-    if obtain_certificate; then
+    if obtain_certificate_with_retry; then
         switch_to_https
     else
         echo "HTTPS не активирован — сайт работает на HTTP."
