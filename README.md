@@ -95,22 +95,6 @@ sudo bash update.sh
 
 ### Ubuntu
 
-#### Вариант 1 — без токена (SSH-ключ на сервере)
-
-```bash
-wget -qO- https://api.github.com/repos/DmitriyKrulow/papi/contents/deploy/ubuntu/install.sh | python3 -c "import sys,base64,json; print(base64.b64decode(json.load(sys.stdin)['content']).decode())" | sudo bash
-```
-
-Скрипт автоматически найдёт SSH-ключ и использует его.
-
-#### Вариант 2 — с Personal Access Token
-
-```bash
-GITHUB_TOKEN=ghp_ваш_токен wget -qO- https://api.github.com/repos/DmitriyKrulow/papi/contents/deploy/ubuntu/install.sh | python3 -c "import sys,base64,json; print(base64.b64decode(json.load(sys.stdin)['content']).decode())" | sudo bash
-```
-
-#### Вариант 3 — интерактивный (скрипт попросит токен)
-
 ```bash
 wget -qO- https://api.github.com/repos/DmitriyKrulow/papi/contents/deploy/ubuntu/install.sh | python3 -c "import sys,base64,json; print(base64.b64decode(json.load(sys.stdin)['content']).decode())" | sudo bash
 ```
@@ -118,12 +102,11 @@ wget -qO- https://api.github.com/repos/DmitriyKrulow/papi/contents/deploy/ubuntu
 Скрипт установит Git и Docker, клонирует репозиторий, сгенерирует `.env`,
 создаст systemd-юниты и настроит firewall.
 
-> **Как создать токен:**
-> 1. Откройте https://github.com/settings/tokens/new
-> 2. Name: любой (например `server-ubuntu`)
-> 3. Permissions: поставьте галочку **`repo`** (полный доступ к репозиториям)
-> 4. Нажмите **Generate token** внизу
-> 5. Скопируйте токен (начинается с `ghp_`)
+> **Примечание:** Для публичных репозиториев авторизация не нужна.
+> Для приватных — передайте токен:
+> ```bash
+> GITHUB_TOKEN=ghp_ваш_токен bash -
+> ```
 
 #### После установки
 

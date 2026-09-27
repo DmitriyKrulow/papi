@@ -41,72 +41,25 @@ DEPLOY_DIR="$(cd "$(dirname "$0")" && pwd)"
 log() { echo "[$(date '+%H:%M:%S')] $*"; }
 
 # ---------------------------------------------------------------------------
-# Определяем URL для git с авторизацией
+# Определяем URL для git
 # ---------------------------------------------------------------------------
-# GitHub требует аутентификацию для HTTPS. Два варианта:
-#
-# 1. SSH-ключ (рекомендуется для серверов):
-#    - Сгенерируйте: ssh-keygen -t ed25519 -C "server"
-#    - Добавьте публичный ключ в GitHub: Settings → SSH and GPG keys → New
-#    - Файл: ~/.ssh/id_ed25519.pub
-#    - Скрипт автоматически использует SSH, если ключ найден
-#
-# 2. Personal Access Token (для HTTPS):
-#    - Создайте токен: https://github.com/settings/tokens/new
-#    - Тип: Classic (не Fine-grained)
-#    - Разрешения: repo (полный доступ к репозиториям)
-#    - Скопируйте токен и передайте:
-#        GITHUB_TOKEN=ghp_xxxx REPO_URL=https://x-access-token:$GITHUB_TOKEN@github.com/DmitriyKrulow/papi.git bash $0
-#
-# Если ни SSH, ни токен не настроены — скрипт попросит ввести токен вручную.
-# ---------------------------------------------------------------------------
-resolve_repo_url() {
-    # Если REPO_URL уже содержит токен — используем как есть
-    if echo "$REPO_URL" | grep -q "x-access-token@"; then
-        log "Используем REPO_URL с токеном"
-        echo "$REPO_URL"
-        return
-    fi
-
-    # Пробуем SSH — если есть приватный ключ
-    if [ -f "$HOME/.ssh/id_ed25519" ] || [ -f "$HOME/.ssh/id_rsa" ]; then
-        log "Найден SSH-ключ — используем SSH"
-        # Конвертируем https://github.com/user/repo.git → git@github.com:user/repo.git
-        local ssh_url
-        ssh_url=$(echo "$REPO_URL" | sed 's|https://github.com/|git@github.com:|; s|\.git$||')
-        echo "$ssh_url"
-        return
-    fi
-
-    # Если токен передан через переменную — подставляем
-    if [ -n "${GITHUB_TOKEN:-}" ]; then
-        log "Используем GITHUB_TOKEN из окружения"
-        echo "https://x-access-token:${GITHUB_TOKEN}@github.com$(echo "$REPO_URL" | sed 's|https://github.com/||')"
-        return
-    fi
-
-    # Ничего не найдено — просим токен
-    log "SSH-ключ не найден, GITHUB_TOKEN не задан"
-    echo ""
-    echo "============================================"
-    echo "  Для клонирования нужен доступ к GitHub"
-    echo "============================================"
-    echo ""
-    echo "Создайте Personal Access Token:"
-    echo "  1. Откройте: https://github.com/settings/tokens/new"
-    echo "  2. Name: любой (например 'server-ubuntu')"
-    echo "  3. Expires: выберите срок"
-    echo "  4. Разрешения: поставьте галочку 'repo' (полный доступ)"
-    echo "  5. Нажмите 'Generate token' внизу"
-    echo "  6. Скопируйте токен (начинается с ghp_)"
-    echo ""
-    echo "Вставьте токен ниже:"
-    read -rs GITHUB_TOKEN_INPUT
-    echo ""
-    echo "https://x-access-token:${GITHUB_TOKEN_INPUT}@github.com$(echo "$REPO_URL" | sed 's|https://github.com/||')"
-}
-
-RESOLVED_URL=$(resolve_repo_url)
+# Если REPO_URL уже содержит токен — используем как есть
+if echo "$REPO_URL" | grep -q "x-access-token@"; then
+    RESOLVED_URL="$REPO_URL"
+    log "Используем REPO_URL с токеном"
+# Пробуем SSH — если есть приватный ключ
+elif [ -f "$HOME/.ssh/id_ed25519" ] || [ -f "$HOME/.ssh/id_rsa" ]; then
+    log "Найден SSH-ключ — используем SSH"
+    RESOLVED_URL=$(echo "$REPO_URL" | sed 's|https://github.com/|git@github.com:|; s|\.git$||')
+# Если токен передан через переменную — подставляем
+elif [ -n "${GITHUB_TOKEN:-}" ]; then
+    log "Используем GITHUB_TOKEN из окружения"
+    RESOLVED_URL="https://x-access-token:${GITHUB_TOKEN}@github.com$(echo "$REPO_URL" | sed 's|https://github.com/||')"
+# Для публичных репозиториев — обычный HTTPS (без авторизации)
+else
+    log "Используем HTTPS (публичный репозиторий)"
+    RESOLVED_URL="$REPO_URL"
+fi
 
 if [ "$(id -u)" -ne 0 ]; then
     echo "Запустите с правами root: sudo bash $0"
