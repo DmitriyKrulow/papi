@@ -155,6 +155,12 @@ log "2/8. Код проекта в $PROJECT_DIR"
 if [ -d "$PROJECT_DIR/.git" ]; then
     log "Репозиторий уже клонирован - обновляю"
     git config --global --add safe.directory "$PROJECT_DIR" || true
+    # Обновляем remote URL на аутентифицированный (если нужно)
+    current_url=$(git -C "$PROJECT_DIR" remote get-url origin)
+    if [ "$current_url" != "$RESOLVED_URL" ]; then
+        log "Обновляю URL origin"
+        git -C "$PROJECT_DIR" remote set-url origin "$RESOLVED_URL"
+    fi
     git -C "$PROJECT_DIR" fetch origin "$BRANCH"
     git -C "$PROJECT_DIR" reset --hard "origin/$BRANCH"
 elif [ -d "$PROJECT_DIR" ] && [ -n "$(ls -A "$PROJECT_DIR" 2>/dev/null)" ]; then
