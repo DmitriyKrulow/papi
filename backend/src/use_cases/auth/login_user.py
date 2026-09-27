@@ -250,7 +250,7 @@ class LoginUser:
         user = db.query(User).filter(User.username == username).first()
         if not user:
             _record_failure(db, username, ip_address)
-            raise HTTPException(status_code=400, detail="Incorrect username or password")
+            raise HTTPException(status_code=400, detail="Неверное имя пользователя или пароль")
 
         # --- Шаг 2: Проверка IP whitelist (для администраторов) ---
         if not _check_ip_allowed(user, ip_address):
@@ -281,15 +281,15 @@ class LoginUser:
         # --- Шаг 5: Проверка пароля ---
         if not user.password_hash:
             _record_failure(db, username, ip_address)
-            raise HTTPException(status_code=400, detail="Password not set for user")
+            raise HTTPException(status_code=400, detail="Пароль не установлен для пользователя")
 
         try:
             password_hash = PasswordHash.from_hash_string(user.password_hash)
             if not password_hash.verify(password):
-                raise HTTPException(status_code=400, detail="Incorrect username or password")
+                raise HTTPException(status_code=400, detail="Неверный пароль")
         except ValueError as e:
             _record_failure(db, username, ip_address)
-            raise HTTPException(status_code=400, detail=f"Invalid password format: {str(e)}")
+            raise HTTPException(status_code=400, detail=f"Ошибка проверки пароля: {str(e)}")
 
         # --- Шаг 6: Успешный вход ---
         _record_success(db, username, ip_address)

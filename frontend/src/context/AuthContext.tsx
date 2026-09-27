@@ -102,8 +102,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return response.data;
     } catch (err) {
       const axiosError = err as AxiosError;
-      const errorDetail = axiosError.response?.data || axiosError.message || 'Login failed';
-      setError(typeof errorDetail === 'string' ? errorDetail : JSON.stringify(errorDetail));
+      // Извлекаем понятное сообщение об ошибке от сервера
+      const errorData = axiosError.response?.data;
+      let errorMsg: string;
+      if (errorData && typeof errorData === 'object' && 'detail' in errorData) {
+        errorMsg = (errorData as any).detail || 'Неизвестная ошибка';
+      } else {
+        errorMsg = axiosError.message || 'Ошибка входа';
+      }
+      setError(errorMsg);
       throw err;
     } finally {
       setLoading(false);
