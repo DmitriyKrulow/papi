@@ -1,3 +1,11 @@
+import os
+from dotenv import load_dotenv
+
+# Загружаем .env как можно раньше
+_env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))), '.env')
+if os.path.exists(_env_path):
+    load_dotenv(_env_path)
+
 from fastapi import Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
@@ -8,7 +16,13 @@ from src.infrastructure.db.session import SessionLocal
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
-SECRET_KEY = "your-secret-key-change-in-production"
+SECRET_KEY = os.getenv("SECRET_KEY")
+
+if not SECRET_KEY:
+    raise RuntimeError(
+        "SECRET_KEY environment variable is not set. "
+        "Please add SECRET_KEY to your .env file."
+    )
 ALGORITHM = "HS256"
 
 

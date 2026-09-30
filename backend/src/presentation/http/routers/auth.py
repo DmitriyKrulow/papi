@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 import logging
+import os
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -11,7 +12,7 @@ from src.core.value_objects.password_hash import PasswordHash
 from src.infrastructure.db.models.user import User
 from ..schemas.auth import UserLogin as LoginRequest, UserCreate as RegisterRequest
 from ..schemas.auth import UserToken, UserResponse, ProfileUpdate
-from ..dependencies.auth import get_current_user
+from ..dependencies.auth import get_current_user, SECRET_KEY, ALGORITHM
 from src.use_cases.auth.login_user import (
     LoginUser,
     BruteForceException,
@@ -19,9 +20,6 @@ from src.use_cases.auth.login_user import (
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-
-SECRET_KEY = "your-secret-key-change-in-production"
-ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 
