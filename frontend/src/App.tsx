@@ -27,6 +27,7 @@ import InventoryMobile from './pages/InventoryMobile';
 import InventoryAssetMobile from './pages/InventoryAssetMobile';
 import AuditLog from './pages/AuditLog';
 import NotificationsPage from './pages/NotificationsPage';
+import SchedulePage from './pages/SchedulePage';
 import './index.css';
 
 class ErrorBoundary extends React.Component<
@@ -237,6 +238,13 @@ function App() {
                 <Route path="/notifications" element={
                   <PrivateRoute>
                     <NotificationsPage />
+                  </PrivateRoute>
+                } />
+                
+                {/* Календарь событий — доступен всем авторизованным пользователям */}
+                <Route path="/schedule" element={
+                  <PrivateRoute>
+                    <SchedulePage />
                   </PrivateRoute>
                 } />
                 

@@ -1114,6 +1114,9 @@ const handleEditClick = (asset: Asset) => {
                     <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-r border-gray-100 dark:border-gray-600 w-28">
                       Проверка
                     </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-r border-gray-100 dark:border-gray-600 w-40">
+                      📡 RFID
+                    </th>
                     <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-24">
                       Действия
                     </th>
@@ -1176,6 +1179,18 @@ const handleEditClick = (asset: Asset) => {
                               <ClipboardCheck className="w-4 h-4 text-gray-300 dark:text-gray-600" />
                               <span className="text-[10px] text-gray-400">—</span>
                             </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-sm font-mono text-gray-600 dark:text-gray-400 border-r border-gray-50 dark:border-gray-700">
+                          {asset.rfid_tag ? (
+                            <div className="flex items-center gap-1">
+                              <span className="text-green-500">📡</span>
+                              <span className="truncate max-w-[120px]" title={asset.rfid_tag}>
+                                {asset.rfid_tag}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-gray-300 dark:text-gray-600">—</span>
                           )}
                         </td>
                         <td className="px-4 py-3 text-center">

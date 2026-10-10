@@ -69,6 +69,12 @@ class Asset(Base):
     last_inventory_date = Column(DateTime, nullable=True)
     last_inventory_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     last_inventory_confirmed = Column(Boolean, nullable=False, default=False)
+    
+    # RFID — метка для сканера
+    rfid_tag = Column(String(100), nullable=True, unique=True, index=True)
+    
+    # Адрес хранения (стеллаж, полка, ячейка)
+    storage_address_id = Column(Integer, ForeignKey("storage_addresses.id"), nullable=True, index=True)
 
     __table_args__ = (
         Index("idx_assets_inventory_number", "inventory_number"),
@@ -76,6 +82,7 @@ class Asset(Base):
         Index("idx_assets_created_at", "created_at"),
         Index("idx_assets_asset_type", "asset_type"),
         Index("idx_assets_is_active", "is_active"),
+        Index("idx_assets_rfid_tag", "rfid_tag"),
     )
 
     repair_requests = relationship("RepairRequest", back_populates="asset")
@@ -89,6 +96,7 @@ class Asset(Base):
     last_inventory_by = relationship("User", foreign_keys=[last_inventory_by_id])
     inventory_check_items = relationship("InventoryCheckItem", back_populates="asset", cascade="all, delete-orphan")
     assigned_room = relationship("Room", backref="assets")
+    storage_address = relationship("StorageAddress", back_populates="assets")
 
     def __repr__(self) -> str:
         return f"<Asset(id={self.id}, name='{self.name}', status='{self.status}')>"

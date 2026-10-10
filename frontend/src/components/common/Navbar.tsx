@@ -24,6 +24,7 @@ const Navbar: React.FC = () => {
     { path: '/marking', label: 'Маркировка', icon: '🏷️' },
     { path: '/reports', label: 'Отчёты', icon: '📈' },
     { path: '/repairs', label: 'Ремонты', icon: '🔧' },
+    { path: '/schedule', label: 'Расписание', icon: '📅' },
     { path: '/notifications', label: 'Уведомления', icon: '🔔' },
   ];
 

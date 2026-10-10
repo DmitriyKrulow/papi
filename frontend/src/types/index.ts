@@ -68,6 +68,11 @@ export interface Asset {
   last_inventory_date?: string;
   last_inventory_by_id?: number;
   last_inventory_confirmed?: boolean;
+  // RFID
+  rfid_tag?: string;
+  // Адрес хранения
+  storage_address_id?: number;
+  storage_address_name?: string;
 }
 
 // ========== Пользователи ==========

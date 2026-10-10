@@ -3,7 +3,14 @@ import re
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
+
+# src/main.py
+import re
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, HTMLResponse
 
 from src.infrastructure.db.init_db import init_db, get_or_create_admin
 from src.infrastructure.db.session import SessionLocal
@@ -21,7 +28,76 @@ os.makedirs("uploads/reports", exist_ok=True)
 os.makedirs("uploads/inventory", exist_ok=True)
 os.makedirs("uploads/asset_photos", exist_ok=True)
 
-app = FastAPI(title="PAPI Backend", redirect_slashes=True)
+app = FastAPI(
+    title="PAPI Backend",
+    description="""
+    ## PAPI — Система управления активами
+    
+    Полнофункциональная система управления активами с поддержкой:
+    
+    - **RFID-сканирование** — пассивное сканирование помещений, приёмка, перемещение
+    - **Адресное хранение** — иерархия стеллажей, полок, ячеек
+    - **Система МОЛ** — передача/возврат активов между сотрудниками
+    - **Аналитика** — тренды поломок, расхождения, рекомендации по закупкам
+    - **Списание** — дисциплина списания с немедленным отражением выбытия
+    - **Календарь инвентаризаций** — выборочная проверка по помещениям
+    - **Ежемесячная сверка** — reconciliation с бухгалтерией
+    - **Нормативные документы** — оснащение, должностные обязанности, ответственность
+    
+    ### Авторизация
+    
+    #### JWT Token (для веб-интерфейса)
+    ```
+    Authorization: Bearer <token>
+    ```
+    
+    #### API Key (для RFID-сканера)
+    ```
+    X-API-Key: rfid_abc123def456...
+    ```
+    
+    ### Основные endpoints
+    
+    | Category | Base Path |
+    |----------|-----------|
+    | Assets | `/api/assets` |
+    | RFID | `/api/rfid` |
+    | Handovers | `/api/handovers` |
+    | Storage | `/api/storage-addresses` |
+    | Analytics | `/api/analytics` |
+    | Disposal | `/api/disposal` |
+    | Schedule | `/api/inventory-schedule` |
+    | Reconciliation | `/api/reconciliation` |
+    | Regulatory | `/api/regulatory` |
+    | Inventory | `/api/inventory-checks` |
+    | Marking | `/api/marking` |
+    | Audit | `/api/audit` |
+    
+    ### Документация
+    
+    - **Swagger UI:** `/docs`
+    - **ReDoc:** `/redoc`
+    - **OpenAPI JSON:** `/openapi.json`
+    """,
+    version="2.0.0",
+    contact={
+        "name": "PAPI Support",
+        "email": "support@papi.local",
+    },
+    license_info={
+        "name": "Proprietary",
+    },
+    redirect_slashes=True,
+)
+
+
+@app.get("/", tags=["root"])
+async def root():
+    """
+    Корневой endpoint — редирект на документацию API.
+    """
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/docs")
 
 
 # ---------------------------------------------------------------------------
@@ -158,6 +234,16 @@ def register_routers():
     from src.presentation.http.routers.system_settings import router as system_settings_router
     from src.presentation.http.routers.audit import router as audit_router
     from src.presentation.http.routers.data_export import router as data_export_router
+    from src.presentation.http.routers.rfid import router as rfid_router
+    from src.presentation.http.routers.rfid_keys import router as rfid_keys_router
+    from src.presentation.http.routers.rfid_1c import router as rfid_1c_router
+    from src.presentation.http.routers.handovers import router as handovers_router
+    from src.presentation.http.routers.storage_addresses import router as storage_addresses_router
+    from src.presentation.http.routers.analytics import router as analytics_router
+    from src.presentation.http.routers.disposal import router as disposal_router
+    from src.presentation.http.routers.inventory_schedule import router as inventory_schedule_router
+    from src.presentation.http.routers.reconciliation import router as reconciliation_router
+    from src.presentation.http.routers.regulatory_documents import router as regulatory_documents_router
 
     app.include_router(assets_router, prefix="/api")
     app.include_router(assets_export_router)
@@ -185,6 +271,16 @@ def register_routers():
     app.include_router(notification_settings_router, prefix="/api")
     app.include_router(system_settings_router, prefix="/api")
     app.include_router(audit_router)
+    app.include_router(rfid_router)
+    app.include_router(rfid_keys_router)
+    app.include_router(rfid_1c_router)
+    app.include_router(handovers_router)
+    app.include_router(storage_addresses_router)
+    app.include_router(analytics_router)
+    app.include_router(disposal_router)
+    app.include_router(inventory_schedule_router)
+    app.include_router(reconciliation_router)
+    app.include_router(regulatory_documents_router)
 
 
 def seed_notification_templates(db):

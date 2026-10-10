@@ -4,6 +4,13 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import type { Department, Employee } from '../types';
 import HttpSettingsPage from './HttpSettings';
+import RfidKeysPage from './RfidKeysPage';
+import HandoversPage from './HandoversPage';
+import RegulatoryPage from './RegulatoryPage';
+import AnalyticsPage from './AnalyticsPage';
+import DisposalPage from './DisposalPage';
+import SchedulePage from './SchedulePage';
+import ReconciliationPage from './ReconciliationPage';
 
 interface TreeDepartment {
   id: number;
@@ -94,9 +101,58 @@ interface RoomFormData {
   building: string;
 }
 
+type TabId = 'users' | 'placements' | 'employees' | 'password-requests' | 'notifications' | 'http-settings' | 'rfid-keys' | 'handovers' | 'analytics' | 'disposal' | 'schedule' | 'reconciliation' | 'regulatory';
+
+interface NavSection {
+  title: string;
+  icon: string;
+  items: { id: TabId; label: string; icon: string }[];
+}
+
+const navSections: NavSection[] = [
+  {
+    title: 'Управление',
+    icon: '⚙️',
+    items: [
+      { id: 'users', label: 'Пользователи', icon: '👥' },
+      { id: 'employees', label: 'Сотрудники', icon: '👤' },
+      { id: 'placements', label: 'Размещения', icon: '🏢' },
+    ],
+  },
+  {
+    title: 'Безопасность',
+    icon: '🔒',
+    items: [
+      { id: 'password-requests', label: 'Заявки на сброс пароля', icon: '🔑' },
+      { id: 'notifications', label: 'Уведомления', icon: '📧' },
+      { id: 'http-settings', label: 'HTTPS', icon: '🔒' },
+    ],
+  },
+  {
+    title: 'Оборудование',
+    icon: '📡',
+    items: [
+      { id: 'rfid-keys', label: 'RFID-сканеры', icon: '📡' },
+      { id: 'handovers', label: 'Передачи', icon: '📦' },
+    ],
+  },
+  {
+    title: 'Отчёты',
+    icon: '📊',
+    items: [
+      { id: 'analytics', label: 'Аналитика', icon: '📊' },
+      { id: 'disposal', label: 'Списание', icon: '🗑️' },
+      { id: 'schedule', label: 'Календарь', icon: '📅' },
+      { id: 'reconciliation', label: 'Сверка', icon: '🔄' },
+      { id: 'regulatory', label: 'Документы', icon: '📜' },
+    ],
+  },
+];
+
 const AdminPanel: React.FC = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'users' | 'placements' | 'employees' | 'password-requests' | 'notifications' | 'http-settings'>('users');
+  const [activeTab, setActiveTab] = useState<TabId>('users');
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -950,68 +1006,63 @@ const AdminPanel: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900">
-      <main className="flex-grow container mx-auto px-4 py-8">
-        <div className="max-w-6xl mx-auto">
-          <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 mb-6 border border-gray-100 dark:border-gray-700">
+    <div className="min-h-screen flex bg-gray-50 dark:bg-gray-900">
+      {sidebarOpen && (
+        <div className="fixed inset-0 bg-black/50 z-20 lg:hidden" onClick={() => setSidebarOpen(false)} />
+      )}
+      <aside className={`fixed lg:static inset-y-0 left-0 z-30 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col transition-all duration-300 ${
+        sidebarOpen ? 'w-64 translate-x-0' : 'w-64 -translate-x-full lg:translate-x-0 lg:w-0 overflow-hidden'
+      }`}>
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+          <h1 className="text-lg font-bold text-gray-900 dark:text-gray-100">👑 Админ</h1>
+          <button onClick={() => setSidebarOpen(false)} className="p-1.5 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition">✕</button>
+        </div>
+        <nav className="flex-1 overflow-y-auto p-3 space-y-4">
+          {navSections.map((section) => (
+            <div key={section.title}>
+              <div className="flex items-center gap-2 px-2 py-1.5 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+                <span>{section.icon}</span><span>{section.title}</span>
+              </div>
+              <div className="space-y-1 mt-1">
+                {section.items.map((item) => {
+                  const isActive = activeTab === item.id;
+                  const hasPending = item.id === 'password-requests' && passwordRequests.filter(r => r.status === 'pending').length > 0;
+                  return (
+                    <button key={item.id} onClick={() => { setActiveTab(item.id); if (window.innerWidth < 1024) setSidebarOpen(false); }}
+                      className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition ${
+                        isActive ? 'bg-blue-600 text-white shadow-md' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}>
+                      <span className="text-base">{item.icon}</span><span className="truncate">{item.label}</span>
+                      {hasPending && !isActive && <span className="ml-auto bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">{passwordRequests.filter(r => r.status === 'pending').length}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </nav>
+        <div className="p-3 border-t border-gray-200 dark:border-gray-700">
+          <button onClick={() => navigate('/dashboard')} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition">
+            <span>←</span><span>Назад в дашборд</span>
+          </button>
+        </div>
+      </aside>
+      <main className="flex-1 flex flex-col min-h-screen">
+        <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center gap-3">
+          {!sidebarOpen && (
+            <button onClick={() => setSidebarOpen(true)} className="p-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition">☰</button>
+          )}
+          <div className="flex-1">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              {(() => { for (const s of navSections) { const i = s.items.find(x => x.id === activeTab); if (i) return `${i.icon} ${i.label}`; } return 'Админ-панель'; })()}
+            </h2>
+          </div>
+        </div>
+        <div className="flex-grow container mx-auto px-4 py-6">
+          <div className="max-w-6xl mx-auto">
             {loading ? (
               <div className="text-center py-8 text-gray-500 dark:text-gray-400">Загрузка...</div>
             ) : (
               <>
-                <div className="flex justify-between items-center mb-4">
-                  <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">👑 Админ-панель</h1>
-                    <button
-                      onClick={() => navigate('/dashboard')}
-                    className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition"
-                  >
-                    ← Назад в дашборд
-                  </button>
-                </div>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Управление системой</p>
-
-                <div className="flex gap-1 mb-6 border-b border-gray-200 dark:border-gray-700">
-                  <button
-                    onClick={() => setActiveTab('users')}
-                    className={`px-4 py-2 font-medium text-sm rounded-t-lg transition ${activeTab === 'users' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
-                  >
-                    👥 Пользователи
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('placements')}
-                    className={`px-4 py-2 font-medium text-sm rounded-t-lg transition ${activeTab === 'placements' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
-                  >
-                    🏢 Размещения
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('employees')}
-                    className={`px-4 py-2 font-medium text-sm rounded-t-lg transition ${activeTab === 'employees' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
-                  >
-                    👤 Сотрудники
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('password-requests')}
-                    className={`px-4 py-2 font-medium text-sm rounded-t-lg transition ${activeTab === 'password-requests' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
-                  >
-                    🔑 Заявки на сброс пароля
-                    {passwordRequests.filter(r => r.status === 'pending').length > 0 && (
-                      <span className="ml-2 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
-                        {passwordRequests.filter(r => r.status === 'pending').length}
-                      </span>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('notifications')}
-                    className={`px-4 py-2 font-medium text-sm rounded-t-lg transition ${activeTab === 'notifications' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
-                  >
-                    📧 Уведомления
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('http-settings')}
-                    className={`px-4 py-2 font-medium text-sm rounded-t-lg transition ${activeTab === 'http-settings' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
-                  >
-                    🔒 HTTPS
-                  </button>
-                </div>
                 
                 {error && activeTab === 'users' && (
                   <div className="bg-red-100 dark:bg-red-900 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-300 px-4 py-3 rounded mb-4">
@@ -1866,9 +1917,14 @@ const AdminPanel: React.FC = () => {
           )}
 
           {/* HTTPS Settings Tab */}
-          {activeTab === 'http-settings' && (
-            <HttpSettingsPage />
-          )}
+          {activeTab === 'http-settings' && <HttpSettingsPage />}
+          {activeTab === 'rfid-keys' && <RfidKeysPage />}
+          {activeTab === 'handovers' && <HandoversPage />}
+          {activeTab === 'analytics' && <AnalyticsPage />}
+          {activeTab === 'disposal' && <DisposalPage />}
+          {activeTab === 'schedule' && <SchedulePage />}
+          {activeTab === 'reconciliation' && <ReconciliationPage />}
+          {activeTab === 'regulatory' && <RegulatoryPage />}
           </div>
         </div>
       </main>

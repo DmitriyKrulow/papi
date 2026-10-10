@@ -344,3 +344,61 @@ class NotificationService:
             logger.error(f"Failed to send notification to user {user.id}: {str(e)}")
         finally:
             db.close()
+    
+    def send_handover_notification(
+        self,
+        user: object,
+        asset: object,
+        from_user: object,
+        reason: str = "",
+        return_deadline: Optional[datetime] = None,
+    ) -> bool:
+        """Отправить уведомление о передаче актива"""
+        from src.infrastructure.db.models.notification import Notification
+        from src.infrastructure.db.init_db import SessionLocal
+        
+        title = "📦 Имущество передано"
+        message = f"Вам передан актив: {asset.name} (инв. № {asset.inventory_number}) от {from_user.full_name or from_user.username}."
+        if reason:
+            message += f"\nПричина: {reason}"
+        if return_deadline:
+            message += f"\nСрок возврата: {return_deadline.strftime('%d.%m.%Y %H:%M')}"
+        else:
+            message += "\nПередано на постоянной основе."
+        
+        db = SessionLocal()
+        try:
+            notification = Notification(
+                user_id=user.id,
+                type="handover",
+                title=title,
+                message=message,
+                reference_type="asset_handover",
+                reference_id=asset.id
+            )
+            db.add(notification)
+            db.commit()
+            
+            # Отправляем email
+            if user.email:
+                email_sent = self.send_email(user.email, title, message)
+                if email_sent:
+                    notification.email_sent = True
+                    notification.email_sent_at = datetime.now()
+                    db.commit()
+            
+            # Отправляем через MAX
+            max_sent = self.send_max_notification(user.id, title, message)
+            if max_sent:
+                notification.max_sent = True
+                notification.max_sent_at = datetime.now()
+                db.commit()
+                
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Failed to send handover notification to user {user.id}: {str(e)}")
+            return False
+        finally:
+            db.close()
+        
+        return True

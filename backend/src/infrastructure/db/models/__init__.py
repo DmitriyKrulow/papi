@@ -33,6 +33,11 @@ from .notification_template import NotificationTemplate
 from .notification_settings import NotificationSettings
 from .audit_log import AuditLog
 from .system_settings import SystemSettings
+from .asset_handover import AssetHandover
+from .rfid_api_key import RfidApiKey
+from .storage_address import StorageAddress
+from .inventory_schedule import InventorySchedule, ReconciliationRecord
+from .regulatory_document import RegulatoryDocument, EquipmentStandard, ResponsibilityRecord
 
 __all__ = [
     "Base",

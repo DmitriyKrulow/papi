@@ -10,7 +10,7 @@ RUN npm config set registry https://registry.npmmirror.com
 
 # Install dependencies (uses lockfile for reproducibility)
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm install
 
 # Copy source and build static assets
 COPY . .

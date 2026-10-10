@@ -108,7 +108,9 @@ server {
     client_max_body_size 100M;
 
     location /api/ {
-        proxy_pass http://backend:8000;
+        resolver 127.0.0.11 valid=10s;
+        set \$backend_upstream http://backend:8000;
+        proxy_pass \$backend_upstream;
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
@@ -129,7 +131,9 @@ server {
     }
 
     location ~ ^/(docs|redoc|openapi.json)\$ {
-        proxy_pass http://backend:8000;
+        resolver 127.0.0.11 valid=10s;
+        set \$backend_upstream http://backend:8000;
+        proxy_pass \$backend_upstream;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;

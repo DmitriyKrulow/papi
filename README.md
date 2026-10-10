@@ -4,11 +4,19 @@ PAPI — полнофункциональная система управлен�
 
 **Возможности:**
 - Веб-интерфейс на React + Vite
-- REST API на FastAPI (Python)
+- REST API на FastAPI (Python) — Swagger/OpenAPI документация
 - PostgreSQL 16 для хранения данных
 - Автоматическое получение SSL-сертификатов Let's Encrypt
 - Автообновление из git каждые 15 минут
 - Docker-контейнеризация всего стека
+- **RFID-сканер** — API для Windows-приложения с пассивным сканированием
+- **Адресное хранение** — стеллажи, полки, ячейки с иерархией
+- **Система МОЛ** — передача/возврат активов между сотрудниками
+- **Аналитика** — тренды поломок, расхождения, рекомендации по закупкам
+- **Списание** — дисциплина списания с немедленным отражением выбытия
+- **Календарь инвентаризаций** — выборочная проверка по помещениям
+- **Ежемесячная сверка** — reconciliation с бухгалтерией
+- **Нормативные документы** — оснащение, должностные обязанности, ответственность
 
 **Доступ:**
 - Веб-приложение: `http://<IP>` или `https://<домен>` (после SSL)
@@ -310,4 +318,241 @@ journalctl -u papi-update -f             # лог обновлений
 ## Известные предупреждения
 
 - **FastAPI `on_event`** — в `main.py` используется устаревший декоратор `@app.on_event()`. Рекомендуется перейти на lifespan-хендлеры: [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
-- **npm audit (react-router)** — уязвимость `GHSA-qwww-vcr4-c8h2` затронуто версии `>=7.12.0, <8.3.0`. Текущая версия `7.11.0` **не уязвима**. Когда появится версия `8.3.0`, обновитесь через `npm install react-router-dom@latest`.
+- **npm audit (react-router)** — уязвимость `GHSA-qwww-vcr4-c8h2` затронуто версии `>=7.12.0, <8.3.0`. Текущая версия `7.11.0` **не уязвима**.     Когда появится версия `8.3.0`, обновитесь через `npm install react-router-dom@latest`.
+
+### Запуск тестов
+
+```bash
+# Все тесты
+cd backend && pytest
+
+# Только unit-тесты (не требуют БД)
+cd backend && pytest tests/unit/
+
+# Интеграционные тесты (требуют PostgreSQL)
+cd backend && pytest tests/integration/
+
+# С покрытием
+cd backend && pytest --cov=src --cov-report=html
+
+# Запустить через pip
+cd backend && pip install -r tests/requirements-test.txt
+cd backend && pytest
+```
+
+### Настройка тестовой среды
+
+Для интеграционных тестов необходим PostgreSQL:
+
+```bash
+# Создание тестовой БД
+createdb papi_test
+export DATABASE_URL="postgresql://user:pass@localhost/papi_test"
+
+# Запуск интеграционных тестов
+pytest tests/integration/ -v
+```
+
+### Структура тестов
+
+```
+backend/tests/
+├── __init__.py                    # Package init
+├── conftest.py                    # Фикстуры (sample data, mocks)
+├── requirements-test.txt          # Зависимости для тестов
+├── unit/                          # Unit-тесты (не требуют БД)
+│   ├── test_audit_service.py      # AuditService
+│   ├── test_inventory_service.py  # InventorySchedule
+│   ├── test_asset_service.py      # Asset, AssetHandover
+│   ├── test_password_hash.py      # PasswordHash VO
+│   ├── test_email.py              # Email VO
+│   ├── test_inventory_number.py   # InventoryNumber VO
+│   ├── test_serial_number.py      # SerialNumber VO
+│   ├── test_jwt_handler.py        # JWT tokens
+│   └── test_utils.py              # get_frontend_url
+└── integration/                   # Интеграционные тесты (требуют PostgreSQL)
+    ├── __init__.py
+    ├── test_auth.py               # Auth endpoints
+    ├── test_assets.py             # Assets, Storage, Analytics, Disposal
+    ├── test_rfid.py               # RFID scanner endpoints
+    ├── test_handovers.py          # Asset handover endpoints
+    ├── test_storage_addresses.py  # Storage address CRUD
+    ├── test_analytics.py          # Analytics endpoints
+    ├── test_disposal.py           # Disposal endpoints
+    ├── test_inventory_schedule.py # Inventory scheduling
+    ├── test_reconciliation.py     # Monthly reconciliation
+    └── test_regulatory.py         # Regulatory documents
+```
+
+### Фикстуры
+
+Тесты используют тестовую базу данных (PostgreSQL) и тестового клиента FastAPI:
+
+```python
+# conftest.py
+@pytest.fixture
+def sample_asset_data():
+    """Тестовые данные актива"""
+    ...
+
+@pytest.fixture
+def sample_user_data():
+    """Тестовые данные пользователя"""
+    ...
+
+@pytest.fixture
+def mock_db_session():
+    """Мок сессии базы данных"""
+    ...
+
+@pytest.fixture
+def client(monkeypatch):
+    """Test client для API с мокацией БД"""
+    ...
+```
+
+### Покрытие тестами
+
+| Модуль | Тип тестов | Описание |
+|--------|-----------|----------|
+| Value Objects | Unit | Email, PasswordHash, InventoryNumber, SerialNumber |
+| JWT Handler | Unit | Создание и верификация токенов |
+| Utils | Unit | get_frontend_url с БД и env |
+| Audit Service | Unit | AuditEntry, AuditAction |
+| RFID API | Integration | Auth, inventories, scan, receive, move |
+| Handovers API | Integration | Handover, return, history, stats |
+| Storage Addresses | Integration | Tree, CRUD, move, search, stats |
+| Analytics API | Integration | Overview, trends, discrepancies |
+| Disposal API | Integration | Decommission, history, restore |
+| Inventory Schedule | Integration | Calendar, upcoming, CRUD |
+| Reconciliation | Integration | Monthly, export, history |
+| Regulatory Docs | Integration | Documents, standards, assign |
+
+### CI/CD
+
+Тесты запускаются автоматически при push в main и develop ветки.
+
+---
+
+## API документация
+
+### Swagger UI
+
+FastAPI автоматически генерирует интерактивную документацию API:
+
+```
+http://localhost:8080/docs          # Swagger UI
+http://localhost:8080/redoc         # ReDoc
+http://localhost:8080/openapi.json  # OpenAPI spec (JSON)
+```
+
+### Основные endpoints
+
+| Category | Base Path | Описание |
+|----------|-----------|----------|
+| **Assets** | `/api/assets` | CRUD активов |
+| **Auth** | `/api/auth` | Авторизация (JWT) |
+| **RFID** | `/api/rfid` | RFID-сканер (пассивное сканирование, приёмка, перемещение) |
+| **RFID Keys** | `/api/admin/rfid-keys` | Управление API-ключами сканеров |
+| **Handovers** | `/api/handovers` | Передача/возврат активов между сотрудниками |
+| **Storage** | `/api/storage-addresses` | Адресное хранение (стеллажи, полки, ячейки) |
+| **Analytics** | `/api/analytics` | Тренды поломок, расхождения, рекомендации |
+| **Disposal** | `/api/disposal` | Списание и выбытие активов |
+| **Schedule** | `/api/inventory-schedule` | Календарь инвентаризаций |
+| **Reconciliation** | `/api/reconciliation` | Ежемесячная сверка с бухгалтерией |
+| **Regulatory** | `/api/regulatory` | Нормативные документы, оснащение, ответственность |
+| **Inventory** | `/api/inventory-checks` | Инвентаризации |
+| **Marking** | `/api/marking` | QR-коды и маркировка |
+| **Audit** | `/api/audit` | Журнал аудита |
+| **Reports** | `/reports` | Отчёты (Excel, PDF) |
+
+### Авторизация
+
+Большинство endpoints требуют JWT-токен:
+```
+Authorization: Bearer <token>
+```
+
+RFID-сканеры используют API-ключ:
+```
+X-API-Key: rfid_abc123def456...
+```
+
+### Примеры запросов
+
+#### Получить активы
+```bash
+curl -H "Authorization: Bearer <token>" http://localhost:8080/api/assets
+```
+
+#### RFID-сканирование помещения
+```bash
+curl -X POST \
+  -H "X-API-Key: rfid_abc123..." \
+  "http://localhost:8080/api/rfid/scan-room?room_id=5&rfid_tags=[tag1,tag2,tag3]"
+```
+
+#### Создать расписание инвентаризации
+```bash
+curl -X POST \
+  -H "Authorization: Bearer <token>" \
+  "http://localhost:8080/api/inventory-schedule?name=Склад+1&check_type=room&target_id=5&scheduled_date=2024-10-15T10:00:00"
+```
+
+---
+
+## Тестирование
+
+### Запуск тестов
+
+```bash
+# Все тесты
+cd backend && pytest
+
+# Только unit-тесты
+cd backend && pytest tests/unit/
+
+# Только интеграционные тесты
+cd backend && pytest tests/integration/
+
+# С покрытием
+cd backend && pytest --cov=src --cov-report=html
+```
+
+### Структура тестов
+
+```
+backend/tests/
+├── unit/                    # Unit-тесты сервисов
+│   ├── test_audit_service.py
+│   ├── test_inventory_service.py
+│   └── test_asset_service.py
+├── integration/             # Интеграционные тесты API
+│   ├── test_auth.py
+│   ├── test_assets.py
+│   ├── test_rfid.py
+│   └── test_inventory.py
+├── conftest.py              # Фикстуры (test DB, test client)
+└── requirements-test.txt    # Зависимости для тестов
+```
+
+### Фикстуры
+
+Тесты используют тестовую базу данных (PostgreSQL в Docker) и тестового клиента FastAPI:
+
+```python
+# conftest.py
+@pytest.fixture
+def test_db():
+    """Тестовая сессия БД"""
+    ...
+
+@pytest.fixture
+def client(test_db):
+    """Test client для API"""
+    ...
+```
+
+### CI/CD
+
+Тесты запускаются автоматически при push в main и develop ветки.

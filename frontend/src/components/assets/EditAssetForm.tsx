@@ -55,6 +55,9 @@ const EditAssetForm: React.FC<EditAssetFormProps> = ({ existingAsset, onSubmit, 
       crypto_token_symbol: existingAsset.crypto_token_symbol || '',
       depreciation_years: existingAsset.depreciation_years || undefined,
       next_maintenance_date: existingAsset.next_maintenance_date || '',
+      rfid_tag: existingAsset.rfid_tag || '',
+      storage_address_id: existingAsset.storage_address_id || undefined,
+      storage_address_name: existingAsset.storage_address_name || '',
     },
   });
 
@@ -242,6 +245,8 @@ const handleSubmitForm = async (data: any) => {
         crypto_token_symbol: data.crypto_token_symbol,
         depreciation_years: data.depreciation_years ? Number(data.depreciation_years) : undefined,
         next_maintenance_date: data.next_maintenance_date || undefined,
+        rfid_tag: data.rfid_tag || undefined,
+        storage_address_id: data.storage_address_id || undefined,
         employee_id: selectedEmployeeId ? Number(selectedEmployeeId) : undefined,
         is_active: existingAsset.is_active,
         created_at: existingAsset.created_at,
@@ -979,6 +984,36 @@ const handleSubmitForm = async (data: any) => {
                           className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           placeholder="Описание актива..."
         />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+          📡 RFID-метка
+        </label>
+        <input
+          type="text"
+          {...register('rfid_tag')}
+          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          placeholder="Уникальный ID RFID-метки (для сканера)"
+        />
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+          Если заполнено, RFID-сканер сможет находить этот актив по метке
+        </p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+          📍 Адрес хранения
+        </label>
+        <input
+          type="text"
+          {...register('storage_address_name')}
+          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          placeholder="Стеллаж A-3-5 (код адреса)"
+        />
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+          Адрес хранения: корпус → этаж → зона → ряд → стеллаж → ячейка
+        </p>
       </div>
 
       <div className="flex gap-3 pt-4">
