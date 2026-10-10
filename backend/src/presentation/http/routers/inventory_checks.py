@@ -18,6 +18,7 @@ from src.infrastructure.db.models.user import User
 from src.infrastructure.db.models.department import Department, Room
 from src.infrastructure.db.models.employee import Employee
 from src.presentation.http.dependencies.auth import get_current_user, get_current_admin
+from src.shared.utils import get_frontend_url
 import logging
 
 logger = logging.getLogger(__name__)
@@ -567,7 +568,7 @@ async def get_inventory_qr_text(
         raise HTTPException(status_code=404, detail="Инвентаризация не найдена")
 
     # Формируем ссылку для проверки
-    base_url = "http://localhost:5173"
+    base_url = get_frontend_url(db) or "http://localhost:5173"
     qr_data = {
         "type": "inventory_check",
         "check_id": check_id,
@@ -601,7 +602,7 @@ async def get_asset_qr(
         raise HTTPException(status_code=404, detail="Актив не найден")
 
     # Формируем ссылку на мобильную страницу актива
-    base_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+    base_url = get_frontend_url(db) or "http://localhost:5173"
     asset_url = f"{base_url}/inventory/asset/{asset_id}?check_id={check_id}"
     
     qr_data = json.dumps({
@@ -642,7 +643,7 @@ async def get_inventory_qr_image(
     if not inv_check:
         raise HTTPException(status_code=404, detail="Инвентаризация не найдена")
 
-    base_url = "http://localhost:5173"
+    base_url = get_frontend_url(db) or "http://localhost:5173"
     qr_text = f"{base_url}/inventory/{check_id}"
 
     qr = qrcode.QRCode(version=2, box_size=10, border=2)

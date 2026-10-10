@@ -8,6 +8,8 @@ interface HttpSettings {
   https_email: string;
   https_port: number;
   http_warning_enabled: boolean;
+  frontend_url: string;
+  system_name: string;
 }
 
 interface HttpStatus {
@@ -26,11 +28,15 @@ const HttpSettingsPage: React.FC = () => {
     https_email: '',
     https_port: 443,
     http_warning_enabled: true,
+    frontend_url: '',
+    system_name: 'PAPI Система',
   });
   const [httpStatus, setHttpStatus] = useState<HttpStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [restarting, setRestarting] = useState(false);
+  const [urlError, setUrlError] = useState<string>('');
+  const [urlChanged, setUrlChanged] = useState(false);
 
   const fetchSettings = async () => {
     try {
@@ -46,6 +52,8 @@ const HttpSettingsPage: React.FC = () => {
           https_email: data.https_email || '',
           https_port: data.https_port || 443,
           http_warning_enabled: data.http_warning_enabled ?? true,
+          frontend_url: data.frontend_url || '',
+          system_name: data.system_name || 'PAPI Система',
         });
       }
     } catch (err) {
@@ -68,6 +76,42 @@ const HttpSettingsPage: React.FC = () => {
     }
   };
 
+  const validateFrontendUrl = (url: string): string => {
+    if (!url.trim()) return '';
+    
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        return 'URL должен использовать протокол http:// или https://';
+      }
+      
+      const hostname = parsed.hostname.toLowerCase();
+      if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.') || hostname.startsWith('10.')) {
+        return 'URL не может быть внутренним (localhost/127.0.0.1/private IP). QR-код должен быть доступен извне.';
+      }
+      
+      return '';
+    } catch {
+      return 'Введите корректный URL (напр. https://example.com)';
+    }
+  };
+
+  const handleFrontendUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSettings({...settings, frontend_url: value});
+    
+    if (value.trim()) {
+      const error = validateFrontendUrl(value);
+      setUrlError(error);
+      
+      // Track if URL actually changed from saved value
+      const oldSettings = { frontend_url: '' };
+      // We'll compare on save instead
+    } else {
+      setUrlError('');
+    }
+  };
+
   useEffect(() => {
     fetchSettings();
     fetchHttpStatus();
@@ -77,7 +121,33 @@ const HttpSettingsPage: React.FC = () => {
   const handleSave = async () => {
     try {
       setSaving(true);
+      
+      // Validate frontend URL before saving
+      if (settings.frontend_url.trim()) {
+        const error = validateFrontendUrl(settings.frontend_url);
+        if (error) {
+          setUrlError(error);
+          toast.error(error);
+          return;
+        }
+        setUrlError('');
+      }
+      
       const token = localStorage.getItem('token');
+      
+      // Check if frontend_url changed
+      const oldSettingsResponse = await fetch('/api/system-settings/config', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      let urlWasChanged = false;
+      if (oldSettingsResponse.ok) {
+        const oldData = await oldSettingsResponse.json();
+        if (oldData.frontend_url && oldData.frontend_url !== settings.frontend_url) {
+          urlWasChanged = true;
+          setUrlChanged(true);
+        }
+      }
+      
       const response = await fetch('/api/system-settings/config', {
         method: 'POST',
         headers: {
@@ -88,8 +158,15 @@ const HttpSettingsPage: React.FC = () => {
       });
 
       if (response.ok) {
-        toast.success('Настройки сохранены. Перезапустите frontend для применения HTTPS.');
+        const msg = urlWasChanged 
+          ? 'Настройки сохранены. Не забудьте перепечатать бирки с новыми QR-кодами!' 
+          : 'Настройки сохранены. Перезапустите frontend для применения HTTPS.';
+        toast.success(msg);
         fetchHttpStatus();
+        
+        if (urlWasChanged) {
+          setTimeout(() => setUrlChanged(false), 10000);
+        }
       } else {
         const err = await response.json();
         toast.error(err.detail || 'Ошибка сохранения');
@@ -195,6 +272,53 @@ const HttpSettingsPage: React.FC = () => {
             HTTPS не настроен. Настройте домен и email ниже, затем перезапустите frontend.
           </div>
         )}
+      </div>
+
+      {/* General Settings */}
+      <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 border border-gray-100 dark:border-gray-700">
+        <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">
+          🌐 Основные настройки
+        </h2>
+        
+        <div className="space-y-4">
+          {/* System Name */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Название системы
+            </label>
+            <input
+              type="text"
+              placeholder="PAPI Система"
+              value={settings.system_name}
+              onChange={(e) => setSettings({...settings, system_name: e.target.value})}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+            />
+          </div>
+
+          {/* Frontend URL — используется в QR-кодах */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              URL фронтенда для QR-кодов
+            </label>
+            <input
+              type="url"
+              placeholder="https://example.com"
+              value={settings.frontend_url}
+              onChange={handleFrontendUrlChange}
+              className={`w-full px-3 py-2 border rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 ${
+                urlError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+              }`}
+            />
+            {urlError ? (
+              <p className="text-xs text-red-600 dark:text-red-400 mt-1">⚠️ {urlError}</p>
+            ) : (
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Базовый URL, который будет зашифрован в QR-кодах маркировки и инвентаризации. 
+                Должен быть доступен извне (не localhost). Без trailing slash.
+              </p>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* HTTPS Settings Form */}
@@ -306,6 +430,34 @@ const HttpSettingsPage: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* QR Regeneration Notice */}
+      {urlChanged && (
+        <div className="bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-800 rounded-lg p-4">
+          <h3 className="font-medium text-orange-900 dark:text-orange-300 mb-2">
+            ⚠️ URL QR-кодов изменён
+          </h3>
+          <p className="text-sm text-orange-800 dark:text-orange-400 mb-3">
+            Вы обновили URL фронтенда. Все <strong>новые</strong> QR-коды будут использовать новый адрес.
+            <br/>
+            Для обновления <strong>уже напечатанных</strong> бирок:
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => window.location.href = '/#/marking'}
+              className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition text-sm"
+            >
+              🖨️ Перепечатать бирки
+            </button>
+            <button
+              onClick={() => setUrlChanged(false)}
+              className="bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition text-sm"
+            >
+              Понятно
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Info */}
       <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">

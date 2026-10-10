@@ -55,6 +55,9 @@ async def save_system_config(
         settings = SystemSettings()
         db.add(settings)
     
+    # Сохраняем старое значение frontend_url для аудита
+    old_frontend_url = settings.frontend_url
+    
     # Основные настройки
     settings.system_name = config.get("system_name", "PAPI Система")
     settings.frontend_url = config.get("frontend_url")
@@ -70,6 +73,25 @@ async def save_system_config(
     
     db.commit()
     db.refresh(settings)
+    
+    # Логирование изменения frontend_url в audit log
+    if old_frontend_url != config.get("frontend_url"):
+        try:
+            from src.infrastructure.db.models.audit_log import AuditLog
+            audit_entry = AuditLog(
+                user_id=current_user.id,
+                entity_type="system_settings",
+                entity_id=settings.id,
+                action="update",
+                old_values={"frontend_url": old_frontend_url},
+                new_values={"frontend_url": config.get("frontend_url")},
+                diff_summary=f"frontend_url изменён: {old_frontend_url or '(пусто)'} → {config.get('frontend_url') or '(пусто)'}",
+                comment="Изменение URL фронтенда для QR-кодов",
+            )
+            db.add(audit_entry)
+            db.commit()
+        except Exception as e:
+            logger.warning(f"Failed to log frontend_url change: {e}")
     
     # Обновляем .env файл если HTTPS настройки изменены
     if config.get("https_domain") or config.get("https_enabled") is not None:

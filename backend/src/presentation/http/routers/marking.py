@@ -17,6 +17,7 @@ from src.infrastructure.db.init_db import get_db
 from src.infrastructure.db.models.asset import Asset
 from src.infrastructure.db.models.user import User
 from src.presentation.http.dependencies.auth import get_current_user
+from src.shared.utils import get_frontend_url
 
 router = APIRouter(prefix="/marking", tags=["marking"])
 
@@ -318,7 +319,7 @@ async def get_label_html(
     # Генерируем QR-код
     
     # URL для мобильной страницы актива (публичный)
-    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+    frontend_url = get_frontend_url(db) or "http://localhost:5173"
     qr_url = f"{frontend_url}/inventory/asset/{asset.id}"
     
     # Генерируем QR-код в base64 — компактный размер для бирки
@@ -480,7 +481,7 @@ async def get_batch_labels(
         purchase_date = safe_date(asset.purchase_date) or "—"
         
         # Генерируем QR-код — компактный размер для бирки
-        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+        frontend_url = get_frontend_url(db) or "http://localhost:5173"
         qr_url = f"{frontend_url}/inventory/asset/{asset.id}"
         
         qr = qrcode.QRCode(version=1, box_size=3, border=1)
