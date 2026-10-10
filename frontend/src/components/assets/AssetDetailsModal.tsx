@@ -1,7 +1,7 @@
 // frontend/src/components/assets/AssetDetailsModal.tsx
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Calendar, DollarSign, Edit, Trash2, MapPin, User, Wrench, Plus, RefreshCw, Image, ClipboardCheck, CheckCircle2, Clock, Printer } from 'lucide-react';
+import { Calendar, DollarSign, Edit, Trash2, MapPin, User, Wrench, Plus, RefreshCw, Image, ClipboardCheck, CheckCircle2, Clock, Printer, Radio } from 'lucide-react';
 import type { Asset, MaintenanceEvent } from '../../types';
 import { AssetStatusMap, MaintenanceEventTypes, AssetTypeNames } from '../../types';
 import { formatMoney, formatDate } from '../../utils/helpers';
@@ -333,6 +333,24 @@ return (
         <DetailRow label="Производитель" value={asset.manufacturer_name} />
         <DetailRow label="Код производителя" value={asset.manufacturer_code} />
         {asset.serial_number && <DetailRow label="Серийный номер" value={asset.serial_number} />}
+        {asset.rfid_tag ? (
+          <div className="flex items-start space-x-3 py-3 border-b border-gray-100 dark:border-gray-700">
+            <Radio className="w-5 h-5 text-blue-500 mt-0.5" />
+            <div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 uppercase">RFID-метка</p>
+              <p className="text-sm font-mono font-medium text-blue-700 dark:text-blue-300 mt-0.5">{asset.rfid_tag}</p>
+              <p className="text-xs text-green-600 dark:text-green-400 mt-1">✓ Метка присвоена и активна</p>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-start space-x-3 py-3 border-b border-gray-100 dark:border-gray-700">
+            <Radio className="w-5 h-5 text-gray-400 mt-0.5" />
+            <div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 uppercase">RFID-метка</p>
+              <p className="text-sm text-gray-400 dark:text-gray-500 mt-0.5 italic">Метка не присвоена</p>
+            </div>
+          </div>
+        )}
         {asset.depreciation_years && <DetailRow label="Срок амортизации" value={`${asset.depreciation_years} лет`} />}
         {asset.capacity && <DetailRow label="Объём" value={`${asset.capacity} л`} />}
         {asset.power && <DetailRow label="Мощность" value={`${asset.power} Вт`} />}
@@ -642,6 +660,7 @@ return (
               printRow('Производитель', asset.manufacturer_name),
               printRow('Код производителя', asset.manufacturer_code),
               printRow('Серийный номер', asset.serial_number),
+              printRow('RFID-метка', asset.rfid_tag || 'Не присвоена'),
               printRow('Количество', asset.quantity),
               printRow('Срок амортизации', asset.depreciation_years != null ? `${asset.depreciation_years} лет` : undefined),
               printRow('Объём', asset.capacity != null ? `${asset.capacity} л` : undefined),

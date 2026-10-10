@@ -44,24 +44,30 @@ async def get_rfid_scanner(
             detail="Недействительный API-ключ. Ключ должен начинаться с 'rfid_'"
         )
     
-    # Ищем активный ключ
+    # Сначала хешируем переданный ключ
+    key_hash = _hash_key(x_api_key)
+    
+    # Ищем ключ по хешу (а не первый попавшийся активный)
     api_key_record = db.query(RfidApiKey).filter(
+        RfidApiKey.key_hash == key_hash,
         RfidApiKey.is_active == True
     ).first()
     
     if not api_key_record:
+        # Проверяем, существует ли ключ вообще (активный или нет)
+        existing_record = db.query(RfidApiKey).filter(
+            RfidApiKey.key_hash == key_hash
+        ).first()
+        
+        if existing_record:
+            raise HTTPException(
+                status_code=401,
+                detail="API-ключ деактивирован. Обратитесь к администратору."
+            )
+        
         raise HTTPException(
             status_code=401,
             detail="API-ключ не найден или неактивен"
-        )
-    
-    # Хешируем переданный ключ и сравниваем
-    key_hash = _hash_key(x_api_key)
-    if api_key_record.key_hash != key_hash:
-        logger.warning(f"Неверный API-ключ от сканера: prefix={api_key_record.key_prefix}")
-        raise HTTPException(
-            status_code=401,
-            detail="Неверный API-ключ"
         )
     
     # Обновляем время последнего использования
