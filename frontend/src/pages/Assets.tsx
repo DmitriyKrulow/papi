@@ -333,14 +333,26 @@ fetch('/api/asset-types/', { headers })
     
     try {
       const token = await getToken();
+      if (!token) {
+        toast.error('Не авторизованы. Перезайдите в систему.');
+        return;
+      }
+      
       const response = await fetch('/api/admin/data/import/all', {
         method: 'POST',
         headers: {
-          'Authorization': token ? `Bearer ${token}` : '',
+          'Authorization': `Bearer ${token}`,
           'Accept': 'application/json',
         },
         body: file,
       });
+      
+      if (response.status === 401) {
+        toast.error('Токен авторизации истёк. Перезайдите в систему.');
+        localStorage.removeItem('token');
+        window.location.href = '/login';
+        return;
+      }
       
       if (response.ok) {
         const result = await response.json();
@@ -348,11 +360,17 @@ fetch('/api/asset-types/', { headers })
         fetchData();
         setRefreshKey(k => k + 1);
       } else {
-        const error = await response.json();
-        toast.error(error.detail || 'Ошибка импорта');
+        let errorMsg = 'Ошибка импорта';
+        try {
+          const error = await response.json();
+          errorMsg = error.detail || errorMsg;
+        } catch {
+          errorMsg = `Ошибка ${response.status}: ${response.statusText}`;
+        }
+        toast.error(errorMsg);
       }
     } catch (err: any) {
-      toast.error('Ошибка соединения с сервером');
+      toast.error('Ошибка соединения с сервером: ' + (err.message || 'Неизвестная ошибка'));
     } finally {
       e.target.value = '';
     }
