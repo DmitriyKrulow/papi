@@ -27,7 +27,6 @@ from src.presentation.http.schemas.repairs import (
 )
 
 from pydantic import ValidationError
-from src.infrastructure.reports.repair_report import RepairReportGenerator
 
 router = APIRouter(prefix="/repairs", tags=["repairs"])
 
@@ -158,39 +157,45 @@ def list_repairs(
 ):
     logger = logging.getLogger(__name__)
     logger.info(f"[repairs] list_repairs called, path: {request.url.path}")
-    query = db.query(RepairRequest).options(
-        joinedload(RepairRequest.asset),
-        joinedload(RepairRequest.creator),
-        joinedload(RepairRequest.assignee)
-    )
-    
-    # Если не админ, скрываем заявки от скрытых (списанных) активов
-    if current_user.role != "admin":
-        query = query.join(RepairRequest.asset).filter(Asset.is_active == True)
-    
-    if status:
-        status_value = get_status_value(status)
-        query = query.filter(RepairRequest.status == status_value)
-    
-    if priority:
-        priority_value = get_priority_value(priority)
-        query = query.filter(RepairRequest.priority == priority_value)
-    
-    if asset_id:
-        query = query.filter(RepairRequest.asset_id == asset_id)
-    
-    if status is None and current_user.role not in ("admin", "responsible"):
-        query = query.filter(RepairRequest.created_by == current_user.id)
-    
-    total = query.count()
-    items = query.offset(skip).limit(limit).all()
-    
-    return {
-        "items": [repair_to_response(repair) for repair in items],
-        "total": total,
-        "skip": skip,
-        "limit": limit,
-    }
+    try:
+        query = db.query(RepairRequest).options(
+            joinedload(RepairRequest.asset),
+            joinedload(RepairRequest.creator),
+            joinedload(RepairRequest.assignee)
+        )
+        
+        # Если не админ, скрываем заявки от скрытых (списанных) активов
+        if current_user.role != "admin":
+            query = query.join(RepairRequest.asset).filter(Asset.is_active == True)
+        
+        if status:
+            status_value = get_status_value(status)
+            query = query.filter(RepairRequest.status == status_value)
+        
+        if priority:
+            priority_value = get_priority_value(priority)
+            query = query.filter(RepairRequest.priority == priority_value)
+        
+        if asset_id:
+            query = query.filter(RepairRequest.asset_id == asset_id)
+        
+        if status is None and current_user.role not in ("admin", "responsible"):
+            query = query.filter(RepairRequest.created_by == current_user.id)
+        
+        total = query.count()
+        items = query.offset(skip).limit(limit).all()
+        
+        return {
+            "items": [repair_to_response(repair) for repair in items],
+            "total": total,
+            "skip": skip,
+            "limit": limit,
+        }
+    except Exception as e:
+        import traceback
+        logger.error(f"[repairs] list_repairs error: {e}")
+        traceback.print_exc()
+        raise
 
 
 @router.get("/{repair_id}/", response_model=RepairRequestResponse)
@@ -575,8 +580,12 @@ def full_pdf_print(repair_id: int, db: Session = Depends(get_db), current_user: 
     
     repair_data = repair_to_response(repair)
     
-    generator = RepairReportGenerator()
-    pdf_bytes = generator.generate_single_repair(repair_data)
+    try:
+        from src.infrastructure.reports.repair_report import RepairReportGenerator
+        generator = RepairReportGenerator()
+        pdf_bytes = generator.generate_single_repair(repair_data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"PDF generation failed: {str(e)}")
     
     return {
         "success": True,
