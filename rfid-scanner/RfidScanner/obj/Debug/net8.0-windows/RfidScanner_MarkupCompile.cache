@@ -10,11 +10,11 @@ none
 false
 TRACE;DEBUG;NET;NET8_0;NETCOREAPP;WINDOWS;WINDOWS7_0;NET5_0_OR_GREATER;NET6_0_OR_GREATER;NET7_0_OR_GREATER;NET8_0_OR_GREATER;NETCOREAPP1_0_OR_GREATER;NETCOREAPP1_1_OR_GREATER;NETCOREAPP2_0_OR_GREATER;NETCOREAPP2_1_OR_GREATER;NETCOREAPP2_2_OR_GREATER;NETCOREAPP3_0_OR_GREATER;NETCOREAPP3_1_OR_GREATER;WINDOWS7_0_OR_GREATER
 F:\Code\papi\rfid-scanner\RfidScanner\App.xaml
-6497126519
+7-1801106581
 
-22-635490222
-205744067369
-Views\InventoryPage.xaml;Views\MainWindow.xaml;Views\MovePage.xaml;Views\ReceivePage.xaml;Views\ScanPage.xaml;Views\SettingsWindow.xaml;
+422144546550
+205-421650772
+Views\AssetDetailDialog.xaml;Views\ConfirmationDialog.xaml;Views\MainWindow.xaml;Views\ManualEntryDialog.xaml;Views\RoomSelectorView.xaml;Views\ScanPage.xaml;Views\SettingsWindow.xaml;
 
 False
 

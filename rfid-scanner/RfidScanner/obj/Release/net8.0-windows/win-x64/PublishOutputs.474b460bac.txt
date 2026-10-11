@@ -1,2 +1,0 @@
-F:\Code\papi\rfid-scanner\singlefile\RfidScanner.pdb
-F:\Code\papi\rfid-scanner\singlefile\RfidScanner.exe

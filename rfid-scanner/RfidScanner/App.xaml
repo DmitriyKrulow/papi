@@ -4,5 +4,12 @@
              xmlns:conv="clr-namespace:RfidScanner.Converters">
     <Application.Resources>
         <conv:BooleanToBrushConverter x:Key="BooleanToBrushConverter"/>
+        <conv:StatusToBrushConverter x:Key="StatusToBrushConverter"/>
+        <conv:StatusToIconConverter x:Key="StatusToIconConverter"/>
+        <conv:StatusToTextConverter x:Key="StatusToTextConverter"/>
+        <conv:InverseBooleanConverter x:Key="InverseBooleanConverter"/>
+        <conv:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+        <conv:CountToBackgroundConverter x:Key="CountToBackgroundConverter"/>
+        <conv:CollectionCountToVisibilityConverter x:Key="CollectionCountToVisibilityConverter"/>
     </Application.Resources>
 </Application>

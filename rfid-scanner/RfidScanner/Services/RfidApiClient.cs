@@ -95,7 +95,29 @@ public class RfidApiClient
         return Convert.ToDouble(result["progress_percent"]);
     }
 
+    // ==================== Помещения ====================
+
+    public async Task<List<Room>> GetRoomsAsync()
+    {
+        var result = await GetJsonAsync<Dictionary<string, object>>("/api/rooms");
+        if (result == null || !result.ContainsKey("rooms"))
+            return new();
+
+        var json = JsonConvert.SerializeObject(result["rooms"]);
+        return JsonConvert.DeserializeObject<List<Room>>(json) ?? new();
+    }
+
     // ==================== Поиск актива ====================
+
+    public async Task<List<Asset>> GetRoomAssetsAsync(int roomId)
+    {
+        var result = await GetJsonAsync<Dictionary<string, object>>($"/api/rooms/{roomId}/assets");
+        if (result == null || !result.ContainsKey("assets"))
+            return new();
+
+        var json = JsonConvert.SerializeObject(result["assets"]);
+        return JsonConvert.DeserializeObject<List<Asset>>(json) ?? new();
+    }
 
     public async Task<Asset?> GetAssetByRfidAsync(string rfidTag)
     {

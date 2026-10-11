@@ -1,5 +1,7 @@
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Controls;
+using RfidScanner.Models;
 using RfidScanner.Services;
 using RfidScanner.ViewModels;
 
@@ -11,7 +13,12 @@ namespace RfidScanner.Views;
 public partial class MainWindow : Window
 {
     private readonly ConfigService _config;
+    private readonly SessionManager _sessionManager;
+    private readonly AssetCacheService _assetCache;
     private readonly ScanViewModel _scanViewModel;
+    private readonly SearchViewModel _searchViewModel;
+    private readonly AuditViewModel _auditViewModel;
+    private readonly RoomSelectorViewModel _roomSelectorViewModel;
 
     public MainWindow(ConfigService config)
     {
@@ -20,88 +27,155 @@ public partial class MainWindow : Window
         
         InitializeComponent();
         
-        // Инициализация ViewModel
-        _scanViewModel = new ScanViewModel(
-            new RfidApiClient(config.Settings.BackendUrl, config.Settings.ApiKey),
-            new OfflineQueueService(),
-            config);
+        // Инициализация сервисов
+        var localStore = new LocalStoreService();
+        var auditService = new AuditService(localStore);
+        _assetCache = new AssetCacheService();
+        _sessionManager = new SessionManager(localStore, auditService);
+        var silentMode = new SilentModeService();
+        var apiClient = new RfidApiClient(config.Settings.BackendUrl, config.Settings.ApiKey);
         
-        ScanPageControl.DataContext = _scanViewModel;
-        InventoryPageControl.DataContext = new InventoryViewModel(
-            new RfidApiClient(config.Settings.BackendUrl, config.Settings.ApiKey),
-            new OfflineQueueService());
+        _scanViewModel = new ScanViewModel(_sessionManager, silentMode, apiClient, localStore, _assetCache);
+        _searchViewModel = new SearchViewModel(apiClient, _assetCache);
+        _auditViewModel = new AuditViewModel(localStore, _sessionManager);
+        _roomSelectorViewModel = new RoomSelectorViewModel(apiClient, _sessionManager, _assetCache, auditService);
         
-        // Настройка обработки клавиш для HID-сканера
+        // Создаём RoomSelectorView в коде (требует параметры в конструкторе)
+        var roomSelectorView = new RoomSelectorView(apiClient, _sessionManager, _assetCache, auditService, OnSessionCreated);
+        RoomSelectorHost.Content = roomSelectorView;
+        
+        // Привязка ViewModel к вкладкам
+        DataContext = _roomSelectorViewModel;
+        
+        // HID-сканер
         PreviewKeyDown += MainWindow_PreviewKeyDown;
         
-        // Статус подключения — без ошибок при отсутствии бэкенда
-        StatusText.Text = "Нет подключения";
-        StatusText.Foreground = System.Windows.Media.Brushes.Orange;
+        // Подписка на создание сессии — автоматический переход к сканированию
+        _sessionManager.SessionChanged += OnSessionCreated;
+        
+        ConnectionStatus.Text = "Нет подключения";
+        ConnectionStatus.Foreground = System.Windows.Media.Brushes.Orange;
+        
+        // Автоматическая загрузка помещений
+        _roomSelectorViewModel.LoadRoomsCommand.Execute(null);
+    }
+
+    private void OnSessionCreated(ScanSession session)
+    {
+        // При создании новой сессии — автоматически переключаемся на вкладку сканирования
+        if (session.State == SessionState.Active)
+        {
+            System.Windows.Application.Current.Dispatcher.Invoke(() =>
+            {
+                TabControl.SelectedIndex = 0;
+                DataContext = _scanViewModel;
+            });
+        }
+    }
+
+    private void TabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        // При переключении на вкладку инвентаризации — показываем RoomSelector
+        if (TabControl.SelectedIndex == 0)
+        {
+            DataContext = _roomSelectorViewModel;
+        }
+        else if (TabControl.SelectedIndex == 1)
+        {
+            DataContext = _searchViewModel;
+        }
+        else if (TabControl.SelectedIndex == 2)
+        {
+            DataContext = _auditViewModel;
+        }
     }
 
     private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        // HID-сканер вводит RFID-тег + Enter
-        // Пропускаем системные клавиши
+        // Только если активна вкладка "Инвентаризация"
+        if (TabControl.SelectedIndex != 0) return;
+        
         if (e.Key >= Key.D0 && e.Key <= Key.Z)
         {
             var charCode = char.ToLower((char)e.Key);
-            _scanViewModel.AddChar(charCode);
+            _scanViewModel.ProcessTagCommand.Execute(charCode.ToString());
             e.Handled = true;
         }
         else if (e.Key >= Key.NumPad0 && e.Key <= Key.NumPad9)
         {
             var charCode = (char)(e.Key - Key.NumPad0 + '0');
-            _scanViewModel.AddChar(charCode);
+            _scanViewModel.ProcessTagCommand.Execute(charCode.ToString());
             e.Handled = true;
         }
         else if (e.Key == Key.Return || e.Key == Key.Enter)
         {
-            _scanViewModel.ProcessCurrentTag();
+            _scanViewModel.ProcessTagCommand.Execute(string.Empty);
             e.Handled = true;
         }
     }
 
-    private async void CheckConnectionAsync()
+    private void OnInventoryStarted(ScanSession session)
     {
-        try
+        // Переключаемся на вкладку сканирования
+        TabControl.SelectedIndex = 0;
+        DataContext = _scanViewModel;
+    }
+
+    private void SkipButton_Click(object sender, RoutedEventArgs e)
+    {
+        _scanViewModel.SkipCommand.Execute(null);
+    }
+
+    private void FinishButton_Click(object sender, RoutedEventArgs e)
+    {
+        _sessionManager.FinishSession();
+    }
+
+    private void ResetButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (MessageBox.Show("Сбросить сессию? Все данные будут удалены.", 
+            "Подтверждение", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes)
         {
-            var apiClient = new RfidApiClient(_config.Settings.BackendUrl, _config.Settings.ApiKey);
-            var connected = await apiClient.AuthenticateAsync();
-            
-            Application.Current.Dispatcher.Invoke(() =>
-            {
-                StatusText.Text = connected ? "Подключено" : "Нет подключения к API";
-                StatusText.Foreground = connected ? 
-                    System.Windows.Media.Brushes.LightGreen : 
-                    System.Windows.Media.Brushes.Orange;
-            });
-            
-            apiClient.Dispose();
+            _sessionManager.ResetSession();
         }
-        catch
+    }
+
+    private void SyncButton_Click(object sender, RoutedEventArgs e)
+    {
+        _scanViewModel.SyncCommand.Execute(null);
+    }
+
+    private void SearchButton_Click(object sender, RoutedEventArgs e)
+    {
+        // Переключаемся на вкладку поиска
+        TabControl.SelectedIndex = 1;
+        DataContext = _searchViewModel;
+        _searchViewModel.SearchCommand.Execute(null);
+    }
+
+    private void SearchBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
         {
-            // Не показываем ошибку — просто статус "Нет подключения"
-            Application.Current.Dispatcher.Invoke(() =>
-            {
-                StatusText.Text = "Нет подключения к API";
-                StatusText.Foreground = System.Windows.Media.Brushes.Orange;
-            });
+            _searchViewModel.SearchCommand.Execute(null);
         }
+    }
+
+    private void HistoryButton_Click(object sender, RoutedEventArgs e)
+    {
+        TabControl.SelectedIndex = 2;
+        DataContext = _auditViewModel;
+        _auditViewModel.Refresh();
+    }
+
+    private void RefreshHistory_Click(object sender, RoutedEventArgs e)
+    {
+        _auditViewModel.Refresh();
     }
 
     private void SettingsButton_Click(object sender, RoutedEventArgs e)
     {
         var settingsWindow = new SettingsWindow(_config);
         settingsWindow.ShowDialog();
-        
-        // Перезагрузка с новыми настройками
-        RefreshWithNewSettings();
-    }
-
-    private void RefreshWithNewSettings()
-    {
-        _config.Load();
-        CheckConnectionAsync();
     }
 }
