@@ -765,35 +765,52 @@ const CreateCheckModal: React.FC<CreateCheckModalProps> = ({ onClose, onCreated 
   const [scopeOptions, setScopeOptions] = useState<ScopeOption[]>([]);
   const [loadingScope, setLoadingScope] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [scopeError, setScopeError] = useState<string | null>(null);
 
   useEffect(() => {
     if (checkType !== 'full') {
-      setLoadingScope(true);
-      const token = localStorage.getItem('token');
-      fetch(`/api/inventory-checks/scope-options?check_type=${checkType}`, {
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-      })
-        .then(res => {
-          if (!res.ok) {
-            return res.json().then(err => { throw new Error(err.detail || `HTTP ${res.status}`); });
-          }
-          return res.json();
-        })
-        .then(data => {
-          setScopeOptions(Array.isArray(data) ? data : []);
-          setLoadingScope(false);
-        })
-        .catch(err => {
-          console.error('Failed to load scope options:', err);
-          toast.error(`Не удалось загрузить список: ${err.message}`);
-          setScopeOptions([]);
-          setLoadingScope(false);
-        });
+      loadScopeOptions();
     } else {
       setScopeOptions([]);
       setScopeId(null);
+      setScopeError(null);
     }
   }, [checkType]);
+
+  const loadScopeOptions = async () => {
+    setLoadingScope(true);
+    setScopeError(null);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setScopeError('Необходима авторизация');
+        setScopeOptions([]);
+        setLoadingScope(false);
+        return;
+      }
+      const res = await fetch(`/api/inventory-checks/scope-options?check_type=${checkType}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setScopeOptions(Array.isArray(data) ? data : []);
+      } else if (res.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setScopeError(err.detail || `Ошибка ${res.status}`);
+        setScopeOptions([]);
+      }
+    } catch (err) {
+      console.error('loadScopeOptions error:', err);
+      setScopeError('Ошибка соединения');
+      setScopeOptions([]);
+    } finally {
+      setLoadingScope(false);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!name.trim()) { toast.error('Введите название'); return; }
@@ -890,6 +907,18 @@ const CreateCheckModal: React.FC<CreateCheckModalProps> = ({ onClose, onCreated 
               </label>
               {loadingScope ? (
                 <p className="text-sm text-gray-400">Загрузка...</p>
+              ) : scopeError ? (
+                <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                  <p className="text-sm text-red-600 dark:text-red-400">{scopeError}</p>
+                  <button
+                    onClick={loadScopeOptions}
+                    className="mt-2 text-xs text-red-700 dark:text-red-300 underline hover:no-underline"
+                  >
+                    Повторить
+                  </button>
+                </div>
+              ) : scopeOptions.length === 0 ? (
+                <p className="text-sm text-gray-400">Нет доступных объектов для выбора</p>
               ) : (
                 <select
                   value={scopeId || ''}
