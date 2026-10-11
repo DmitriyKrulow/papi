@@ -1,3 +1,4 @@
+using System;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Controls;
@@ -40,7 +41,7 @@ public partial class MainWindow : Window
         _auditViewModel = new AuditViewModel(localStore, _sessionManager);
         _roomSelectorViewModel = new RoomSelectorViewModel(apiClient, _sessionManager, _assetCache, auditService, OnSessionCreated);
         
-        // Создаём RoomSelectorView в коде (требует параметры в конструкторе)
+        // Создаём RoomSelectorView в коде
         var roomSelectorView = new RoomSelectorView(apiClient, _sessionManager, _assetCache, auditService, OnSessionCreated);
         RoomSelectorHost.Content = roomSelectorView;
         
@@ -50,19 +51,19 @@ public partial class MainWindow : Window
         // HID-сканер
         PreviewKeyDown += MainWindow_PreviewKeyDown;
         
-        // Подписка на создание сессии — автоматический переход к сканированию
+        // Подписка на создание сессии
         _sessionManager.SessionChanged += OnSessionCreated;
         
-        ConnectionStatus.Text = "Нет подключения";
+        // Статус по умолчанию
+        ConnectionStatus.Text = "Проверка подключения...";
         ConnectionStatus.Foreground = System.Windows.Media.Brushes.Orange;
         
-        // Автоматическая загрузка помещений
+        // Загрузка помещений
         _roomSelectorViewModel.LoadRoomsCommand.Execute(null);
     }
 
     private void OnSessionCreated(ScanSession session)
     {
-        // При создании новой сессии — автоматически переключаемся на вкладку сканирования
         if (session.State == SessionState.Active)
         {
             System.Windows.Application.Current.Dispatcher.Invoke(() =>
@@ -75,7 +76,6 @@ public partial class MainWindow : Window
 
     private void TabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        // При переключении на вкладку инвентаризации — показываем RoomSelector
         if (TabControl.SelectedIndex == 0)
         {
             DataContext = _roomSelectorViewModel;
@@ -92,11 +92,10 @@ public partial class MainWindow : Window
 
     private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        // Если фокус в TextBox — пропускаем ввод (пользователь печатает)
+        // Если фокус в TextBox — пропускаем ввод
         var focused = Keyboard.FocusedElement as TextBox;
         if (focused != null) return;
         
-        // Если фокус в ComboBox — пропускаем
         if (Keyboard.FocusedElement is ComboBox) return;
         
         // Только если активна вкладка "Инвентаризация"
@@ -121,13 +120,6 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnInventoryStarted(ScanSession session)
-    {
-        // Переключаемся на вкладку сканирования
-        TabControl.SelectedIndex = 0;
-        DataContext = _scanViewModel;
-    }
-
     private void SkipButton_Click(object sender, RoutedEventArgs e)
     {
         _scanViewModel.SkipCommand.Execute(null);
@@ -147,14 +139,8 @@ public partial class MainWindow : Window
         }
     }
 
-    private void SyncButton_Click(object sender, RoutedEventArgs e)
-    {
-        _scanViewModel.SyncCommand.Execute(null);
-    }
-
     private void SearchButton_Click(object sender, RoutedEventArgs e)
     {
-        // Переключаемся на вкладку поиска
         TabControl.SelectedIndex = 1;
         DataContext = _searchViewModel;
         _searchViewModel.SearchCommand.Execute(null);
