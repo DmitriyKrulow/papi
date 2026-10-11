@@ -25,8 +25,10 @@ const RfidKeysPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [newKeyName, setNewKeyName] = useState('');
-  const [createdKey, setCreatedKey] = useState<string | null>(null);
+  const [createdKey, setCreatedFullKey] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking');
+  const [connectionMessage, setConnectionMessage] = useState('');
 
   const fetchKeys = async () => {
     try {
@@ -51,8 +53,32 @@ const RfidKeysPage: React.FC = () => {
     }
   };
 
+  const checkConnection = async () => {
+    setConnectionStatus('checking');
+    setConnectionMessage('Проверка соединения...');
+    
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/admin/rfid-keys/stats', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      
+      if (response.ok) {
+        setConnectionStatus('connected');
+        setConnectionMessage('✅ Соединение с сервером активно');
+      } else {
+        setConnectionStatus('disconnected');
+        setConnectionMessage(`❌ Сервер недоступен (HTTP ${response.status})`);
+      }
+    } catch (err) {
+      setConnectionStatus('disconnected');
+      setConnectionMessage('❌ Нет соединения — проверьте сеть или URL сервера');
+    }
+  };
+
   useEffect(() => {
     fetchKeys();
+    checkConnection();
   }, []);
 
   const handleCreateKey = async () => {
@@ -76,7 +102,7 @@ const RfidKeysPage: React.FC = () => {
 
       if (response.ok) {
         const data = await response.json();
-        setCreatedKey(data.api_key);
+        setCreatedFullKey(data.api_key);
         setNewKeyName('');
         toast.success('API-ключ создан! СОХРАНИТЕ ЕГО СЕЙЧАС!');
         fetchKeys();
@@ -150,6 +176,38 @@ const RfidKeysPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Connection Status */}
+      <div className={`rounded-lg p-4 border ${
+        connectionStatus === 'connected' 
+          ? 'bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800' 
+          : connectionStatus === 'disconnected'
+          ? 'bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800'
+          : 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800'
+      }`}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className={`w-3 h-3 rounded-full ${
+              connectionStatus === 'connected' ? 'bg-green-500' :
+              connectionStatus === 'disconnected' ? 'bg-red-500' : 'bg-blue-500 animate-pulse'
+            }`}></div>
+            <span className={`font-medium ${
+              connectionStatus === 'connected' ? 'text-green-900 dark:text-green-300' :
+              connectionStatus === 'disconnected' ? 'text-red-900 dark:text-red-300' :
+              'text-blue-900 dark:text-blue-300'
+            }`}>
+              {connectionMessage}
+            </span>
+          </div>
+          <button
+            onClick={checkConnection}
+            disabled={connectionStatus === 'checking'}
+            className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 px-3 py-1.5 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition disabled:opacity-50"
+          >
+            {connectionStatus === 'checking' ? '⏳ Проверка...' : '🔄 Обновить'}
+          </button>
+        </div>
+      </div>
+
       {/* Stats */}
       {stats && (
         <div className="grid grid-cols-4 gap-4">
@@ -216,7 +274,7 @@ const RfidKeysPage: React.FC = () => {
               </button>
             </div>
             <button
-              onClick={() => { setCreatedKey(null); fetchKeys(); }}
+              onClick={() => { setCreatedFullKey(null); fetchKeys(); }}
               className="mt-3 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition text-sm"
             >
               Понял, сохраняю
