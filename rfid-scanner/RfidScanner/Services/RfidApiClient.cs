@@ -1,6 +1,7 @@
 using System.Net.Http;
 using System.Text;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
 using RfidScanner.Models;
 
 namespace RfidScanner.Services;
@@ -82,7 +83,12 @@ public class RfidApiClient
                 return new();
 
             var json = JsonConvert.SerializeObject(result["inventories"]);
-            return JsonConvert.DeserializeObject<List<Inventory>>(json) ?? new();
+            var settings = new JsonSerializerSettings
+            {
+                ContractResolver = new CamelCasePropertyNamesContractResolver(),
+                NullValueHandling = NullValueHandling.Ignore
+            };
+            return JsonConvert.DeserializeObject<List<Inventory>>(json, settings) ?? new();
         }
         catch
         {
@@ -99,7 +105,12 @@ public class RfidApiClient
                 return new();
 
             var json = JsonConvert.SerializeObject(result["items"]);
-            return JsonConvert.DeserializeObject<List<InventoryItem>>(json) ?? new();
+            var settings = new JsonSerializerSettings
+            {
+                ContractResolver = new CamelCasePropertyNamesContractResolver(),
+                NullValueHandling = NullValueHandling.Ignore
+            };
+            return JsonConvert.DeserializeObject<List<InventoryItem>>(json, settings) ?? new();
         }
         catch
         {
@@ -142,7 +153,12 @@ public class RfidApiClient
                 return new();
 
             var json = JsonConvert.SerializeObject(result["rooms"]);
-            return JsonConvert.DeserializeObject<List<Room>>(json) ?? new();
+            var settings = new JsonSerializerSettings
+            {
+                ContractResolver = new CamelCasePropertyNamesContractResolver(),
+                NullValueHandling = NullValueHandling.Ignore
+            };
+            return JsonConvert.DeserializeObject<List<Room>>(json, settings) ?? new();
         }
         catch
         {
