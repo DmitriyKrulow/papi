@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <OutputType>Library</OutputType>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <RootNamespace>RfidScanner.Installer</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <WixExtension Include="WixUtilExtension">
+      <HintPath>$(WIX)\lib\net472\WixUtilExtension.dll</HintPath>
+    </WixExtension>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.Wix4.Sdk" Version="4.0.0" />
+    <PackageReference Include="WixToolset.Wix4Extensions" Version="4.0.0" />
+  </ItemGroup>
+
+</Project>

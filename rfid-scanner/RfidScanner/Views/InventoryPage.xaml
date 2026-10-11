@@ -1,0 +1,50 @@
+<UserControl x:Class="RfidScanner.Views.InventoryPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d" 
+             d:DesignHeight="600" d:DesignWidth="1000">
+    
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Панель управления -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,15">
+            <Button Content="🔄 Обновить" Click="RefreshButton_Click" Padding="15,5" Margin="0,0,10,0"/>
+            <TextBox x:Name="SearchBox" Width="250" Text=""
+                    KeyDown="SearchBox_KeyDown"/>
+        </StackPanel>
+
+        <!-- Список инвентаризаций -->
+        <ListView Grid.Row="1" x:Name="InventoryList" 
+                 SelectionMode="Single"
+                 SelectionChanged="InventoryList_SelectionChanged">
+            <ListView.View>
+                <GridView>
+                    <GridViewColumn Header="Название" Width="200" DisplayMemberBinding="{Binding Name}"/>
+                    <GridViewColumn Header="Подразделение" Width="150" DisplayMemberBinding="{Binding Department}"/>
+                    <GridViewColumn Header="Всего" Width="80" DisplayMemberBinding="{Binding TotalChecked}"/>
+                    <GridViewColumn Header="Найдено" Width="100" DisplayMemberBinding="{Binding Found}">
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock Foreground="Green" Text="{Binding Found}"/>
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
+                    <GridViewColumn Header="Прогресс" Width="150">
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate>
+                                <ProgressBar Value="{Binding ProgressPercent}" 
+                                            Height="20" Minimum="0" Maximum="100"/>
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
+                </GridView>
+            </ListView.View>
+        </ListView>
+    </Grid>
+</UserControl>

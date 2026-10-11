@@ -1,0 +1,66 @@
+<Window x:Class="RfidScanner.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:RfidScanner.ViewModels"
+        xmlns:views="clr-namespace:RfidScanner.Views"
+        mc:Ignorable="d"
+        Title="PAPI RFID Scanner" Height="700" Width="1100"
+        WindowStartupLocation="CenterScreen">
+    
+    <Window.Resources>
+        <DataTemplate x:Key="InventoryTemplate">
+            <StackPanel Margin="5">
+                <TextBlock Text="{Binding Name, FallbackValue='Инвентаризация'}" FontWeight="Bold" FontSize="14"/>
+                <TextBlock Text="{Binding Department, FallbackValue=''}" Foreground="Gray" FontSize="11"/>
+            </StackPanel>
+        </DataTemplate>
+    </Window.Resources>
+
+    <DockPanel>
+        <!-- Верхняя панель -->
+        <Border DockPanel.Dock="Top" Background="#2196F3" Padding="10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                
+                <TextBlock Grid.Column="0" Text="PAPI RFID Scanner" 
+                          Foreground="White" FontSize="18" FontWeight="Bold"
+                          VerticalAlignment="Center"/>
+                
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <TextBlock x:Name="StatusText" Text="Готов" Foreground="White" 
+                              VerticalAlignment="Center" Margin="10,0"/>
+                    <Button Content="⚙" Width="35" Height="35" FontSize="16"
+                           Click="SettingsButton_Click" Margin="5"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Навигация -->
+        <TabControl x:Name="MainTabControl" Margin="10">
+            <!-- Вкладка сканирования -->
+            <TabItem Header="📡 Сканирование">
+                <views:ScanPage x:Name="ScanPageControl"/>
+            </TabItem>
+            
+            <!-- Вкладка инвентаризации -->
+            <TabItem Header="📋 Инвентаризация">
+                <views:InventoryPage x:Name="InventoryPageControl"/>
+            </TabItem>
+            
+            <!-- Вкладка приёмки -->
+            <TabItem Header="📦 Приёмка">
+                <views:ReceivePage x:Name="ReceivePageControl"/>
+            </TabItem>
+            
+            <!-- Вкладка перемещения -->
+            <TabItem Header="🔄 Перемещение">
+                <views:MovePage x:Name="MovePageControl"/>
+            </TabItem>
+        </TabControl>
+    </DockPanel>
+</Window>

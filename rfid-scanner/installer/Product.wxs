@@ -1,0 +1,103 @@
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product 
+    Name="PAPI RFID Scanner"
+    Version="1.0.0"
+    Manufacturer="PAPI"
+    Language="1049"
+    UpgradeCode="a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+    Codepage="1251"
+    Id="*">
+
+    <Package 
+      Description="RFID Scanner for PAPI Asset Management System"
+      InstallerVersion="200" 
+      Compressed="yes" 
+      Platform="x64" />
+
+    <Media Id="1" Cabinet="rfidscanner.cab" EmbedCab="yes" />
+
+    <MajorUpgrade 
+      Schedule="afterInstallInitialize" 
+      DowngradeErrorMessage="A newer version is already installed." />
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="PAPIFOLDER" Name="PAPI">
+          <Directory Id="INSTALLFOLDER" Name="RfidScanner" />
+        </Directory>
+      </Directory>
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="ApplicationProgramsFolder" Name="PAPI RFID Scanner" />
+      </Directory>
+      <Directory Id="DesktopFolder" Name="Desktop" />
+    </Directory>
+
+    <Feature Id="ProductFeature" 
+             Title="RfidScanner" 
+             Level="1"
+             AllowAdvertise="no"
+             Display="expand">
+      <ComponentGroupRef Id="RfidScannerComponents" />
+      <ComponentRef Id="DesktopShortcut" />
+      <ComponentRef Id="StartMenuShortcut" />
+      <ComponentRef Id="StartMenuRemove" />
+    </Feature>
+
+
+
+
+
+  </Product>
+
+  <Fragment>
+    <ComponentGroup Id="RfidScannerComponents" Directory="INSTALLFOLDER">
+      <Component Id="MainExe" Guid="11111111-1111-1111-1111-111111111111" Win64="yes">
+        <File Source="$(var.PublishDir)\RfidScanner.exe" KeyPath="yes" />
+      </Component>
+      
+      <Component Id="Dlls" Guid="22222222-2222-2222-2222-222222222222" Win64="yes">
+        <File Source="$(var.PublishDir)\RfidScanner.dll" />
+        <File Source="$(var.PublishDir)\RfidScanner.pdb" />
+        <File Source="$(var.PublishDir)\CommunityToolkit.Mvvm.dll" />
+        <File Source="$(var.PublishDir)\Newtonsoft.Json.dll" />
+        <File Source="$(var.PublishDir)\System.Data.SQLite.dll" />
+        <File Source="$(var.PublishDir)\System.IO.Ports.dll" />
+        <File Source="$(var.PublishDir)\SQLitePCLRaw.core.dll" />
+        <File Source="$(var.PublishDir)\SQLitePCLRaw.provider.e_sqlite3.dll" />
+        <File Source="$(var.PublishDir)\SQLitePCLRaw.batteries_v2.dll" />
+        <File Source="$(var.PublishDir)\e_sqlite3.dll" />
+        <File Source="$(var.PublishDir)\RfidScanner.deps.json" />
+        <File Source="$(var.PublishDir)\RfidScanner.runtimeconfig.json" />
+      </Component>
+
+      <Component Id="SQLiteInterop" Guid="33333333-3333-3333-3333-333333333333" Win64="yes">
+        <File Source="$(var.PublishDir)\SQLite.Interop.dll" />
+      </Component>
+    </ComponentGroup>
+
+    <Component Id="DesktopShortcut" Guid="44444444-4444-4444-4444-444444444444" Directory="DesktopFolder">
+      <Shortcut Id="DesktopRfidScanner" 
+                Name="PAPI RFID Scanner"
+                Description="RFID Scanner for PAPI Asset Management"
+                Target="[INSTALLFOLDER]RfidScanner.exe"
+                WorkingDirectory="INSTALLFOLDER" />
+      <RegistryValue Root="HKCU" Key="Software\PAPI\RfidScanner" Name="desktop_shortcut" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <Component Id="StartMenuShortcut" Guid="55555555-5555-5555-5555-555555555555" Directory="ApplicationProgramsFolder">
+      <Shortcut Id="StartMenuRfidScanner"
+                Name="PAPI RFID Scanner"
+                Description="RFID Scanner for PAPI Asset Management"
+                Target="[INSTALLFOLDER]RfidScanner.exe"
+                WorkingDirectory="INSTALLFOLDER" />
+      <RegistryValue Root="HKCU" Key="Software\PAPI\RfidScanner" Name="startmenu_shortcut" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <Component Id="StartMenuRemove" Guid="66666666-6666-6666-6666-666666666666" Directory="ApplicationProgramsFolder">
+      <RemoveFolder Id="CleanShortcuts" On="uninstall" />
+      <RegistryValue Root="HKCU" Key="Software\PAPI\RfidScanner" Name="startmenu_removed" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+  </Fragment>
+
+</Wix>

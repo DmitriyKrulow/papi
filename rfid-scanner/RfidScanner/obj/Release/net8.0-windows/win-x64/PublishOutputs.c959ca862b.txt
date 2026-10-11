@@ -1,0 +1,14 @@
+F:\Code\papi\rfid-scanner\singlefile_new\RfidScanner.exe
+F:\Code\papi\rfid-scanner\singlefile_new\RfidScanner.dll
+F:\Code\papi\rfid-scanner\singlefile_new\RfidScanner.deps.json
+F:\Code\papi\rfid-scanner\singlefile_new\RfidScanner.runtimeconfig.json
+F:\Code\papi\rfid-scanner\singlefile_new\RfidScanner.pdb
+F:\Code\papi\rfid-scanner\singlefile_new\CommunityToolkit.Mvvm.dll
+F:\Code\papi\rfid-scanner\singlefile_new\Newtonsoft.Json.dll
+F:\Code\papi\rfid-scanner\singlefile_new\SQLitePCLRaw.batteries_v2.dll
+F:\Code\papi\rfid-scanner\singlefile_new\SQLitePCLRaw.core.dll
+F:\Code\papi\rfid-scanner\singlefile_new\SQLitePCLRaw.provider.e_sqlite3.dll
+F:\Code\papi\rfid-scanner\singlefile_new\System.Data.SQLite.dll
+F:\Code\papi\rfid-scanner\singlefile_new\System.IO.Ports.dll
+F:\Code\papi\rfid-scanner\singlefile_new\e_sqlite3.dll
+F:\Code\papi\rfid-scanner\singlefile_new\SQLite.Interop.dll
