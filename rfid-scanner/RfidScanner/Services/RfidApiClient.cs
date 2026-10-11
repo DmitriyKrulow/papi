@@ -24,7 +24,8 @@ public class RfidApiClient
 
     private async Task<HttpResponseMessage> SendAsync(HttpMethod method, string url, StringContent? content = null)
     {
-        var request = new HttpRequestMessage(method, url);
+        var fullUrl = $"{_baseUrl}{url}";
+        var request = new HttpRequestMessage(method, fullUrl);
         request.Headers.Add("X-API-Key", _apiKey);
         if (content != null)
             request.Content = content;
