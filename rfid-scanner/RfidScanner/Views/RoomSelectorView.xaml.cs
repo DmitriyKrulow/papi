@@ -45,13 +45,19 @@ public partial class RoomSelectorView : UserControl
 
     private void OnTabControlSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_tabControl?.SelectedItem is TabItem selectedTab)
-        {
-            if (selectedTab == RoomsTab)
-                _viewModel.LoadRoomsCommand.Execute(null);
-            else if (selectedTab == InventoriesTab)
-                _viewModel.LoadInventoriesCommand.Execute(null);
-        }
+        // Если ничего не добавлено — значит кликнули по элементу внутри вкладки, а не переключили вкладку
+        if (e.AddedItems.Count == 0) return;
+        
+        // Если ничего не удалено — вкладка не менялась, просто кликнули по элементу
+        if (e.RemovedItems.Count == 0) return;
+        
+        // Теперь проверяем что это именно TabItem
+        if (e.AddedItems[0] is not TabItem addedTab) return;
+        
+        if (addedTab == RoomsTab)
+            _viewModel.LoadRoomsCommand.Execute(null);
+        else if (addedTab == InventoriesTab)
+            _viewModel.LoadInventoriesCommand.Execute(null);
     }
 
     private void StartButton_Click(object sender, RoutedEventArgs e)
