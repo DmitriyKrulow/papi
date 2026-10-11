@@ -191,25 +191,17 @@ public class RoomSelectorViewModel : INotifyPropertyChanged
             // Создаём инвентаризацию на сервере
             var result = await _apiClient.CreateInventoryAsync(SelectedRoom.Id, SelectedRoom.Name);
             
-            if (!result.ContainsKey("id"))
-            {
-                StatusMessage = "⚠ Ошибка создания инвентаризации";
-                return;
-            }
+            int inventoryId = 0;
+            if (result.ContainsKey("id"))
+                inventoryId = Convert.ToInt32(result["id"]);
 
-            int inventoryId = Convert.ToInt32(result["id"]);
-            
-            // Загружаем активы помещения
-            var assets = await _apiClient.GetRoomAssetsAsync(SelectedRoom.Id);
-            await _assetCache.LoadRoomAssetsAsync(SelectedRoom.Id, assets);
-            
             // Создаём локальную сессию
             _sessionManager.CreateSession(SelectedRoom.Name, SelectedRoom.Id, inventoryId);
             
             // Логируем начало
             _audit.Log(AuditAction.SessionStart, 
                 roomName: SelectedRoom.Name,
-                details: $"Инвентаризация создана: {SelectedRoom.Name} ({assets.Count} активов)");
+                details: $"Инвентаризация создана: {SelectedRoom.Name}");
             
             StatusMessage = $"✅ Инвентаризация создана: {SelectedRoom.Name}";
             
@@ -236,20 +228,17 @@ public class RoomSelectorViewModel : INotifyPropertyChanged
         }
 
         IsLoading = true;
-        StatusMessage = $"Загрузка инвентаризации: {SelectedInventory.Name}...";
+        StatusMessage = $"Продолжение инвентаризации: {SelectedInventory.Name}...";
 
         try
         {
-            // Загружаем активы инвентаризации
-            var items = await _apiClient.GetInventoryAssetsAsync(SelectedInventory.Id);
-            
-            // Создаём сессию
+            // Создаём локальную сессию
             _sessionManager.CreateSession(SelectedInventory.Name, 0, SelectedInventory.Id);
             
             // Логируем продолжение
             _audit.Log(AuditAction.SessionStart, 
                 roomName: SelectedInventory.Name,
-                details: $"Продолжена инвентаризация: {SelectedInventory.Name} ({items.Count} активов)");
+                details: $"Продолжена инвентаризация: {SelectedInventory.Name}");
             
             StatusMessage = $"✅ Продолжена инвентаризация: {SelectedInventory.Name}";
             
