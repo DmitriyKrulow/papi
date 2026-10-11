@@ -220,6 +220,79 @@ async def get_my_assets_for_inventory(
     } for a in assets])
 
 
+# ======================================================================
+# Вспомогательные endpoints (ДО /{check_id} чтобы не конфликтовать!)
+# ======================================================================
+
+@router.get("/scope-options")
+async def get_scope_options(
+    check_type: str = Query(..., description="Тип проверки"),
+    department_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Получить список доступных объектов для проверки (комнаты, сотрудники, пользователи)"""
+    try:
+        if check_type == "by_room":
+            query = db.query(Room).filter(Room.is_active == True)
+            if department_id:
+                query = query.filter(Room.department_id == department_id)
+            rooms = query.order_by(Room.name).all()
+            return [
+                {"id": r.id, "name": r.name, "department_id": r.department_id,
+                 "building": r.building, "floor": r.floor}
+                for r in rooms
+            ]
+        elif check_type == "by_employee":
+            employees = db.query(Employee).filter(Employee.is_active == True).order_by(Employee.last_name).all()
+            return [
+                {
+                    "id": e.id,
+                    "name": f"{e.last_name} {e.first_name} {e.middle_name or ''}".strip(),
+                    "department_id": e.department_id,
+                    "position": e.position,
+                    "type": "employee",
+                }
+                for e in employees
+            ]
+        elif check_type == "by_responsible":
+            users = db.query(User).filter(User.is_active == True).order_by(User.username).all()
+            return [
+                {
+                    "id": u.id,
+                    "name": u.full_name or u.username,
+                    "username": u.username,
+                    "role": u.role,
+                    "type": "user",
+                }
+                for u in users
+            ]
+        return []
+    except Exception as e:
+        logger.error(f"Error loading scope options for check_type={check_type}: {e}", exc_info=True)
+        return JSONResponse(content=[], status_code=500)
+
+
+@router.get("/asset-check-status/{asset_id:int}")
+async def get_asset_check_status(
+    asset_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Получить статус проверки актива"""
+    asset = db.query(Asset).filter(Asset.id == asset_id).first()
+    if not asset:
+        raise HTTPException(status_code=404, detail="Актив не найден")
+
+    return JSONResponse(content={
+        "asset_id": asset.id,
+        "inventory_number": safe_str(asset.inventory_number),
+        "last_inventory_date": asset.last_inventory_date.isoformat() if asset.last_inventory_date else None,
+        "last_inventory_by_id": asset.last_inventory_by_id,
+        "last_inventory_confirmed": asset.last_inventory_confirmed,
+    })
+
+
 @router.get("/{check_id}")
 async def get_inventory_check(
     check_id: int,
@@ -686,79 +759,6 @@ async def get_inventory_qr_image(
             "Content-Disposition": f'attachment; filename="inventory_{check_id}_qr.png"'
         },
     )
-
-
-# ======================================================================
-# Вспомогательные endpoints
-# ======================================================================
-
-@router.get("/scope-options")
-async def get_scope_options(
-    check_type: str = Query(..., description="Тип проверки"),
-    department_id: Optional[int] = Query(None),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Получить список доступных объектов для проверки (комнаты, сотрудники, пользователи)"""
-    try:
-        if check_type == "by_room":
-            query = db.query(Room).filter(Room.is_active == True)
-            if department_id:
-                query = query.filter(Room.department_id == department_id)
-            rooms = query.order_by(Room.name).all()
-            return [
-                {"id": r.id, "name": r.name, "department_id": r.department_id,
-                 "building": r.building, "floor": r.floor}
-                for r in rooms
-            ]
-        elif check_type == "by_employee":
-            employees = db.query(Employee).filter(Employee.is_active == True).order_by(Employee.last_name).all()
-            return [
-                {
-                    "id": e.id,
-                    "name": f"{e.last_name} {e.first_name} {e.middle_name or ''}".strip(),
-                    "department_id": e.department_id,
-                    "position": e.position,
-                    "type": "employee",
-                }
-                for e in employees
-            ]
-        elif check_type == "by_responsible":
-            users = db.query(User).filter(User.is_active == True).order_by(User.username).all()
-            return [
-                {
-                    "id": u.id,
-                    "name": u.full_name or u.username,
-                    "username": u.username,
-                    "role": u.role,
-                    "type": "user",
-                }
-                for u in users
-            ]
-        return []
-    except Exception as e:
-        logger.error(f"Error loading scope options for check_type={check_type}: {e}", exc_info=True)
-        return JSONResponse(content=[], status_code=500)
-
-
-@router.get("/asset-check-status/{asset_id:int}")
-async def get_asset_check_status(
-    asset_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Получить статус проверки актива"""
-    asset = db.query(Asset).filter(Asset.id == asset_id).first()
-    if not asset:
-        raise HTTPException(status_code=404, detail="Актив не найден")
-
-    return JSONResponse(content={
-        "asset_id": asset.id,
-        "inventory_number": safe_str(asset.inventory_number),
-        "last_inventory_date": asset.last_inventory_date.isoformat() if asset.last_inventory_date else None,
-        "last_inventory_by_id": asset.last_inventory_by_id,
-        "last_inventory_confirmed": asset.last_inventory_confirmed,
-    })
 
 
 @router.post("/{check_id}/scan-qr")
