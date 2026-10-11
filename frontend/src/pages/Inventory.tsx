@@ -107,17 +107,27 @@ const Inventory: React.FC = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
+      if (!token) {
+        toast.error('Необходима авторизация');
+        return;
+      }
       const res = await fetch('/api/inventory-checks', {
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        headers: { 'Authorization': `Bearer ${token}` },
       });
       if (res.ok) {
         const data = await res.json();
         setChecks(data);
+      } else if (res.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
       } else {
-        toast.error('Ошибка загрузки списка');
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.detail || 'Ошибка загрузки списка');
       }
-    } catch {
-      toast.error('Ошибка соединения');
+    } catch (err) {
+      console.error('fetchChecks error:', err);
+      toast.error('Ошибка соединения с сервером');
     } finally {
       setLoading(false);
     }
@@ -130,15 +140,19 @@ const Inventory: React.FC = () => {
   const fetchCheckDetails = async (checkId: number) => {
     try {
       const token = localStorage.getItem('token');
+      if (!token) return;
       const res = await fetch(`/api/inventory-checks/${checkId}`, {
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        headers: { 'Authorization': `Bearer ${token}` },
       });
       if (res.ok) {
         const data = await res.json();
         setSelectedCheck(data);
+      } else if (res.status === 401) {
+        localStorage.removeItem('token');
+        window.location.href = '/login';
       }
-    } catch {
-      toast.error('Ошибка загрузки деталей');
+    } catch (err) {
+      console.error('fetchCheckDetails error:', err);
     }
   };
 
@@ -146,9 +160,13 @@ const Inventory: React.FC = () => {
     if (!confirm('Начать инвентаризацию? Это сбросит статус проверки у всех активов.')) return;
     try {
       const token = localStorage.getItem('token');
+      if (!token) {
+        toast.error('Необходима авторизация');
+        return;
+      }
       const res = await fetch(`/api/inventory-checks/${checkId}/start`, {
         method: 'POST',
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        headers: { 'Authorization': `Bearer ${token}` },
       });
       if (res.ok) {
         const data = await res.json();
@@ -156,10 +174,11 @@ const Inventory: React.FC = () => {
         fetchChecks();
         fetchCheckDetails(checkId);
       } else {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
         toast.error(err.detail || 'Ошибка');
       }
-    } catch {
+    } catch (err) {
+      console.error('handleStart error:', err);
       toast.error('Ошибка соединения');
     }
   };
@@ -168,9 +187,13 @@ const Inventory: React.FC = () => {
     if (!confirm('Завершить инвентаризацию?')) return;
     try {
       const token = localStorage.getItem('token');
+      if (!token) {
+        toast.error('Необходима авторизация');
+        return;
+      }
       const res = await fetch(`/api/inventory-checks/${checkId}/complete`, {
         method: 'POST',
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        headers: { 'Authorization': `Bearer ${token}` },
       });
       if (res.ok) {
         const data = await res.json();
@@ -178,10 +201,11 @@ const Inventory: React.FC = () => {
         fetchChecks();
         fetchCheckDetails(checkId);
       } else {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
         toast.error(err.detail || 'Ошибка');
       }
-    } catch {
+    } catch (err) {
+      console.error('handleComplete error:', err);
       toast.error('Ошибка соединения');
     }
   };
@@ -190,19 +214,24 @@ const Inventory: React.FC = () => {
     if (!confirm('Удалить инвентаризацию? Это действие необратимо.')) return;
     try {
       const token = localStorage.getItem('token');
+      if (!token) {
+        toast.error('Необходима авторизация');
+        return;
+      }
       const res = await fetch(`/api/inventory-checks/${checkId}`, {
         method: 'DELETE',
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        headers: { 'Authorization': `Bearer ${token}` },
       });
       if (res.ok) {
         toast.success('Инвентаризация удалена');
         setSelectedCheck(null);
         fetchChecks();
       } else {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
         toast.error(err.detail || 'Ошибка');
       }
-    } catch {
+    } catch (err) {
+      console.error('handleDelete error:', err);
       toast.error('Ошибка соединения');
     }
   };
@@ -210,17 +239,23 @@ const Inventory: React.FC = () => {
   const handleConfirm = async (checkId: number, assetId: number, found: boolean) => {
     try {
       const token = localStorage.getItem('token');
+      if (!token) {
+        toast.error('Необходима авторизация');
+        return;
+      }
       const res = await fetch(
         `/api/inventory-checks/${checkId}/confirm/${assetId}?found=${found}`,
-        { method: 'POST', headers: token ? { 'Authorization': `Bearer ${token}` } : {} }
+        { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } }
       );
       if (res.ok) {
+        toast.success(found ? 'Актив найден' : 'Актив отмечен как отсутствующий');
         fetchCheckDetails(checkId);
       } else {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
         toast.error(err.detail || 'Ошибка');
       }
-    } catch {
+    } catch (err) {
+      console.error('handleConfirm error:', err);
       toast.error('Ошибка соединения');
     }
   };
@@ -228,18 +263,23 @@ const Inventory: React.FC = () => {
   const handleSkip = async (checkId: number, assetId: number) => {
     try {
       const token = localStorage.getItem('token');
+      if (!token) {
+        toast.error('Необходима авторизация');
+        return;
+      }
       const res = await fetch(
         `/api/inventory-checks/${checkId}/confirm/${assetId}?skip=true`,
-        { method: 'POST', headers: token ? { 'Authorization': `Bearer ${token}` } : {} }
+        { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } }
       );
       if (res.ok) {
         toast.success('Актив пропущен');
         fetchCheckDetails(checkId);
       } else {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
         toast.error(err.detail || 'Ошибка пропуска');
       }
-    } catch {
+    } catch (err) {
+      console.error('handleSkip error:', err);
       toast.error('Ошибка соединения');
     }
   };
@@ -247,18 +287,23 @@ const Inventory: React.FC = () => {
   const handleResetAsset = async (checkId: number, assetId: number) => {
     try {
       const token = localStorage.getItem('token');
+      if (!token) {
+        toast.error('Необходима авторизация');
+        return;
+      }
       const res = await fetch(
         `/api/inventory-checks/${checkId}/reset-asset/${assetId}`,
-        { method: 'POST', headers: token ? { 'Authorization': `Bearer ${token}` } : {} }
+        { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } }
       );
       if (res.ok) {
         toast.success('Статус сброшен');
         fetchCheckDetails(checkId);
       } else {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
         toast.error(err.detail || 'Ошибка');
       }
-    } catch {
+    } catch (err) {
+      console.error('handleResetAsset error:', err);
       toast.error('Ошибка соединения');
     }
   };
