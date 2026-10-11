@@ -117,9 +117,9 @@ public class RoomSelectorViewModel : INotifyPropertyChanged
             
             RoomsLoaded?.Invoke();
         }
-        catch
+        catch (Exception ex)
         {
-            StatusMessage = "⚠ Сервер недоступен";
+            StatusMessage = $"⚠ Ошибка: {ex.Message}";
         }
         finally
         {
@@ -144,9 +144,9 @@ public class RoomSelectorViewModel : INotifyPropertyChanged
                 ? $"✅ Найдено {inventories.Count} активных инвентаризаций" 
                 : "⚠ Нет активных инвентаризаций";
         }
-        catch
+        catch (Exception ex)
         {
-            StatusMessage = "⚠ Ошибка загрузки";
+            StatusMessage = $"⚠ Ошибка загрузки: {ex.Message}";
         }
         finally
         {

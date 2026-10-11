@@ -36,7 +36,11 @@ public class RfidApiClient
     private async Task<T?> GetJsonAsync<T>(string endpoint)
     {
         var response = await SendAsync(HttpMethod.Get, endpoint);
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync();
+            throw new HttpRequestException($"HTTP {response.StatusCode}: {errorContent}");
+        }
         var json = await response.Content.ReadAsStringAsync();
         return JsonConvert.DeserializeObject<T>(json);
     }
@@ -45,7 +49,11 @@ public class RfidApiClient
     {
         var content = body != null ? new StringContent(body, Encoding.UTF8, "application/json") : null;
         var response = await SendAsync(HttpMethod.Post, endpoint, content);
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync();
+            throw new HttpRequestException($"HTTP {response.StatusCode}: {errorContent}");
+        }
         var json = await response.Content.ReadAsStringAsync();
         return JsonConvert.DeserializeObject<T>(json);
     }

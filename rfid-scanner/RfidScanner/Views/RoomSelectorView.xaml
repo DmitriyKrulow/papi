@@ -168,7 +168,7 @@
                                                     </TextBlock>
                                                     <TextBlock FontSize="11" Foreground="#9E9E9E" Margin="0,2,0,0">
                                                         <Run Text="Прогресс: "/>
-                                                        <Run Text="{Binding ProgressPercentText}"/>
+                                                        <Run Text="{Binding ProgressPercentText, Mode=OneWay}"/>
                                                     </TextBlock>
                                                 </StackPanel>
                                             </Border>
