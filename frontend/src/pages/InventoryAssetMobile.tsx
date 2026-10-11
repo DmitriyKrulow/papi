@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import {
-  ArrowLeft, CheckCircle2, XCircle, Loader2, Camera
+  ArrowLeft, CheckCircle2, XCircle, Loader2, Camera, ArrowRight
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -46,7 +46,7 @@ const InventoryAssetMobile: React.FC = () => {
   const [asset, setAsset] = useState<Asset | null>(null);
   const [inventory, setInventory] = useState<InventoryCheck | null>(null);
   const [loading, setLoading] = useState(true);
-  const [confirming, setConfirming] = useState(false);
+  const [confirming, setConfirming] = useState<'found' | 'missing' | 'skip' | null>(null);
   const [confirmResult, setConfirmResult] = useState<'found' | 'missing' | null>(null);
   const [newPhoto, setNewPhoto] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -61,30 +61,48 @@ const InventoryAssetMobile: React.FC = () => {
       setLoading(true);
       const token = await getToken();
       
-      // Получаем данные актива
-      const assetRes = await fetch(`/api/assets/${assetId}`, {
-        headers: { 'Authorization': token ? `Bearer ${token}` : '' },
-      });
-      
-      if (assetRes.ok) {
-        const assetData = await assetRes.json();
-        setAsset(assetData);
-      } else {
-        toast.error('Актив не найден');
+      if (!token) {
+        toast.error('Необходима авторизация');
+        navigate('/login');
+        return;
       }
       
-      // Получаем активную инвентаризацию
-      const invRes = await fetch('/api/inventory-checks/active', {
-        headers: { 'Authorization': token ? `Bearer ${token}` : '' },
+      // Получаем данные актива
+      const assetRes = await fetch(`/api/assets/${assetId}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
       });
       
-      if (invRes.ok) {
-        const invData = await invRes.json();
-        if (invData && invData.id === checkId) {
-          setInventory(invData);
+      if (!assetRes.ok) {
+        toast.error('Актив не найден');
+        return;
+      }
+      
+      const assetData = await assetRes.json();
+      setAsset(assetData);
+      
+      // Получаем активную инвентаризацию по check_id из URL
+      if (checkId > 0) {
+        const invRes = await fetch(`/api/inventory-checks/${checkId}`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        
+        if (invRes.ok) {
+          const invData = await invRes.json();
+          if (invData && invData.status === 'in_progress') {
+            setInventory({
+              id: invData.id,
+              name: invData.name,
+              check_type: invData.check_type,
+              started_at: invData.started_at || '',
+              found: invData.found || 0,
+              missing: invData.missing || 0,
+              total_checked: invData.total_checked || 0,
+            });
+          }
         }
       }
     } catch (err) {
+      console.error('Error fetching data:', err);
       toast.error('Ошибка загрузки данных');
     } finally {
       setLoading(false);
@@ -92,18 +110,23 @@ const InventoryAssetMobile: React.FC = () => {
   };
 
   const handleConfirm = async (found: boolean) => {
-    if (!inventory || !asset) return;
+    if (!asset || !checkId || !assetId) return;
     
     try {
-      setConfirming(true);
+      setConfirming('found');
       const token = await getToken();
       
+      if (!token) {
+        toast.error('Необходима авторизация');
+        return;
+      }
+      
       const res = await fetch(
-        `/api/inventory-checks/${inventory.id}/confirm/${asset.id}?found=${found}`,
+        `/api/inventory-checks/${checkId}/confirm/${assetId}?found=${found}`,
         {
           method: 'POST',
           headers: {
-            'Authorization': token ? `Bearer ${token}` : '',
+            'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
         }
@@ -116,28 +139,86 @@ const InventoryAssetMobile: React.FC = () => {
         
         // Обновляем данные актива
         const updatedAssetRes = await fetch(`/api/assets/${assetId}`, {
-          headers: { 'Authorization': token ? `Bearer ${token}` : '' },
+          headers: { 'Authorization': `Bearer ${token}` },
         });
         if (updatedAssetRes.ok) {
           setAsset(await updatedAssetRes.json());
         }
         
         // Обновляем данные инвентаризации
-        const updatedInvRes = await fetch('/api/inventory-checks/active', {
-          headers: { 'Authorization': token ? `Bearer ${token}` : '' },
+        const updatedInvRes = await fetch(`/api/inventory-checks/${checkId}`, {
+          headers: { 'Authorization': `Bearer ${token}` },
         });
         if (updatedInvRes.ok) {
-          setInventory(await updatedInvRes.json());
+          const updatedInvData = await updatedInvRes.json();
+          setInventory({
+            id: updatedInvData.id,
+            name: updatedInvData.name,
+            check_type: updatedInvData.check_type,
+            started_at: updatedInvData.started_at || '',
+            found: updatedInvData.found || 0,
+            missing: updatedInvData.missing || 0,
+            total_checked: updatedInvData.total_checked || 0,
+          });
         }
+        
+        // Переходим к следующему активу через 1 секунду
+        setTimeout(() => {
+          navigate('/inventory-mobile');
+        }, 1000);
       } else {
         const err = await res.json();
         toast.error(err.detail || 'Ошибка подтверждения');
       }
     } catch (err) {
+      console.error('Confirm error:', err);
       toast.error('Ошибка соединения');
     } finally {
-      setConfirming(false);
-      setTimeout(() => setConfirmResult(null), 3000);
+      setConfirming(null);
+      setTimeout(() => setConfirmResult(null), 2000);
+    }
+  };
+
+  const handleSkip = async () => {
+    if (!asset || !checkId || !assetId) return;
+    
+    try {
+      setConfirming('skip');
+      const token = await getToken();
+      
+      if (!token) {
+        toast.error('Необходима авторизация');
+        return;
+      }
+      
+      const res = await fetch(
+        `/api/inventory-checks/${checkId}/confirm/${assetId}?skip=true`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (res.ok) {
+        const data = await res.json();
+        toast.success(data.message || 'Актив пропущен');
+        
+        // Переходим к следующему активу
+        setTimeout(() => {
+          navigate('/inventory-mobile');
+        }, 1000);
+      } else {
+        const err = await res.json();
+        toast.error(err.detail || 'Ошибка пропуска');
+      }
+    } catch (err) {
+      console.error('Skip error:', err);
+      toast.error('Ошибка соединения');
+    } finally {
+      setConfirming(null);
     }
   };
 
@@ -159,6 +240,11 @@ const InventoryAssetMobile: React.FC = () => {
       setUploadingPhoto(true);
       const token = await getToken();
       
+      if (!token) {
+        toast.error('Необходима авторизация');
+        return;
+      }
+      
       // Отправляем фото на сервер
       const formData = new FormData();
       const response = await fetch(newPhoto);
@@ -170,7 +256,7 @@ const InventoryAssetMobile: React.FC = () => {
       const uploadRes = await fetch(`/api/assets/${assetId}/photos`, {
         method: 'POST',
         headers: {
-          'Authorization': token ? `Bearer ${token}` : '',
+          'Authorization': `Bearer ${token}`,
         },
         body: formData,
       });
@@ -180,15 +266,17 @@ const InventoryAssetMobile: React.FC = () => {
         setNewPhoto(null);
         // Обновляем список фото
         const updatedAssetRes = await fetch(`/api/assets/${assetId}`, {
-          headers: { 'Authorization': token ? `Bearer ${token}` : '' },
+          headers: { 'Authorization': `Bearer ${token}` },
         });
         if (updatedAssetRes.ok) {
           setAsset(await updatedAssetRes.json());
         }
       } else {
-        toast.error('Ошибка загрузки фото');
+        const err = await uploadRes.json().catch(() => ({}));
+        toast.error(err.detail || 'Ошибка загрузки фото');
       }
     } catch (err) {
+      console.error('Upload photo error:', err);
       toast.error('Ошибка соединения');
     } finally {
       setUploadingPhoto(false);
@@ -415,31 +503,47 @@ const InventoryAssetMobile: React.FC = () => {
               Подтвердить наличие
             </h2>
             
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => handleConfirm(true)}
-                disabled={confirming}
-                className="px-4 py-3 bg-green-600 dark:bg-green-700 text-white rounded-lg hover:bg-green-700 dark:hover:bg-green-600 transition disabled:opacity-50 font-medium flex items-center justify-center gap-2"
-              >
-                {confirming && confirmResult === 'found' ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="w-5 h-5" />
-                )}
-                Найден
-              </button>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => handleConfirm(true)}
+                  disabled={confirming !== null}
+                  className="px-4 py-3 bg-green-600 dark:bg-green-700 text-white rounded-lg hover:bg-green-700 dark:hover:bg-green-600 transition disabled:opacity-50 font-medium flex items-center justify-center gap-2"
+                >
+                  {confirming === 'found' ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="w-5 h-5" />
+                  )}
+                  Найден
+                </button>
+                
+                <button
+                  onClick={() => handleConfirm(false)}
+                  disabled={confirming !== null}
+                  className="px-4 py-3 bg-red-600 dark:bg-red-700 text-white rounded-lg hover:bg-red-700 dark:hover:bg-red-600 transition disabled:opacity-50 font-medium flex items-center justify-center gap-2"
+                >
+                  {confirming === 'missing' ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <XCircle className="w-5 h-5" />
+                  )}
+                  Отсутствует
+                </button>
+              </div>
               
+              {/* Skip button */}
               <button
-                onClick={() => handleConfirm(false)}
-                disabled={confirming}
-                className="px-4 py-3 bg-red-600 dark:bg-red-700 text-white rounded-lg hover:bg-red-700 dark:hover:bg-red-600 transition disabled:opacity-50 font-medium flex items-center justify-center gap-2"
+                onClick={handleSkip}
+                disabled={confirming !== null}
+                className="w-full px-4 py-2 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition disabled:opacity-50 font-medium flex items-center justify-center gap-2"
               >
-                {confirming && confirmResult === 'missing' ? (
+                {confirming === 'skip' ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
                 ) : (
-                  <XCircle className="w-5 h-5" />
+                  <ArrowRight className="w-5 h-5" />
                 )}
-                Отсутствует
+                Пропустить
               </button>
             </div>
           </div>

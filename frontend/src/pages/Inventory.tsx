@@ -6,7 +6,7 @@ import {
   ClipboardList, Plus, FileText, CheckCircle2, XCircle, Loader2,
   Building2, Users, User, Camera, ChevronRight, QrCode,
   ChevronLeft, Play, Trash2, Search, Clock, Check, X,
-  RefreshCw, Package, Download, Printer
+  RefreshCw, Package, Download, Printer, ArrowRight
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -225,6 +225,25 @@ const Inventory: React.FC = () => {
     }
   };
 
+  const handleSkip = async (checkId: number, assetId: number) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(
+        `/api/inventory-checks/${checkId}/confirm/${assetId}?skip=true`,
+        { method: 'POST', headers: token ? { 'Authorization': `Bearer ${token}` } : {} }
+      );
+      if (res.ok) {
+        toast.success('Актив пропущен');
+        fetchCheckDetails(checkId);
+      } else {
+        const err = await res.json();
+        toast.error(err.detail || 'Ошибка пропуска');
+      }
+    } catch {
+      toast.error('Ошибка соединения');
+    }
+  };
+
   const handleResetAsset = async (checkId: number, assetId: number) => {
     try {
       const token = localStorage.getItem('token');
@@ -371,6 +390,7 @@ const Inventory: React.FC = () => {
           onComplete={handleComplete}
           onDelete={handleDelete}
           onConfirm={handleConfirm}
+          onSkip={handleSkip}
           onResetAsset={handleResetAsset}
           onRefresh={() => fetchCheckDetails(selectedCheck.id)}
           onShowQr={() => setShowQrModal(selectedCheck)}
@@ -403,13 +423,14 @@ interface CheckDetailViewProps {
   onComplete: (id: number) => void;
   onDelete: (id: number) => void;
   onConfirm: (checkId: number, assetId: number, found: boolean) => void;
+  onSkip: (checkId: number, assetId: number) => void;
   onResetAsset: (checkId: number, assetId: number) => void;
   onRefresh: () => void;
   onShowQr: () => void;
 }
 
 const CheckDetailView: React.FC<CheckDetailViewProps> = ({
-  check, isAdmin, onBack, onStart, onComplete, onDelete, onConfirm, onResetAsset, onRefresh, onShowQr
+  check, isAdmin, onBack, onStart, onComplete, onDelete, onConfirm, onSkip, onResetAsset, onRefresh, onShowQr
 }) => {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'pending' | 'found' | 'missing'>('all');
@@ -614,7 +635,7 @@ const CheckDetailView: React.FC<CheckDetailViewProps> = ({
                   </div>
 
                   {/* Action buttons */}
-                  <div className="flex-shrink-0 flex gap-1">
+                  <div className="flex-shrink-0 flex gap-1 flex-wrap justify-end">
                     {check.status === 'in_progress' && (
                       <>
                         {item.result !== 'found' && (
@@ -633,6 +654,15 @@ const CheckDetailView: React.FC<CheckDetailViewProps> = ({
                             title="Отсутствует"
                           >
                             <X className="w-3.5 h-3.5" /> Нет
+                          </button>
+                        )}
+                        {item.result === 'pending' && (
+                          <button
+                            onClick={() => onSkip(check.id, item.asset_id)}
+                            className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 rounded hover:bg-gray-50 dark:hover:bg-gray-700 transition flex items-center gap-1"
+                            title="Пропустить"
+                          >
+                            <ArrowRight className="w-3.5 h-3.5" /> Пропуск
                           </button>
                         )}
                         {isAdmin && item.result !== 'pending' && (
@@ -698,12 +728,22 @@ const CreateCheckModal: React.FC<CreateCheckModalProps> = ({ onClose, onCreated 
       fetch(`/api/inventory-checks/scope-options?check_type=${checkType}`, {
         headers: token ? { 'Authorization': `Bearer ${token}` } : {},
       })
-        .then(res => res.json())
+        .then(res => {
+          if (!res.ok) {
+            return res.json().then(err => { throw new Error(err.detail || `HTTP ${res.status}`); });
+          }
+          return res.json();
+        })
         .then(data => {
           setScopeOptions(Array.isArray(data) ? data : []);
           setLoadingScope(false);
         })
-        .catch(() => { setScopeOptions([]); setLoadingScope(false); });
+        .catch(err => {
+          console.error('Failed to load scope options:', err);
+          toast.error(`Не удалось загрузить список: ${err.message}`);
+          setScopeOptions([]);
+          setLoadingScope(false);
+        });
     } else {
       setScopeOptions([]);
       setScopeId(null);

@@ -365,12 +365,13 @@ async def start_inventory_check(
 async def confirm_asset(
     check_id: int,
     asset_id: int,
-    found: bool = Query(True, description="Актив найден?"),
+    found: Optional[bool] = Query(None, description="Актив найден? (true/false)"),
+    skip: bool = Query(False, description="Пропустить актив"),
     comment: Optional[str] = Query(None, description="Комментарий"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Подтвердить/отметить отсутствие актива"""
+    """Подтвердить/отметить отсутствие или пропустить актив"""
     inv_check = db.query(InventoryCheck).filter(InventoryCheck.id == check_id).first()
     if not inv_check:
         raise HTTPException(status_code=404, detail="Инвентаризация не найдена")
@@ -393,12 +394,35 @@ async def confirm_asset(
         inv_check.missing = max(0, inv_check.missing - 1)
 
     # Устанавливаем новый результат
+    if skip:
+        item.result = "pending"  # Пропуск — оставляем pending
+        item.comment = comment
+        item.confirmed_by = None
+        item.confirmed_at = None
+        asset = db.query(Asset).filter(Asset.id == asset_id).first()
+        if asset:
+            asset.last_inventory_confirmed = False
+        db.commit()
+        return JSONResponse(content={
+            "message": "Актив пропущен",
+            "asset_id": asset_id,
+            "result": "pending",
+            "found_count": inv_check.found,
+            "missing_count": inv_check.missing,
+            "remaining": inv_check.total_checked - inv_check.found - inv_check.missing,
+        })
+
+    if found is None:
+        raise HTTPException(status_code=400, detail="Необходимо указать found=true (найден) или found=false (отсутствует)")
+
     if found:
         item.result = "found"
         inv_check.found += 1
+        asset_status = "найден"
     else:
         item.result = "missing"
         inv_check.missing += 1
+        asset_status = "отсутствует"
 
     item.comment = comment
     item.confirmed_by = current_user.id
@@ -414,7 +438,7 @@ async def confirm_asset(
     db.commit()
 
     return JSONResponse(content={
-        "message": f"Актив {'найден' if found else 'отсутствует'}",
+        "message": f"Актив {asset_status}",
         "asset_id": asset_id,
         "result": item.result,
         "found_count": inv_check.found,
@@ -713,7 +737,8 @@ async def get_scope_options(
             ]
         return []
     except Exception as e:
-        return JSONResponse(content=[])
+        logger.error(f"Error loading scope options for check_type={check_type}: {e}", exc_info=True)
+        return JSONResponse(content=[], status_code=500)
 
 
 @router.get("/asset-check-status/{asset_id:int}")
@@ -740,6 +765,7 @@ async def get_asset_check_status(
 async def scan_qr_for_inventory(
     check_id: int,
     inventory_number: str = Query(..., description="Инвентарный номер актива"),
+    found: bool = Query(True, description="Актив найден?"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -770,33 +796,37 @@ async def scan_qr_for_inventory(
     if not item:
         raise HTTPException(status_code=404, detail="Актив не включен в эту инвентаризацию")
     
-    # Если уже подтвержден
-    if item.result != "pending":
-        return JSONResponse(content={
-            "message": f"Актив уже отмечен как '{item.result}'",
-            "result": item.result,
-        })
+    # Если уже подтвержден, корректируем счётчики
+    if item.result == "found":
+        inv_check.found = max(0, inv_check.found - 1)
+    elif item.result == "missing":
+        inv_check.missing = max(0, inv_check.missing - 1)
     
-    # Отмечаем как найденный
-    item.result = "found"
+    if found:
+        item.result = "found"
+        inv_check.found += 1
+        asset_status = "найден"
+    else:
+        item.result = "missing"
+        inv_check.missing += 1
+        asset_status = "отсутствует"
+    
     item.confirmed_by = current_user.id
     item.confirmed_at = datetime.now()
-    
-    inv_check.found += 1
     
     # Обновляем актив
     asset.last_inventory_date = datetime.now()
     asset.last_inventory_by_id = current_user.id
-    asset.last_inventory_confirmed = True
+    asset.last_inventory_confirmed = found
     
     db.commit()
     
     return JSONResponse(content={
-        "message": "Актив найден и отмечен",
+        "message": f"Актив {asset_status} и отмечен",
         "asset_id": asset.id,
         "inventory_number": safe_str(asset.inventory_number),
         "asset_name": safe_str(asset.name),
-        "result": "found",
+        "result": item.result,
         "found_count": inv_check.found,
         "missing_count": inv_check.missing,
         "remaining": inv_check.total_checked - inv_check.found - inv_check.missing,

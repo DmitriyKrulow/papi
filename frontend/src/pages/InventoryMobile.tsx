@@ -1,9 +1,9 @@
 // frontend/src/pages/InventoryMobile.tsx
 import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { CheckCircle2, XCircle, Loader2, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { useNavigate } from 'react-router-dom';
 
 interface Asset {
   id: number;
@@ -29,34 +29,71 @@ interface InventoryCheck {
 const InventoryMobile: React.FC = () => {
   const navigate = useNavigate();
   const { user, getToken } = useAuth();
+  const [searchParams] = useSearchParams();
+  
+  const forcedCheckId = searchParams.get('check_id') ? parseInt(searchParams.get('check_id') || '0') : null;
+  
   const [activeInventory, setActiveInventory] = useState<InventoryCheck | null>(null);
   const [myAssets, setMyAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [forcedCheckId]);
 
   const fetchData = async () => {
     try {
       setLoading(true);
       const token = await getToken();
       
-      // Получаем активную инвентаризацию
-      const invRes = await fetch('/api/inventory-checks/active', {
-        headers: { 'Authorization': token ? `Bearer ${token}` : '' },
-      });
+      if (!token) {
+        toast.error('Необходима авторизация');
+        navigate('/login');
+        return;
+      }
       
-      let invData = null;
-      if (invRes.ok) {
-        invData = await invRes.json();
-        setActiveInventory(invData);
+      // Получаем активную инвентаризацию
+      let invData: any = null;
+      
+      if (forcedCheckId && forcedCheckId > 0) {
+        // Используем check_id из URL
+        const invRes = await fetch(`/api/inventory-checks/${forcedCheckId}`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        
+        if (invRes.ok) {
+          const data = await invRes.json();
+          if (data.status === 'in_progress') {
+            invData = {
+              id: data.id,
+              name: data.name,
+              check_type: data.check_type,
+              started_at: data.started_at || '',
+              found: data.found || 0,
+              missing: data.missing || 0,
+              total_checked: data.total_checked || 0,
+            };
+            setActiveInventory(invData);
+          }
+        }
+      } else {
+        // Получаем активную инвентаризацию
+        const invRes = await fetch('/api/inventory-checks/active', {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        
+        if (invRes.ok) {
+          invData = await invRes.json();
+          if (invData) {
+            setActiveInventory(invData);
+          }
+        }
       }
       
       // Получаем активы пользователя только если есть инвентаризация
       if (invData) {
         const assetsRes = await fetch('/api/inventory-checks/my-assets', {
-          headers: { 'Authorization': token ? `Bearer ${token}` : '' },
+          headers: { 'Authorization': `Bearer ${token}` },
         });
         
         if (assetsRes.ok) {
@@ -65,6 +102,7 @@ const InventoryMobile: React.FC = () => {
         }
       }
     } catch (err) {
+      console.error('Error fetching inventory data:', err);
       toast.error('Ошибка загрузки данных');
     } finally {
       setLoading(false);
@@ -113,7 +151,7 @@ const InventoryMobile: React.FC = () => {
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
             <div className="flex justify-between items-center mb-2">
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Общий прогресс
+                {activeInventory.name}
               </span>
               <span className="text-sm font-bold text-blue-600 dark:text-blue-400">
                 {progress}%
@@ -128,6 +166,10 @@ const InventoryMobile: React.FC = () => {
             <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-2">
               <span>Проверено: {confirmedAssets.length}/{myAssets.length}</span>
               <span>Осталось: {pendingAssets.length}</span>
+            </div>
+            <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+              <span className="text-green-600 dark:text-green-400">Найдено: {activeInventory.found}</span>
+              <span className="text-red-600 dark:text-red-400">Отсутствует: {activeInventory.missing}</span>
             </div>
           </div>
         </div>
@@ -185,7 +227,10 @@ const InventoryMobile: React.FC = () => {
                 {/* Click to view details */}
                 {!asset.last_inventory_confirmed && activeInventory && (
                   <button
-                    onClick={() => navigate(`/inventory/asset/${asset.id}?check_id=${activeInventory.id}`)}
+                    onClick={() => {
+                      const checkId = forcedCheckId || activeInventory.id;
+                      navigate(`/inventory/asset/${asset.id}?check_id=${checkId}`);
+                    }}
                     className="mt-3 w-full px-4 py-2 bg-blue-600 dark:bg-blue-700 text-white rounded-lg text-sm hover:bg-blue-700 dark:hover:bg-blue-600 transition font-medium"
                   >
                     Проверить актив
