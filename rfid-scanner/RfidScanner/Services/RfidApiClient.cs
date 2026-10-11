@@ -99,7 +99,7 @@ public class RfidApiClient
 
     public async Task<List<Room>> GetRoomsAsync()
     {
-        var result = await GetJsonAsync<Dictionary<string, object>>("/api/rooms");
+        var result = await GetJsonAsync<Dictionary<string, object>>("/api/rfid/rooms");
         if (result == null || !result.ContainsKey("rooms"))
             return new();
 
@@ -111,7 +111,7 @@ public class RfidApiClient
 
     public async Task<List<Asset>> GetRoomAssetsAsync(int roomId)
     {
-        var result = await GetJsonAsync<Dictionary<string, object>>($"/api/rooms/{roomId}/assets");
+        var result = await GetJsonAsync<Dictionary<string, object>>($"/api/rfid/rooms/{roomId}/assets");
         if (result == null || !result.ContainsKey("assets"))
             return new();
 

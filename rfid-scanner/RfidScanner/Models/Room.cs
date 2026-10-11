@@ -9,5 +9,6 @@ public class Room
     public string Name { get; set; } = string.Empty;
     public string? Building { get; set; }
     public string? Floor { get; set; }
+    public string? Department { get; set; }
     public int? DepartmentId { get; set; }
 }

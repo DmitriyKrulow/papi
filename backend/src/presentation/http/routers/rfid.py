@@ -756,3 +756,100 @@ async def get_inventory_status(
             (inv_check.found + inv_check.missing) / inv_check.total_checked * 100, 1
         ) if inv_check.total_checked > 0 else 0
     }
+
+
+# ======================================================================
+# Помещения и активы для RFID-сканера (отдельные эндпоинты с API Key auth)
+# ======================================================================
+
+@router.get("/rooms")
+async def get_rooms_for_scanner(
+    search: Optional[str] = None,
+    db: Session = Depends(get_db),
+    scanner: dict = Depends(get_rfid_scanner),
+):
+    """
+    Получить список помещений для RFID-сканера.
+    Использует X-API-Key аутентификацию вместо admin Bearer token.
+    
+    Header: X-API-Key: rfid_abc123...
+    Query: search=текст
+    """
+    from src.infrastructure.db.models.department import Room, Department
+    
+    query = db.query(Room).options(
+        joinedload(Room.department)
+    ).filter(
+        Room.is_active == True
+    )
+    
+    if search:
+        search_pattern = f"%{search}%"
+        query = query.filter(
+            (Room.name.ilike(search_pattern)) |
+            (Room.floor.ilike(search_pattern)) |
+            (Room.building.ilike(search_pattern))
+        )
+    
+    rooms = query.order_by(Room.name).all()
+    
+    return {
+        "rooms": [
+            {
+                "id": r.id,
+                "name": r.name or "",
+                "building": r.building or "",
+                "floor": r.floor or "",
+                "department": r.department.name if r.department else "",
+            }
+            for r in rooms
+        ],
+        "count": len(rooms)
+    }
+
+
+@router.get("/rooms/{room_id}/assets")
+async def get_room_assets_for_scanner(
+    room_id: int,
+    db: Session = Depends(get_db),
+    scanner: dict = Depends(get_rfid_scanner),
+):
+    """
+    Получить список активов для помещения.
+    Использует X-API-Key аутентификацию вместо admin Bearer token.
+    
+    Header: X-API-Key: rfid_abc123...
+    """
+    from src.infrastructure.db.models.department import Room
+    
+    room = db.query(Room).filter(Room.id == room_id, Room.is_active == True).first()
+    if not room:
+        raise HTTPException(status_code=404, detail="Помещение не найдено")
+    
+    assets = db.query(Asset).options(
+        joinedload(Asset.assigned_room)
+    ).filter(
+        Asset.room_id == room_id,
+        Asset.is_active == True
+    ).all()
+    
+    return {
+        "room_id": room_id,
+        "room_name": room.name,
+        "total": len(assets),
+        "assets": [
+            {
+                "id": a.id,
+                "rfid_tag": a.rfid_tag or "",
+                "inventory_number": a.inventory_number or "",
+                "name": a.name or "",
+                "model": a.model or "",
+                "serial_number": a.serial_number or "",
+                "department": a.department_code or "",
+                "responsible": a.responsible_person or "",
+                "location": a.location_address or "",
+                "status": a.status,
+            }
+            for a in assets
+        ]
+    }
