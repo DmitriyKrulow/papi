@@ -40,8 +40,22 @@ public partial class SettingsWindow : Window
     {
         try
         {
+            var url = BackendUrlBox.Text.TrimEnd('/');
+            
+            // Проверка на Punycode/Cyrillic домены — HttpClient их не поддерживает
+            if (url.Contains('р') || url.Contains('ф') || url.Contains('к') || url.Contains('м'))
+            {
+                MessageBox.Show(
+                    "URL содержит кириллический домен. HttpClient не поддерживает Punycode.\n\n" +
+                    "Используйте IP-адрес (например: http://109.229.69.163:8080)",
+                    "Ошибка URL",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
             var settings = _config.Settings;
-            settings.BackendUrl = BackendUrlBox.Text.TrimEnd('/');
+            settings.BackendUrl = url;
             settings.ApiKey = ApiKeyBox.Text;
             settings.TcpReaderIp = TcpIpBox.Text;
             settings.TcpReaderPort = int.TryParse(TcpPortBox.Text, out var port) ? port : 8000;

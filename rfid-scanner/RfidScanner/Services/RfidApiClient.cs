@@ -35,7 +35,7 @@ public class RfidApiClient
 
     private async Task<T?> GetJsonAsync<T>(string endpoint)
     {
-        var response = await SendAsync(HttpMethod.Get, $"{_baseUrl}{endpoint}");
+        var response = await SendAsync(HttpMethod.Get, endpoint);
         response.EnsureSuccessStatusCode();
         var json = await response.Content.ReadAsStringAsync();
         return JsonConvert.DeserializeObject<T>(json);
@@ -44,7 +44,7 @@ public class RfidApiClient
     private async Task<T?> PostJsonAsync<T>(string endpoint, string? body = null)
     {
         var content = body != null ? new StringContent(body, Encoding.UTF8, "application/json") : null;
-        var response = await SendAsync(HttpMethod.Post, $"{_baseUrl}{endpoint}", content);
+        var response = await SendAsync(HttpMethod.Post, endpoint, content);
         response.EnsureSuccessStatusCode();
         var json = await response.Content.ReadAsStringAsync();
         return JsonConvert.DeserializeObject<T>(json);

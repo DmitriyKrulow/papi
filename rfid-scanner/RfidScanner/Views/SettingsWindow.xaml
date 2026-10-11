@@ -24,7 +24,7 @@
                     
                     <TextBlock Grid.Column="0" Text="URL сервера:" VerticalAlignment="Center"/>
                     <TextBox Grid.Column="1" x:Name="BackendUrlBox" 
-                            Text="http://localhost:8080"/>
+                             Text="http://109.229.69.163:8080"/>
                 </Grid>
 
                 <Grid Margin="0,0,0,15">

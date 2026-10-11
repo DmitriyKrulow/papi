@@ -96,6 +96,8 @@ public class RoomSelectorViewModel : INotifyPropertyChanged
     public ICommand StartInventoryCommand => new RelayCommand(StartInventory);
     public ICommand ContinueInventoryCommand => new RelayCommand(ContinueInventory);
 
+    public event Action? RoomsLoaded;
+
     private async void LoadRooms()
     {
         IsLoading = true;
@@ -112,6 +114,8 @@ public class RoomSelectorViewModel : INotifyPropertyChanged
             StatusMessage = rooms.Count > 0 
                 ? $"✅ Загружено {rooms.Count} помещений" 
                 : "⚠ Помещения не найдены";
+            
+            RoomsLoaded?.Invoke();
         }
         catch
         {

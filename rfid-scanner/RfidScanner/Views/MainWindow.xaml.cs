@@ -60,6 +60,24 @@ public partial class MainWindow : Window
         
         // Загрузка помещений
         _roomSelectorViewModel.LoadRoomsCommand.Execute(null);
+        
+        // Подписка на загрузку помещений для обновления статуса
+        _roomSelectorViewModel.RoomsLoaded += () =>
+        {
+            System.Windows.Application.Current.Dispatcher.Invoke(() =>
+            {
+                if (_roomSelectorViewModel.Rooms.Count > 0)
+                {
+                    ConnectionStatus.Text = "Подключено";
+                    ConnectionStatus.Foreground = System.Windows.Media.Brushes.Green;
+                }
+                else
+                {
+                    ConnectionStatus.Text = "Нет данных";
+                    ConnectionStatus.Foreground = System.Windows.Media.Brushes.Orange;
+                }
+            });
+        };
     }
 
     private void OnSessionCreated(ScanSession session)
