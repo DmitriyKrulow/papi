@@ -56,7 +56,7 @@
                         </Style>
                     </TabControl.ItemContainerStyle>
                     <TabItem Header="🏢 Помещения" IsSelected="True" x:Name="RoomsTab">
-                        <Border Padding="15" Background="White">
+                        <Border Padding="15" Background="White" MaxHeight="500">
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
@@ -76,24 +76,82 @@
                                 </TextBox>
 
                                 <!-- Список помещений -->
-                                <Grid Grid.Row="1">
-                                    <ListView ItemsSource="{Binding Rooms}" 
-                                              SelectedItem="{Binding SelectedRoom, Mode=TwoWay}"
+                                <ListView Grid.Row="1" ItemsSource="{Binding Rooms}" 
+                                          SelectedItem="{Binding SelectedRoom, Mode=TwoWay}"
+                                          BorderThickness="0"
+                                          ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                          ScrollViewer.CanContentScroll="True">
+                                    <ListView.ItemContainerStyle>
+                                        <Style TargetType="ListViewItem">
+                                            <Setter Property="Padding" Value="0"/>
+                                            <Setter Property="Margin" Value="0,2"/>
+                                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="ListViewItem">
+                                                        <ContentPresenter/>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Style>
+                                    </ListView.ItemContainerStyle>
+                                    <ListView.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border x:Name="ItemBorder" Padding="12" Margin="0,2" CornerRadius="6"
+                                                   Background="#FAFAFA" BorderThickness="2" BorderBrush="#E0E0E0">
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Name}" FontSize="15" FontWeight="Bold" 
+                                                              Foreground="#212121"/>
+                                                    <TextBlock FontSize="12" Foreground="#757575" Margin="0,2,0,0">
+                                                        <Run Text="🏢 "/>
+                                                        <Run Text="{Binding Building, FallbackValue='—'}"/>
+                                                        <Run Text=" | "/>
+                                                        <Run Text="📐 "/>
+                                                        <Run Text="{Binding Floor, FallbackValue='—'}"/>
+                                                    </TextBlock>
+                                                </StackPanel>
+                                            </Border>
+                                            <DataTemplate.Triggers>
+                                                <!-- Выбранная комната -->
+                                                <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListViewItem}, Path=IsSelected}" Value="True">
+                                                    <Setter TargetName="ItemBorder" Property="Background" Value="#E8F5E9"/>
+                                                    <Setter TargetName="ItemBorder" Property="BorderBrush" Value="#4CAF50"/>
+                                                    <Setter TargetName="ItemBorder" Property="Padding" Value="12"/>
+                                                </DataTrigger>
+                                                <!-- Наведение -->
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="ItemBorder" Property="Background" Value="#F5F5F5"/>
+                                                    <Setter TargetName="ItemBorder" Property="BorderBrush" Value="#90CAF9"/>
+                                                </Trigger>
+                                            </DataTemplate.Triggers>
+                                        </DataTemplate>
+                                    </ListView.ItemTemplate>
+                                </ListView>
+
+                                <!-- Пустой список -->
+                                <TextBlock Text="Нет помещений. Проверьте подключение к серверу." 
+                                          FontSize="13" Foreground="#BDBDBD" HorizontalAlignment="Center" 
+                                          VerticalAlignment="Center" Margin="10"
+                                          Visibility="{Binding Rooms.Count, Converter={StaticResource CollectionCountToVisibilityConverter}}"/>
+                            </Grid>
+                        </Border>
+                    </TabItem>
+                    <TabItem Header="📦 Инвентаризации" x:Name="InventoriesTab">
+                        <TabItem.ContentTemplate>
+                            <DataTemplate>
+                                <Border Padding="15" Background="White" MaxHeight="500">
+                                    <ListView ItemsSource="{Binding Inventories}" 
+                                              SelectedItem="{Binding SelectedInventory}"
                                               BorderThickness="0"
                                               ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                               ScrollViewer.CanContentScroll="True">
                                         <ListView.ItemContainerStyle>
                                             <Style TargetType="ListViewItem">
                                                 <Setter Property="Padding" Value="0"/>
                                                 <Setter Property="Margin" Value="0,2"/>
                                                 <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                                                <Setter Property="Template">
-                                                    <Setter.Value>
-                                                        <ControlTemplate TargetType="ListViewItem">
-                                                            <ContentPresenter/>
-                                                        </ControlTemplate>
-                                                    </Setter.Value>
-                                                </Setter>
                                             </Style>
                                         </ListView.ItemContainerStyle>
                                         <ListView.ItemTemplate>
@@ -104,20 +162,26 @@
                                                         <TextBlock Text="{Binding Name}" FontSize="15" FontWeight="Bold" 
                                                                   Foreground="#212121"/>
                                                         <TextBlock FontSize="12" Foreground="#757575" Margin="0,2,0,0">
-                                                            <Run Text="🏢 "/>
-                                                            <Run Text="{Binding Building, FallbackValue='—'}"/>
+                                                            <Run Text="📊 Найдено: "/>
+                                                            <Run Text="{Binding Found}" Foreground="Green"/>
+                                                            <Run Text=" / "/>
+                                                            <Run Text="Пропущено: "/>
+                                                            <Run Text="{Binding Missing}" Foreground="Red"/>
                                                             <Run Text=" | "/>
-                                                            <Run Text="📐 "/>
-                                                            <Run Text="{Binding Floor, FallbackValue='—'}"/>
+                                                            <Run Text="Всего: "/>
+                                                            <Run Text="{Binding TotalChecked}"/>
+                                                        </TextBlock>
+                                                        <TextBlock FontSize="11" Foreground="#9E9E9E" Margin="0,2,0,0">
+                                                            <Run Text="Прогресс: "/>
+                                                            <Run Text="{Binding ProgressPercentText, Mode=OneWay}"/>
                                                         </TextBlock>
                                                     </StackPanel>
                                                 </Border>
                                                 <DataTemplate.Triggers>
-                                                    <!-- Выбранная комната -->
+                                                    <!-- Выбранная инвентаризация -->
                                                     <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListViewItem}, Path=IsSelected}" Value="True">
-                                                        <Setter TargetName="ItemBorder" Property="Background" Value="#E8F5E9"/>
-                                                        <Setter TargetName="ItemBorder" Property="BorderBrush" Value="#4CAF50"/>
-                                                        <Setter TargetName="ItemBorder" Property="Padding" Value="12"/>
+                                                        <Setter TargetName="ItemBorder" Property="Background" Value="#E3F2FD"/>
+                                                        <Setter TargetName="ItemBorder" Property="BorderBrush" Value="#2196F3"/>
                                                     </DataTrigger>
                                                     <!-- Наведение -->
                                                     <Trigger Property="IsMouseOver" Value="True">
@@ -128,67 +192,9 @@
                                             </DataTemplate>
                                         </ListView.ItemTemplate>
                                     </ListView>
-
-                                    <!-- Пустой список -->
-                                    <TextBlock Text="Нет помещений. Проверьте подключение к серверу." 
-                                              FontSize="13" Foreground="#BDBDBD" HorizontalAlignment="Center" 
-                                              VerticalAlignment="Center" Margin="10"
-                                              Visibility="{Binding Rooms.Count, Converter={StaticResource CollectionCountToVisibilityConverter}}"/>
-                                </Grid>
-                            </Grid>
-                        </Border>
-                    </TabItem>
-                    <TabItem Header="📦 Инвентаризации" x:Name="InventoriesTab">
-                        <ListView ItemsSource="{Binding Inventories}" 
-                                  SelectedItem="{Binding SelectedInventory}"
-                                  BorderThickness="0"
-                                  ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                  ScrollViewer.CanContentScroll="True">
-                            <ListView.ItemContainerStyle>
-                                <Style TargetType="ListViewItem">
-                                    <Setter Property="Padding" Value="0"/>
-                                    <Setter Property="Margin" Value="0,2"/>
-                                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                                </Style>
-                            </ListView.ItemContainerStyle>
-                            <ListView.ItemTemplate>
-                                <DataTemplate>
-                                    <Border x:Name="ItemBorder" Padding="12" Margin="0,2" CornerRadius="6"
-                                           Background="#FAFAFA" BorderThickness="2" BorderBrush="#E0E0E0">
-                                        <StackPanel>
-                                            <TextBlock Text="{Binding Name}" FontSize="15" FontWeight="Bold" 
-                                                      Foreground="#212121"/>
-                                            <TextBlock FontSize="12" Foreground="#757575" Margin="0,2,0,0">
-                                                <Run Text="📊 Найдено: "/>
-                                                <Run Text="{Binding Found}" Foreground="Green"/>
-                                                <Run Text=" / "/>
-                                                <Run Text="Пропущено: "/>
-                                                <Run Text="{Binding Missing}" Foreground="Red"/>
-                                                <Run Text=" | "/>
-                                                <Run Text="Всего: "/>
-                                                <Run Text="{Binding TotalChecked}"/>
-                                            </TextBlock>
-                                            <TextBlock FontSize="11" Foreground="#9E9E9E" Margin="0,2,0,0">
-                                                <Run Text="Прогресс: "/>
-                                                <Run Text="{Binding ProgressPercentText, Mode=OneWay}"/>
-                                            </TextBlock>
-                                        </StackPanel>
-                                    </Border>
-                                    <DataTemplate.Triggers>
-                                        <!-- Выбранная инвентаризация -->
-                                        <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListViewItem}, Path=IsSelected}" Value="True">
-                                            <Setter TargetName="ItemBorder" Property="Background" Value="#E3F2FD"/>
-                                            <Setter TargetName="ItemBorder" Property="BorderBrush" Value="#2196F3"/>
-                                        </DataTrigger>
-                                        <!-- Наведение -->
-                                        <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="ItemBorder" Property="Background" Value="#F5F5F5"/>
-                                            <Setter TargetName="ItemBorder" Property="BorderBrush" Value="#90CAF9"/>
-                                        </Trigger>
-                                    </DataTemplate.Triggers>
-                                </DataTemplate>
-                            </ListView.ItemTemplate>
-                        </ListView>
+                                </Border>
+                            </DataTemplate>
+                        </TabItem.ContentTemplate>
                     </TabItem>
                 </TabControl>
             </Grid>
