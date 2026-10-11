@@ -197,6 +197,126 @@ const Inventory: React.FC = () => {
         toast.error(err.detail || 'Ошибка');
       }
     } catch (err) {
+      console.error('handleStart error:', err);
+      toast.error('Ошибка соединения');
+    }
+  };
+
+  const handleComplete = async (checkId: number) => {
+    if (!confirm('Завершить инвентаризацию?')) return;
+    if (!checkAuth()) return;
+    try {
+      const token = localStorage.getItem('token')!;
+      const res = await fetch(`/api/inventory-checks/${checkId}/complete`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        toast.success(data.message);
+        fetchChecks();
+        fetchCheckDetails(checkId);
+      } else if (res.status === 401) {
+        clearAuth();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.detail || 'Ошибка');
+      }
+    } catch (err) {
+      console.error('handleComplete error:', err);
+      toast.error('Ошибка соединения');
+    }
+  };
+
+  const handleDelete = async (checkId: number) => {
+    if (!confirm('Удалить инвентаризацию? Это действие необратимо.')) return;
+    if (!checkAuth()) return;
+    try {
+      const token = localStorage.getItem('token')!;
+      const res = await fetch(`/api/inventory-checks/${checkId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (res.ok) {
+        toast.success('Инвентаризация удалена');
+        setSelectedCheck(null);
+        fetchChecks();
+      } else if (res.status === 401) {
+        clearAuth();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.detail || 'Ошибка');
+      }
+    } catch (err) {
+      console.error('handleDelete error:', err);
+      toast.error('Ошибка соединения');
+    }
+  };
+
+  const handleConfirm = async (checkId: number, assetId: number, found: boolean) => {
+    if (!checkAuth()) return;
+    try {
+      const token = localStorage.getItem('token')!;
+      const res = await fetch(
+        `/api/inventory-checks/${checkId}/confirm/${assetId}?found=${found}`,
+        { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } }
+      );
+      if (res.ok) {
+        toast.success(found ? 'Актив найден' : 'Актив отмечен как отсутствующий');
+        fetchCheckDetails(checkId);
+      } else if (res.status === 401) {
+        clearAuth();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.detail || 'Ошибка');
+      }
+    } catch (err) {
+      console.error('handleConfirm error:', err);
+      toast.error('Ошибка соединения');
+    }
+  };
+
+  const handleSkip = async (checkId: number, assetId: number) => {
+    if (!checkAuth()) return;
+    try {
+      const token = localStorage.getItem('token')!;
+      const res = await fetch(
+        `/api/inventory-checks/${checkId}/confirm/${assetId}?skip=true`,
+        { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } }
+      );
+      if (res.ok) {
+        toast.success('Актив пропущен');
+        fetchCheckDetails(checkId);
+      } else if (res.status === 401) {
+        clearAuth();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.detail || 'Ошибка пропуска');
+      }
+    } catch (err) {
+      console.error('handleSkip error:', err);
+      toast.error('Ошибка соединения');
+    }
+  };
+
+  const handleResetAsset = async (checkId: number, assetId: number) => {
+    if (!checkAuth()) return;
+    try {
+      const token = localStorage.getItem('token')!;
+      const res = await fetch(
+        `/api/inventory-checks/${checkId}/reset-asset/${assetId}`,
+        { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } }
+      );
+      if (res.ok) {
+        toast.success('Статус сброшен');
+        fetchCheckDetails(checkId);
+      } else if (res.status === 401) {
+        clearAuth();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.detail || 'Ошибка');
+      }
+    } catch (err) {
       console.error('handleResetAsset error:', err);
       toast.error('Ошибка соединения');
     }
