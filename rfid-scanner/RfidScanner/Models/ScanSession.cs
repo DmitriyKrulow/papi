@@ -34,6 +34,7 @@ public class ScanSession
     public string Id { get; set; } = Guid.NewGuid().ToString();
     public string RoomName { get; set; } = string.Empty;
     public int RoomId { get; set; }
+    public int InventoryId { get; set; }
     public DateTime StartedAt { get; set; } = DateTime.Now;
     public DateTime? PausedAt { get; set; }
     public DateTime? FinishedAt { get; set; }

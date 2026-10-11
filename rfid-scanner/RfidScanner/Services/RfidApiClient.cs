@@ -119,6 +119,16 @@ public class RfidApiClient
         return JsonConvert.DeserializeObject<List<Asset>>(json) ?? new();
     }
 
+    // ==================== Инвентаризации ====================
+
+    public async Task<Dictionary<string, object>> CreateInventoryAsync(int roomId, string roomName)
+    {
+        var url = $"/api/rfid/inventories?room_id={roomId}&room_name={Uri.EscapeDataString(roomName)}";
+        var response = await SendAsync(HttpMethod.Post, url);
+        var json = await response.Content.ReadAsStringAsync();
+        return JsonConvert.DeserializeObject<Dictionary<string, object>>(json) ?? new();
+    }
+
     public async Task<Asset?> GetAssetByRfidAsync(string rfidTag)
     {
         var result = await GetJsonAsync<Dictionary<string, object>>($"/api/rfid/assets/by-rfid/{Uri.EscapeDataString(rfidTag)}");

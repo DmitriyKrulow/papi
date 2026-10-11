@@ -27,12 +27,13 @@ public class SessionManager
         _audit = audit;
     }
 
-    public void CreateSession(string roomName, int roomId)
+    public void CreateSession(string roomName, int roomId, int inventoryId = 0)
     {
         _currentSession = new ScanSession
         {
             RoomName = roomName,
-            RoomId = roomId
+            RoomId = roomId,
+            InventoryId = inventoryId
         };
         SessionChanged?.Invoke(_currentSession);
         _audit.Log(AuditAction.SessionStart, sessionId: _currentSession.Id, roomName: roomName, 

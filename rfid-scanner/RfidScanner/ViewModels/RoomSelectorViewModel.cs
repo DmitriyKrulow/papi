@@ -18,20 +18,25 @@ public class RoomSelectorViewModel : INotifyPropertyChanged
     private readonly SessionManager _sessionManager;
     private readonly AssetCacheService _assetCache;
     private readonly AuditService _audit;
+    private readonly Action<ScanSession> _onInventoryStarted;
 
     private ObservableCollection<Room> _rooms = new();
+    private ObservableCollection<Inventory> _inventories = new();
     private Room? _selectedRoom;
+    private Inventory? _selectedInventory;
     private string _searchText = "";
     private bool _isLoading;
-    private string _statusMessage = "Выберите помещение для инвентаризации";
+    private string _statusMessage = "Выберите помещение или инвентаризацию";
+    private bool _showInventories;
 
     public RoomSelectorViewModel(RfidApiClient apiClient, SessionManager sessionManager, 
-        AssetCacheService assetCache, AuditService audit)
+        AssetCacheService assetCache, AuditService audit, Action<ScanSession> onInventoryStarted)
     {
         _apiClient = apiClient;
         _sessionManager = sessionManager;
         _assetCache = assetCache;
         _audit = audit;
+        _onInventoryStarted = onInventoryStarted;
     }
 
     public ObservableCollection<Room> Rooms
@@ -40,10 +45,22 @@ public class RoomSelectorViewModel : INotifyPropertyChanged
         private set => SetProperty(ref _rooms, value);
     }
 
+    public ObservableCollection<Inventory> Inventories
+    {
+        get => _inventories;
+        private set => SetProperty(ref _inventories, value);
+    }
+
     public Room? SelectedRoom
     {
         get => _selectedRoom;
         set => SetProperty(ref _selectedRoom, value);
+    }
+
+    public Inventory? SelectedInventory
+    {
+        get => _selectedInventory;
+        set => SetProperty(ref _selectedInventory, value);
     }
 
     public string SearchText
@@ -68,17 +85,25 @@ public class RoomSelectorViewModel : INotifyPropertyChanged
         private set => SetProperty(ref _statusMessage, value);
     }
 
+    public bool ShowInventories
+    {
+        get => _showInventories;
+        set => SetProperty(ref _showInventories, value);
+    }
+
     public ICommand LoadRoomsCommand => new RelayCommand(LoadRooms);
+    public ICommand LoadInventoriesCommand => new RelayCommand(LoadInventories);
     public ICommand StartInventoryCommand => new RelayCommand(StartInventory);
+    public ICommand ContinueInventoryCommand => new RelayCommand(ContinueInventory);
 
     private async void LoadRooms()
     {
         IsLoading = true;
         StatusMessage = "Загрузка помещений...";
+        ShowInventories = false;
 
         try
         {
-            // Загрузка списка помещений из API
             var rooms = await _apiClient.GetRoomsAsync();
             Rooms.Clear();
             foreach (var room in rooms)
@@ -90,7 +115,34 @@ public class RoomSelectorViewModel : INotifyPropertyChanged
         }
         catch
         {
-            StatusMessage = "⚠ Сервер недоступен — проверьте подключение";
+            StatusMessage = "⚠ Сервер недоступен";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async void LoadInventories()
+    {
+        IsLoading = true;
+        StatusMessage = "Загрузка инвентаризаций...";
+        ShowInventories = true;
+
+        try
+        {
+            var inventories = await _apiClient.GetActiveInventoriesAsync();
+            Inventories.Clear();
+            foreach (var inv in inventories)
+                Inventories.Add(inv);
+            
+            StatusMessage = inventories.Count > 0 
+                ? $"✅ Найдено {inventories.Count} активных инвентаризаций" 
+                : "⚠ Нет активных инвентаризаций";
+        }
+        catch
+        {
+            StatusMessage = "⚠ Ошибка загрузки";
         }
         finally
         {
@@ -100,19 +152,21 @@ public class RoomSelectorViewModel : INotifyPropertyChanged
 
     private void FilterRooms()
     {
+        var view = System.Windows.Data.CollectionViewSource.GetDefaultView(Rooms);
+        
         if (string.IsNullOrWhiteSpace(SearchText))
         {
-            // Показываем все
+            view.Filter = null;
             return;
         }
 
-        // Фильтрация через CollectionView
-        var view = System.Windows.Data.CollectionViewSource.GetDefaultView(Rooms);
+        string query = SearchText.ToLower();
         view.Filter = item =>
         {
             if (item is Room room)
-                return room.Name?.ToLower().Contains(SearchText.ToLower()) == true ||
-                       room.Building?.ToLower().Contains(SearchText.ToLower()) == true;
+                return room.Name?.ToLower().Contains(query) == true ||
+                       room.Building?.ToLower().Contains(query) == true ||
+                       room.Floor?.ToLower().Contains(query) == true;
             return false;
         };
     }
@@ -126,28 +180,82 @@ public class RoomSelectorViewModel : INotifyPropertyChanged
         }
 
         IsLoading = true;
-        StatusMessage = $"Загрузка активов для {SelectedRoom.Name}...";
+        StatusMessage = $"Создание инвентаризации для {SelectedRoom.Name}...";
 
         try
         {
-            // Загружаем кэш активов для помещения
+            // Создаём инвентаризацию на сервере
+            var result = await _apiClient.CreateInventoryAsync(SelectedRoom.Id, SelectedRoom.Name);
+            
+            if (!result.ContainsKey("id"))
+            {
+                StatusMessage = "⚠ Ошибка создания инвентаризации";
+                return;
+            }
+
+            int inventoryId = Convert.ToInt32(result["id"]);
+            
+            // Загружаем активы помещения
             var assets = await _apiClient.GetRoomAssetsAsync(SelectedRoom.Id);
             await _assetCache.LoadRoomAssetsAsync(SelectedRoom.Id, assets);
             
-            // Создаём сессию
-            _sessionManager.CreateSession(SelectedRoom.Name, SelectedRoom.Id);
+            // Создаём локальную сессию
+            _sessionManager.CreateSession(SelectedRoom.Name, SelectedRoom.Id, inventoryId);
             
             // Логируем начало
             _audit.Log(AuditAction.SessionStart, 
                 roomName: SelectedRoom.Name,
-                details: $"Начата инвентаризация помещения: {SelectedRoom.Name} " +
-                        $"({assets.Count} активов)");
+                details: $"Инвентаризация создана: {SelectedRoom.Name} ({assets.Count} активов)");
             
-            StatusMessage = $"✅ Начата инвентаризация: {SelectedRoom.Name}";
+            StatusMessage = $"✅ Инвентаризация создана: {SelectedRoom.Name}";
+            
+            // Переключаемся на сканирование
+            if (_sessionManager.CurrentSession != null)
+                _onInventoryStarted(_sessionManager.CurrentSession);
         }
-        catch
+        catch (Exception ex)
         {
-            StatusMessage = "⚠ Ошибка загрузки — повторите попытку";
+            StatusMessage = $"⚠ Ошибка: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async void ContinueInventory()
+    {
+        if (SelectedInventory == null)
+        {
+            StatusMessage = "⚠ Выберите инвентаризацию";
+            return;
+        }
+
+        IsLoading = true;
+        StatusMessage = $"Загрузка инвентаризации: {SelectedInventory.Name}...";
+
+        try
+        {
+            // Загружаем активы инвентаризации
+            var items = await _apiClient.GetInventoryAssetsAsync(SelectedInventory.Id);
+            
+            // Создаём сессию
+            _sessionManager.CreateSession(SelectedInventory.Name, 0, SelectedInventory.Id);
+            
+            // Логируем продолжение
+            _audit.Log(AuditAction.SessionStart, 
+                roomName: SelectedInventory.Name,
+                details: $"Продолжена инвентаризация: {SelectedInventory.Name} ({items.Count} активов)");
+            
+            StatusMessage = $"✅ Продолжена инвентаризация: {SelectedInventory.Name}";
+            
+            // Переключаемся на сканирование
+            if (_sessionManager.CurrentSession != null)
+                _onInventoryStarted(_sessionManager.CurrentSession);
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"⚠ Ошибка: {ex.Message}";
         }
         finally
         {

@@ -1,4 +1,4 @@
-using System;
+using System.Windows;
 using System.Windows.Controls;
 using RfidScanner.Models;
 using RfidScanner.Services;
@@ -14,6 +14,7 @@ public partial class RoomSelectorView : UserControl
     private readonly RoomSelectorViewModel _viewModel;
     private readonly SessionManager _sessionManager;
     private readonly Action<ScanSession> _onInventoryStarted;
+    private TabControl? _tabControl;
 
     public RoomSelectorView(RfidApiClient apiClient, SessionManager sessionManager, 
         AssetCacheService assetCache, AuditService audit, Action<ScanSession> onInventoryStarted)
@@ -23,22 +24,45 @@ public partial class RoomSelectorView : UserControl
         
         InitializeComponent();
         
-        _viewModel = new RoomSelectorViewModel(apiClient, sessionManager, assetCache, audit);
+        _viewModel = new RoomSelectorViewModel(apiClient, sessionManager, assetCache, audit, onInventoryStarted);
         DataContext = _viewModel;
         
         // Автоматическая загрузка помещений
         _viewModel.LoadRoomsCommand.Execute(null);
     }
 
-    private void StartButton_Click(object sender, System.Windows.RoutedEventArgs e)
+    protected override void OnInitialized(EventArgs e)
     {
-        // Начать инвентаризацию
-        _viewModel.StartInventoryCommand.Execute(null);
+        base.OnInitialized(e);
         
-        // После успешного старта — перейти к сканированию
-        if (_sessionManager.CurrentSession != null)
+        // Находим TabControl внутри UserControl
+        _tabControl = RoomsTab.Parent as TabControl;
+        if (_tabControl != null)
         {
-            _onInventoryStarted(_sessionManager.CurrentSession);
+            _tabControl.SelectionChanged += OnTabControlSelectionChanged;
+        }
+    }
+
+    private void OnTabControlSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_tabControl?.SelectedItem is TabItem selectedTab)
+        {
+            if (selectedTab == RoomsTab)
+                _viewModel.LoadRoomsCommand.Execute(null);
+            else if (selectedTab == InventoriesTab)
+                _viewModel.LoadInventoriesCommand.Execute(null);
+        }
+    }
+
+    private void StartButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_viewModel.ShowInventories)
+        {
+            _viewModel.ContinueInventoryCommand.Execute(null);
+        }
+        else
+        {
+            _viewModel.StartInventoryCommand.Execute(null);
         }
     }
 }

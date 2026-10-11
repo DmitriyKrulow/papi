@@ -38,7 +38,7 @@ public partial class MainWindow : Window
         _scanViewModel = new ScanViewModel(_sessionManager, silentMode, apiClient, localStore, _assetCache);
         _searchViewModel = new SearchViewModel(apiClient, _assetCache);
         _auditViewModel = new AuditViewModel(localStore, _sessionManager);
-        _roomSelectorViewModel = new RoomSelectorViewModel(apiClient, _sessionManager, _assetCache, auditService);
+        _roomSelectorViewModel = new RoomSelectorViewModel(apiClient, _sessionManager, _assetCache, auditService, OnSessionCreated);
         
         // Создаём RoomSelectorView в коде (требует параметры в конструкторе)
         var roomSelectorView = new RoomSelectorView(apiClient, _sessionManager, _assetCache, auditService, OnSessionCreated);
@@ -92,6 +92,13 @@ public partial class MainWindow : Window
 
     private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        // Если фокус в TextBox — пропускаем ввод (пользователь печатает)
+        var focused = Keyboard.FocusedElement as TextBox;
+        if (focused != null) return;
+        
+        // Если фокус в ComboBox — пропускаем
+        if (Keyboard.FocusedElement is ComboBox) return;
+        
         // Только если активна вкладка "Инвентаризация"
         if (TabControl.SelectedIndex != 0) return;
         

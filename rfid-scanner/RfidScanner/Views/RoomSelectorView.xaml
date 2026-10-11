@@ -16,62 +16,181 @@
                 <TextBlock Text="📋 PAPI RFID Scanner" 
                           FontSize="20" FontWeight="Bold" Foreground="#1976D2"/>
                 <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center"
-                          Text="Выберите помещение для инвентаризации" 
+                          Text="Выберите помещение или инвентаризацию" 
                           FontSize="13" Foreground="#757575"/>
             </Grid>
         </Border>
 
-        <!-- ===== ПОМЕЩЕНИЯ ===== -->
-        <Border Grid.Row="1" Background="White" Margin="20,10,20,10" CornerRadius="8" Padding="15">
+        <!-- ===== ВКЛАДКИ: ПОМЕЩЕНИЯ / ИНВЕНТАРИЗАЦИИ ===== -->
+        <Border Grid.Row="1" Background="White" Margin="20,10,20,10" CornerRadius="8" Padding="0">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
-                <!-- Поиск -->
-                <TextBox Grid.Row="0" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" 
-                         FontSize="14" Padding="10,8" Margin="0,0,0,10"
-                         Background="#FAFAFA" BorderBrush="#E0E0E0" BorderThickness="1"
-                         VerticalContentAlignment="Center">
-                    <TextBox.Resources>
-                        <Style TargetType="Border">
-                            <Setter Property="CornerRadius" Value="6"/>
+                <!-- Табы -->
+                <TabControl Grid.Row="0" Margin="0,0,0,10" Background="Transparent" BorderThickness="0">
+                    <TabControl.ItemContainerStyle>
+                        <Style TargetType="TabItem">
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="TabItem">
+                                        <Border x:Name="Border" Padding="15,8" Margin="0,0,5,0" 
+                                               Background="Transparent" BorderThickness="0" CornerRadius="6,6,0,0">
+                                            <ContentPresenter ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter TargetName="Border" Property="Background" Value="#E3F2FD"/>
+                                                <Setter Property="Foreground" Value="#1976D2"/>
+                                                <Setter Property="FontWeight" Value="Bold"/>
+                                            </Trigger>
+                                            <Trigger Property="IsSelected" Value="False">
+                                                <Setter Property="Foreground" Value="#757575"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
                         </Style>
-                    </TextBox.Resources>
-                </TextBox>
+                    </TabControl.ItemContainerStyle>
+                    <TabItem Header="🏢 Помещения" IsSelected="True" x:Name="RoomsTab">
+                        <Border Padding="15" Background="White">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
 
-                <!-- Список -->
-                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                    <ListView ItemsSource="{Binding Rooms}" 
-                              SelectedItem="{Binding SelectedRoom}"
-                              BorderThickness="0">
-                        <ListView.ItemTemplate>
-                            <DataTemplate>
-                                <Border Padding="12" Margin="0,2" CornerRadius="6"
-                                       Background="#FAFAFA" BorderThickness="1" BorderBrush="#E0E0E0">
-                                    <StackPanel>
-                                        <TextBlock Text="{Binding Name}" FontSize="15" FontWeight="Bold" 
-                                                  Foreground="#212121"/>
-                                        <TextBlock FontSize="12" Foreground="#757575" Margin="0,2,0,0">
-                                            <Run Text="🏢 "/>
-                                            <Run Text="{Binding Building, FallbackValue='—'}"/>
-                                            <Run Text=" | "/>
-                                            <Run Text="📐 "/>
-                                            <Run Text="{Binding Floor, FallbackValue='—'}"/>
-                                        </TextBlock>
-                                    </StackPanel>
-                                </Border>
-                            </DataTemplate>
-                        </ListView.ItemTemplate>
-                    </ListView>
-                </ScrollViewer>
+                                <!-- Поиск -->
+                                <TextBox Grid.Row="0" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" 
+                                         FontSize="14" Padding="10,8" Margin="0,0,0,10"
+                                         Background="#FAFAFA" BorderBrush="#E0E0E0" BorderThickness="1"
+                                         VerticalContentAlignment="Center">
+                                    <TextBox.Resources>
+                                        <Style TargetType="Border">
+                                            <Setter Property="CornerRadius" Value="6"/>
+                                        </Style>
+                                    </TextBox.Resources>
+                                </TextBox>
 
-                <!-- Пустой список -->
-                <TextBlock Text="Нет помещений. Проверьте подключение к серверу." 
-                          FontSize="13" Foreground="#BDBDBD" HorizontalAlignment="Center" 
-                          VerticalAlignment="Center" Margin="10"
-                          Visibility="{Binding Rooms.Count, Converter={StaticResource CollectionCountToVisibilityConverter}}"/>
+                                <!-- Список помещений -->
+                                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                    <ListView ItemsSource="{Binding Rooms}" 
+                                              SelectedItem="{Binding SelectedRoom, Mode=TwoWay}"
+                                              BorderThickness="0">
+                                        <ListView.ItemContainerStyle>
+                                            <Style TargetType="ListViewItem">
+                                                <Setter Property="Padding" Value="0"/>
+                                                <Setter Property="Margin" Value="0,2"/>
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="ListViewItem">
+                                                            <ContentPresenter/>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </ListView.ItemContainerStyle>
+                                        <ListView.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border x:Name="ItemBorder" Padding="12" Margin="0,2" CornerRadius="6"
+                                                       Background="#FAFAFA" BorderThickness="2" BorderBrush="#E0E0E0">
+                                                    <StackPanel>
+                                                        <TextBlock Text="{Binding Name}" FontSize="15" FontWeight="Bold" 
+                                                                  Foreground="#212121"/>
+                                                        <TextBlock FontSize="12" Foreground="#757575" Margin="0,2,0,0">
+                                                            <Run Text="🏢 "/>
+                                                            <Run Text="{Binding Building, FallbackValue='—'}"/>
+                                                            <Run Text=" | "/>
+                                                            <Run Text="📐 "/>
+                                                            <Run Text="{Binding Floor, FallbackValue='—'}"/>
+                                                        </TextBlock>
+                                                    </StackPanel>
+                                                </Border>
+                                                <DataTemplate.Triggers>
+                                                    <!-- Выбранная комната -->
+                                                    <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListViewItem}, Path=IsSelected}" Value="True">
+                                                        <Setter TargetName="ItemBorder" Property="Background" Value="#E8F5E9"/>
+                                                        <Setter TargetName="ItemBorder" Property="BorderBrush" Value="#4CAF50"/>
+                                                        <Setter TargetName="ItemBorder" Property="Padding" Value="12"/>
+                                                    </DataTrigger>
+                                                    <!-- Наведение -->
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="ItemBorder" Property="Background" Value="#F5F5F5"/>
+                                                        <Setter TargetName="ItemBorder" Property="BorderBrush" Value="#90CAF9"/>
+                                                    </Trigger>
+                                                </DataTemplate.Triggers>
+                                            </DataTemplate>
+                                        </ListView.ItemTemplate>
+                                    </ListView>
+                                </ScrollViewer>
+
+                                <!-- Пустой список -->
+                                <TextBlock Text="Нет помещений. Проверьте подключение к серверу." 
+                                          FontSize="13" Foreground="#BDBDBD" HorizontalAlignment="Center" 
+                                          VerticalAlignment="Center" Margin="10"
+                                          Visibility="{Binding Rooms.Count, Converter={StaticResource CollectionCountToVisibilityConverter}}"/>
+                            </Grid>
+                        </Border>
+                    </TabItem>
+                    <TabItem Header="📦 Инвентаризации" x:Name="InventoriesTab">
+                        <Border Padding="15" Background="White">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                <ListView ItemsSource="{Binding Inventories}" 
+                                          SelectedItem="{Binding SelectedInventory, Mode=TwoWay}"
+                                          BorderThickness="0">
+                                    <ListView.ItemContainerStyle>
+                                        <Style TargetType="ListViewItem">
+                                            <Setter Property="Padding" Value="0"/>
+                                            <Setter Property="Margin" Value="0,2"/>
+                                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                        </Style>
+                                    </ListView.ItemContainerStyle>
+                                    <ListView.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border x:Name="ItemBorder" Padding="12" Margin="0,2" CornerRadius="6"
+                                                   Background="#FAFAFA" BorderThickness="2" BorderBrush="#E0E0E0">
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Name}" FontSize="15" FontWeight="Bold" 
+                                                              Foreground="#212121"/>
+                                                    <TextBlock FontSize="12" Foreground="#757575" Margin="0,2,0,0">
+                                                        <Run Text="📊 Найдено: "/>
+                                                        <Run Text="{Binding Found}" Foreground="Green"/>
+                                                        <Run Text=" / "/>
+                                                        <Run Text="Пропущено: "/>
+                                                        <Run Text="{Binding Missing}" Foreground="Red"/>
+                                                        <Run Text=" | "/>
+                                                        <Run Text="Всего: "/>
+                                                        <Run Text="{Binding TotalChecked}"/>
+                                                    </TextBlock>
+                                                    <TextBlock FontSize="11" Foreground="#9E9E9E" Margin="0,2,0,0">
+                                                        <Run Text="Прогресс: "/>
+                                                        <Run Text="{Binding ProgressPercent, StringFormat={}{0}%}"/>
+                                                    </TextBlock>
+                                                </StackPanel>
+                                            </Border>
+                                            <DataTemplate.Triggers>
+                                                <!-- Выбранная инвентаризация -->
+                                                <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListViewItem}, Path=IsSelected}" Value="True">
+                                                    <Setter TargetName="ItemBorder" Property="Background" Value="#E3F2FD"/>
+                                                    <Setter TargetName="ItemBorder" Property="BorderBrush" Value="#2196F3"/>
+                                                </DataTrigger>
+                                                <!-- Наведение -->
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="ItemBorder" Property="Background" Value="#F5F5F5"/>
+                                                    <Setter TargetName="ItemBorder" Property="BorderBrush" Value="#90CAF9"/>
+                                                </Trigger>
+                                            </DataTemplate.Triggers>
+                                        </DataTemplate>
+                                    </ListView.ItemTemplate>
+                                </ListView>
+                            </ScrollViewer>
+                        </Border>
+                    </TabItem>
+                </TabControl>
             </Grid>
         </Border>
 
@@ -88,28 +207,54 @@
                           Padding="20,8,20,4"
                           TextTrimming="CharacterEllipsis"/>
 
-                <Button Grid.Row="1" Content="▶ Начать инвентаризацию" 
-                        Click="StartButton_Click"
-                        Background="#4CAF50" Foreground="White"
-                        FontSize="16" Padding="40,12"
-                        Width="280" Height="48"
-                        IsEnabled="{Binding !IsLoading}"
-                        Margin="0,0,20,12" HorizontalAlignment="Right">
-                    <Button.Style>
-                        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-                            <Setter Property="Background" Value="#4CAF50"/>
-                            <Setter Property="Foreground" Value="White"/>
-                            <Setter Property="BorderThickness" Value="0"/>
-                            <Setter Property="FontSize" Value="16"/>
-                            <Setter Property="Cursor" Value="Hand"/>
-                            <Style.Triggers>
-                                <Trigger Property="IsEnabled" Value="False">
-                                    <Setter Property="Background" Value="#BDBDBD"/>
-                                </Trigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
-                </Button>
+                <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,20,12">
+                    <Button Content="▶ Начать инвентаризацию" 
+                            Click="StartButton_Click"
+                            Background="#4CAF50" Foreground="White"
+                            FontSize="14" Padding="20,10"
+                            Width="220" Height="42"
+                            IsEnabled="{Binding !IsLoading}"
+                            Margin="0,0,8,0"
+                            Visibility="{Binding ShowInventories, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                <Setter Property="Background" Value="#4CAF50"/>
+                                <Setter Property="Foreground" Value="White"/>
+                                <Setter Property="BorderThickness" Value="0"/>
+                                <Setter Property="FontSize" Value="14"/>
+                                <Setter Property="Cursor" Value="Hand"/>
+                                <Style.Triggers>
+                                    <Trigger Property="IsEnabled" Value="False">
+                                        <Setter Property="Background" Value="#BDBDBD"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                    
+                    <Button Content="▶ Продолжить" 
+                            Click="StartButton_Click"
+                            Background="#2196F3" Foreground="White"
+                            FontSize="14" Padding="20,10"
+                            Width="180" Height="42"
+                            IsEnabled="{Binding !IsLoading}"
+                            Visibility="{Binding ShowInventories, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                <Setter Property="Background" Value="#2196F3"/>
+                                <Setter Property="Foreground" Value="White"/>
+                                <Setter Property="BorderThickness" Value="0"/>
+                                <Setter Property="FontSize" Value="14"/>
+                                <Setter Property="Cursor" Value="Hand"/>
+                                <Style.Triggers>
+                                    <Trigger Property="IsEnabled" Value="False">
+                                        <Setter Property="Background" Value="#BDBDBD"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                </StackPanel>
             </Grid>
         </Border>
 

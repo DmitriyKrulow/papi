@@ -528,6 +528,131 @@ async def passive_room_scan(
 
 
 # ======================================================================
+# Создание и управление инвентаризациями через RFID-сканер
+# ======================================================================
+
+@router.post("/inventories")
+async def create_inventory_for_scanner(
+    room_id: int = Query(..., description="ID помещения"),
+    room_name: str = Query(..., description="Название помещения"),
+    scanner: dict = Depends(get_rfid_scanner),
+    db: Session = Depends(get_db),
+):
+    """
+    Создать инвентаризацию для помещения через RFID-сканер.
+    Автоматически добавляет все активы помещения в проверку.
+    
+    Header: X-API-Key: rfid_abc123...
+    """
+    from src.infrastructure.db.models.department import Room
+    from datetime import date
+    
+    room = db.query(Room).filter(Room.id == room_id, Room.is_active == True).first()
+    if not room:
+        raise HTTPException(status_code=404, detail="Помещение не найдено")
+    
+    # Проверяем, нет ли уже активной инвентаризации для этого помещения
+    existing = db.query(InventoryCheck).filter(
+        InventoryCheck.status == "in_progress",
+        InventoryCheck.scope_id == room_id
+    ).first()
+    
+    if existing:
+        return {
+            "id": existing.id,
+            "name": existing.name,
+            "status": existing.status,
+            "message": f"Инвентаризация уже создана: {existing.name}",
+            "created": False
+        }
+    
+    # Создаём инвентаризацию
+    inv_check = InventoryCheck(
+        name=f"Инвентаризация: {room_name}",
+        check_date=date.today(),
+        check_type="by_room",
+        scope_id=room_id,
+        scope_name=room_name,
+        status="in_progress",
+        created_at=datetime.now(),
+        started_at=datetime.now(),
+    )
+    db.add(inv_check)
+    
+    # Добавляем все активы помещения
+    assets = db.query(Asset).filter(
+        Asset.room_id == room_id,
+        Asset.is_active == True
+    ).all()
+    
+    for a in assets:
+        item = InventoryCheckItem(
+            inventory_check_id=inv_check.id,
+            asset_id=a.id,
+            result="pending",
+        )
+        db.add(item)
+        a.last_inventory_confirmed = False
+        a.last_inventory_date = None
+    
+    inv_check.total_checked = len(assets)
+    db.commit()
+    db.refresh(inv_check)
+    
+    return {
+        "id": inv_check.id,
+        "name": inv_check.name,
+        "status": inv_check.status,
+        "total_checked": inv_check.total_checked,
+        "found": inv_check.found,
+        "missing": inv_check.missing,
+        "message": f"Инвентаризация создана: {inv_check.total_checked} активов",
+        "created": True
+    }
+
+
+@router.get("/inventories")
+async def get_scanner_inventories(
+    scanner: dict = Depends(get_rfid_scanner),
+    db: Session = Depends(get_db),
+):
+    """
+    Получить список активных инвентаризаций для сканера.
+    Можно выбрать существующую для продолжения или создать новую.
+    
+    Header: X-API-Key: rfid_abc123...
+    """
+    inventories = db.query(InventoryCheck).options(
+        joinedload(InventoryCheck.department),
+    ).filter(
+        InventoryCheck.status == "in_progress"
+    ).order_by(InventoryCheck.created_at.desc()).all()
+    
+    result = []
+    for inv in inventories:
+        result.append({
+            "id": inv.id,
+            "name": inv.name,
+            "check_date": inv.check_date.isoformat() if inv.check_date else None,
+            "check_type": inv.check_type,
+            "scope_name": inv.scope_name or "",
+            "status": inv.status,
+            "total_checked": inv.total_checked,
+            "found": inv.found,
+            "missing": inv.missing,
+            "started_at": inv.started_at.isoformat() if inv.started_at else None,
+            "progress_percent": round(
+                (inv.found + inv.missing) / inv.total_checked * 100, 1
+            ) if inv.total_checked > 0 else 0,
+        })
+    
+    return {
+        "inventories": result,
+        "count": len(result)
+    }
+
+
+# ======================================================================
 # Приёмка имущества через RFID
 # ======================================================================
 
