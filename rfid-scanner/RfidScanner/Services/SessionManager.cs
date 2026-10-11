@@ -37,7 +37,7 @@ public class SessionManager
         };
         SessionChanged?.Invoke(_currentSession);
         _audit.Log(AuditAction.SessionStart, sessionId: _currentSession.Id, roomName: roomName, 
-            details: $"Начата инвентаризация помещения {roomName}");
+            details: $"Начата инвентаризация помещения {roomName} (inventory_id={inventoryId})");
         SaveAsync();
     }
 

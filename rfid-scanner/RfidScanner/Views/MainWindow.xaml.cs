@@ -42,7 +42,8 @@ public partial class MainWindow : Window
         _roomSelectorViewModel = new RoomSelectorViewModel(apiClient, _sessionManager, _assetCache, auditService, OnSessionCreated);
         
         // Создаём RoomSelectorView в коде
-        var roomSelectorView = new RoomSelectorView(apiClient, _sessionManager, _assetCache, auditService, OnSessionCreated);
+        var roomSelectorView = new RoomSelectorView();
+        roomSelectorView.Initialize(apiClient, _sessionManager, _assetCache, auditService, OnSessionCreated);
         RoomSelectorHost.Content = roomSelectorView;
         
         // Привязка ViewModel к вкладкам
@@ -58,8 +59,7 @@ public partial class MainWindow : Window
         ConnectionStatus.Text = "Проверка подключения...";
         ConnectionStatus.Foreground = System.Windows.Media.Brushes.Orange;
         
-        // Загрузка помещений
-        _roomSelectorViewModel.LoadRoomsCommand.Execute(null);
+        // Загрузка помещений и инвентаризаций происходит в RoomSelectorView.Initialize()
         
         // Подписка на загрузку помещений для обновления статуса
         _roomSelectorViewModel.RoomsLoaded += () =>

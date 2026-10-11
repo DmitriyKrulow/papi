@@ -68,6 +68,36 @@ public class ScanViewModel : INotifyPropertyChanged
         UpdateSyncStatus();
     }
 
+    /// <summary>
+    /// Загрузка активов для текущей сессии
+    /// </summary>
+    public async Task LoadSessionAssetsAsync()
+    {
+        if (_sessionManager.CurrentSession == null || _sessionManager.CurrentSession.InventoryId == 0)
+            return;
+
+        try
+        {
+            StatusText = "🔄 Загрузка списка активов...";
+            HintText = "Подождите, загружается проверяемое имущество...";
+            
+            // TODO: Загрузить активы инвентаризации через API
+            // var assets = await _apiClient.GetInventoryAssetsAsync(_sessionManager.CurrentSession.InventoryId);
+            // TotalCount = assets.Count;
+            // MatchedCount = assets.Count(a => a.CheckStatus == "found");
+            // ExtraCount = assets.Count(a => a.CheckStatus == "extra");
+            // MissingCount = assets.Count(a => a.CheckStatus == "missing");
+            
+            StatusText = "✅ Готово к сканированию";
+            HintText = "💡 Поднесите RFID-сканер на 1-3 см к метке и дождитесь сигнала";
+        }
+        catch (Exception ex)
+        {
+            StatusText = "❌ Ошибка загрузки";
+            HintText = $"Не удалось загрузить список: {ex.Message}";
+        }
+    }
+
     // ==================== Сводка ====================
 
     public int MatchedCount
@@ -421,6 +451,12 @@ public class ScanViewModel : INotifyPropertyChanged
             AllResults.Clear();
             foreach (var result in session.Results)
                 AllResults.Add(result);
+
+            // Загружаем активы при создании новой сессии
+            if (session.State == SessionState.Active && session.InventoryId > 0)
+            {
+                LoadSessionAssetsAsync();
+            }
 
             // Цветовой статус
             if (session.ExtraCount > 0)

@@ -228,19 +228,22 @@ public class RoomSelectorViewModel : INotifyPropertyChanged
         }
 
         IsLoading = true;
-        StatusMessage = $"Продолжение инвентаризации: {SelectedInventory.Name}...";
+        StatusMessage = $"Загрузка активов для инвентаризации: {SelectedInventory.Name}...";
 
         try
         {
+            // Загружаем активы инвентаризации
+            var assets = await _apiClient.GetInventoryAssetsAsync(SelectedInventory.Id);
+            
             // Создаём локальную сессию
             _sessionManager.CreateSession(SelectedInventory.Name, 0, SelectedInventory.Id);
             
             // Логируем продолжение
             _audit.Log(AuditAction.SessionStart, 
                 roomName: SelectedInventory.Name,
-                details: $"Продолжена инвентаризация: {SelectedInventory.Name}");
+                details: $"Продолжена инвентаризация: {SelectedInventory.Name} с {assets.Count} активами");
             
-            StatusMessage = $"✅ Продолжена инвентаризация: {SelectedInventory.Name}";
+            StatusMessage = $"✅ Продолжена инвентаризация: {SelectedInventory.Name} ({assets.Count} активов)";
             
             // Переключаемся на сканирование
             if (_sessionManager.CurrentSession != null)

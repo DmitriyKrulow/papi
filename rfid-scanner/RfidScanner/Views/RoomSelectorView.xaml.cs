@@ -11,24 +11,28 @@ namespace RfidScanner.Views;
 /// </summary>
 public partial class RoomSelectorView : UserControl
 {
-    private readonly RoomSelectorViewModel _viewModel;
-    private readonly SessionManager _sessionManager;
-    private readonly Action<ScanSession> _onInventoryStarted;
+    private RoomSelectorViewModel? _viewModel;
+    private SessionManager? _sessionManager;
+    private Action<ScanSession>? _onInventoryStarted;
     private TabControl? _tabControl;
 
-    public RoomSelectorView(RfidApiClient apiClient, SessionManager sessionManager, 
+    public RoomSelectorView()
+    {
+        InitializeComponent();
+    }
+
+    public void Initialize(RfidApiClient apiClient, SessionManager sessionManager, 
         AssetCacheService assetCache, AuditService audit, Action<ScanSession> onInventoryStarted)
     {
         _onInventoryStarted = onInventoryStarted;
         _sessionManager = sessionManager;
         
-        InitializeComponent();
-        
         _viewModel = new RoomSelectorViewModel(apiClient, sessionManager, assetCache, audit, onInventoryStarted);
         DataContext = _viewModel;
         
-        // Автоматическая загрузка помещений
+        // Автоматическая загрузка помещений и инвентаризаций
         _viewModel.LoadRoomsCommand.Execute(null);
+        _viewModel.LoadInventoriesCommand.Execute(null);
     }
 
     protected override void OnInitialized(EventArgs e)

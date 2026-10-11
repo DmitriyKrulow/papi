@@ -99,7 +99,7 @@ namespace RfidScanner.Views {
                 return;
             }
             _contentLoaded = true;
-            System.Uri resourceLocater = new System.Uri("/RfidScanner;V1.0.0.0;component/views/confirmationdialog.xaml", System.UriKind.Relative);
+            System.Uri resourceLocater = new System.Uri("/RfidScanner;component/views/confirmationdialog.xaml", System.UriKind.Relative);
             
             #line 1 "..\..\..\..\Views\ConfirmationDialog.xaml"
             System.Windows.Application.LoadComponent(this, resourceLocater);
