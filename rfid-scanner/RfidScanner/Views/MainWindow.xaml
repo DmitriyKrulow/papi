@@ -3,7 +3,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:RfidScanner.ViewModels"
         xmlns:views="clr-namespace:RfidScanner.Views"
-        Title="PAPI RFID Scanner" Height="700" Width="1000"
+        Title="PAPI RFID Scanner" Height="580" Width="900"
+        MinHeight="500" MinWidth="700"
         WindowStartupLocation="CenterScreen">
     
     <Window.Resources>
