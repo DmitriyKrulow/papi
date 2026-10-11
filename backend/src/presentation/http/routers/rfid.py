@@ -585,11 +585,21 @@ async def create_inventory_for_scanner(
         responsible_id=creator_id,
     )
     db.add(inv_check)
+    db.commit()  # Фиксируем инвентаризацию чтобы получить ID
+    db.refresh(inv_check)
     
-    # Добавляем все активы помещения
+    # Добавляем все активы помещения (ищем по location_address как подстрока)
+    from sqlalchemy import or_
+    import re
+    
+    room_name_pattern = re.escape(room_name)
     assets = db.query(Asset).filter(
-        Asset.room_id == room_id,
-        Asset.is_active == True
+        Asset.is_active == True,
+        or_(
+            Asset.location_address == room_name,
+            Asset.location_address.like(f"%{room_name_pattern} -%"),
+            Asset.location_address.like(f"%{room_name_pattern} ("),
+        )
     ).all()
     
     for a in assets:
