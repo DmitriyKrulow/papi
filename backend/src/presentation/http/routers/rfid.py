@@ -566,6 +566,11 @@ async def create_inventory_for_scanner(
             "created": False
         }
     
+    # Находим первого пользователя для created_by
+    from src.infrastructure.db.models.user import User
+    first_user = db.query(User).first()
+    creator_id = first_user.id if first_user else 0
+    
     # Создаём инвентаризацию
     inv_check = InventoryCheck(
         name=f"Инвентаризация: {room_name}",
@@ -576,6 +581,8 @@ async def create_inventory_for_scanner(
         status="in_progress",
         created_at=datetime.now(),
         started_at=datetime.now(),
+        created_by=creator_id,
+        responsible_id=creator_id,
     )
     db.add(inv_check)
     
