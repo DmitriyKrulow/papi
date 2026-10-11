@@ -24,4 +24,7 @@ public class Inventory
     public double ProgressPercent => TotalChecked > 0 
         ? Math.Round((Found + Missing) * 100.0 / TotalChecked, 1) 
         : 0;
+    public string ProgressPercentText => TotalChecked > 0 
+        ? $"{Math.Round((Found + Missing) * 100.0 / TotalChecked, 1)}%" 
+        : "0%";
 }

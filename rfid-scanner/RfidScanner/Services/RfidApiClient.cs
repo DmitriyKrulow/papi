@@ -79,11 +79,12 @@ public class RfidApiClient
 
     public async Task<List<InventoryItem>> GetInventoryAssetsAsync(int inventoryId)
     {
-        var result = await GetJsonAsync<Dictionary<string, object>>($"/api/rfid/inventories/{inventoryId}/assets");
-        if (result == null || !result.ContainsKey("assets"))
+        // Получаем детали инвентаризации
+        var result = await GetJsonAsync<Dictionary<string, object>>($"/api/rfid/inventories/{inventoryId}");
+        if (result == null || !result.ContainsKey("items"))
             return new();
 
-        var json = JsonConvert.SerializeObject(result["assets"]);
+        var json = JsonConvert.SerializeObject(result["items"]);
         return JsonConvert.DeserializeObject<List<InventoryItem>>(json) ?? new();
     }
 

@@ -139,9 +139,9 @@
                     <TabItem Header="📦 Инвентаризации" x:Name="InventoriesTab">
                         <Border Padding="15" Background="White">
                             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                <ListView ItemsSource="{Binding Inventories}" 
-                                          SelectedItem="{Binding SelectedInventory, Mode=TwoWay}"
-                                          BorderThickness="0">
+                                    <ListView ItemsSource="{Binding Inventories}" 
+                                              SelectedItem="{Binding SelectedInventory}"
+                                              BorderThickness="0">
                                     <ListView.ItemContainerStyle>
                                         <Style TargetType="ListViewItem">
                                             <Setter Property="Padding" Value="0"/>
@@ -168,7 +168,7 @@
                                                     </TextBlock>
                                                     <TextBlock FontSize="11" Foreground="#9E9E9E" Margin="0,2,0,0">
                                                         <Run Text="Прогресс: "/>
-                                                        <Run Text="{Binding ProgressPercent, StringFormat={}{0}%}"/>
+                                                        <Run Text="{Binding ProgressPercentText}"/>
                                                     </TextBlock>
                                                 </StackPanel>
                                             </Border>
