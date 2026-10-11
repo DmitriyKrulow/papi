@@ -4,11 +4,12 @@ from typing import Optional, List
 import os
 import io
 import json
+import re
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Body
 from fastapi.responses import JSONResponse, FileResponse, Response
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func
+from sqlalchemy import func, or_
 
 from src.infrastructure.db.init_db import get_db
 from src.infrastructure.db.models.inventory_check import InventoryCheck
@@ -53,12 +54,24 @@ def _get_assets_for_check(db: Session, check_type: str, scope_id: Optional[int] 
     query = db.query(Asset).filter(Asset.is_active == True)
 
     if check_type == "by_room":
-        # По кабинету — ищем по location_address
+        # По кабинету — ищем по location_address (подстрока)
         room = db.query(Room).filter(Room.id == scope_id).first()
-        if room:
-            query = query.filter(Asset.location_address == room.name)
-        else:
+        if not room:
             raise HTTPException(status_code=404, detail="Помещение не найдено")
+        
+        # Извлекаем номер/название комнаты из location_address
+        # Формат location_address: "УВМ - 100 - 1 (1)" или "УВМ - Большой зал - 4 (1)"
+        # Ищем активы, у которых location_address содержит имя комнаты
+        # Используем LIKE с экранированием специальных символов
+        room_name_pattern = re.escape(room.name)
+        # Паттерн: "УВМ - {room_name} -" или "УВМ - {room_name} ("
+        query = query.filter(
+            or_(
+                Asset.location_address == room.name,
+                Asset.location_address.like(f"%{room_name_pattern} -%"),
+                Asset.location_address.like(f"%{room_name_pattern} ("),
+            )
+        )
     elif check_type == "by_employee":
         # По сотруднику
         emp = db.query(Employee).filter(Employee.id == scope_id).first()
