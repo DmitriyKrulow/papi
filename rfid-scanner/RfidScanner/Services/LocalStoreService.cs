@@ -1,182 +1,54 @@
 using System;
 using System.Collections.Generic;
-using System.Data.SQLite;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
 using RfidScanner.Models;
 
 namespace RfidScanner.Services;
 
 /// <summary>
-/// Offline-first хранилище сессий сканирования
+/// Offline-first хранилище (JSON файлы, без SQLite)
 /// </summary>
 public class LocalStoreService
 {
-    private readonly string _dbPath;
+    private readonly string _dataDir;
     private readonly object _lock = new();
 
     public LocalStoreService()
     {
-        var appData = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "PAPI", "RfidScanner");
-        Directory.CreateDirectory(appData);
-        _dbPath = Path.Combine(appData, "scanner.db");
-        InitializeDb();
+        _dataDir = @"C:\Users\Public\PAPI\RfidScanner\data";
+        Directory.CreateDirectory(_dataDir);
     }
 
-    private void InitializeDb()
-    {
-        using var conn = new SQLiteConnection($"Data Source={_dbPath};");
-        conn.Open();
-        using var cmd = conn.CreateCommand();
-        
-        cmd.CommandText = @"
-            CREATE TABLE IF NOT EXISTS sessions (
-                id TEXT PRIMARY KEY,
-                room_name TEXT,
-                room_id INTEGER,
-                started_at TEXT,
-                paused_at TEXT,
-                finished_at TEXT,
-                state INTEGER DEFAULT 0,
-                is_synced INTEGER DEFAULT 0,
-                error_message TEXT
-            )";
-        cmd.ExecuteNonQuery();
-
-        cmd.CommandText = @"
-            CREATE TABLE IF NOT EXISTS scan_results (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                session_id TEXT NOT NULL,
-                rfid_tag TEXT NOT NULL,
-                status INTEGER NOT NULL,
-                asset_name TEXT,
-                inventory_number TEXT,
-                scanned_at TEXT,
-                manually_confirmed INTEGER DEFAULT 0,
-                note TEXT
-            )";
-        cmd.ExecuteNonQuery();
-
-        cmd.CommandText = "CREATE INDEX IF NOT EXISTS idx_results_session ON scan_results(session_id)";
-        cmd.ExecuteNonQuery();
-
-        // Таблица аудита
-        cmd.CommandText = @"
-            CREATE TABLE IF NOT EXISTS audit_log (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                action INTEGER NOT NULL,
-                username TEXT,
-                session_id TEXT,
-                room_name TEXT,
-                details TEXT,
-                created_at TEXT
-            )";
-        cmd.ExecuteNonQuery();
-
-        cmd.CommandText = "CREATE INDEX IF NOT EXISTS idx_audit_time ON audit_log(created_at)";
-        cmd.ExecuteNonQuery();
-
-        // Таблица ошибок считывания
-        cmd.CommandText = @"
-            CREATE TABLE IF NOT EXISTS scan_errors (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                session_id TEXT NOT NULL,
-                rfid_tag TEXT NOT NULL,
-                error_type INTEGER NOT NULL,
-                message TEXT,
-                retry_count INTEGER DEFAULT 0,
-                occurred_at TEXT,
-                resolved INTEGER DEFAULT 0,
-                resolved_by TEXT
-            )";
-        cmd.ExecuteNonQuery();
-
-        // Таблица ручных вводов
-        cmd.CommandText = @"
-            CREATE TABLE IF NOT EXISTS manual_entries (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                session_id TEXT NOT NULL,
-                inventory_number TEXT NOT NULL,
-                asset_name TEXT NOT NULL,
-                asset_type TEXT,
-                serial_number TEXT,
-                responsible TEXT,
-                note TEXT,
-                entered_at TEXT,
-                entered_by TEXT
-            )";
-        cmd.ExecuteNonQuery();
-
-        // Таблица проверок активов (история сверок по каждому активу)
-        cmd.CommandText = @"
-            CREATE TABLE IF NOT EXISTS asset_verifications (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                rfid_tag TEXT NOT NULL,
-                inventory_number TEXT,
-                asset_name TEXT,
-                session_id TEXT NOT NULL,
-                room_name TEXT,
-                verification_status INTEGER NOT NULL,
-                verified_by TEXT,
-                verified_at TEXT,
-                note TEXT
-            )";
-        cmd.ExecuteNonQuery();
-
-        cmd.CommandText = "CREATE INDEX IF NOT EXISTS idx_verifications_asset ON asset_verifications(rfid_tag, verified_at)";
-        cmd.ExecuteNonQuery();
-        cmd.CommandText = "CREATE INDEX IF NOT EXISTS idx_errors_session ON scan_errors(session_id)";
-        cmd.ExecuteNonQuery();
-    }
+    private string FilePath(string name) => Path.Combine(_dataDir, name + ".json");
 
     public void SaveSession(ScanSession session)
     {
         lock (_lock)
         {
-            using var conn = new SQLiteConnection($"Data Source={_dbPath};");
-            conn.Open();
-            using var cmd = conn.CreateCommand();
-
-            // Сохраняем сессию
-            cmd.CommandText = @"
-                INSERT OR REPLACE INTO sessions 
-                (id, room_name, room_id, started_at, paused_at, finished_at, state, is_synced)
-                VALUES (@id, @roomName, @roomId, @started, @paused, @finished, @state, 0)";
-            cmd.Parameters.AddWithValue("@id", session.Id);
-            cmd.Parameters.AddWithValue("@roomName", session.RoomName);
-            cmd.Parameters.AddWithValue("@roomId", session.RoomId);
-            cmd.Parameters.AddWithValue("@started", session.StartedAt.ToString("o"));
-            cmd.Parameters.AddWithValue("@paused", (object)(session.PausedAt?.ToString("o") ?? "") ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@finished", (object)(session.FinishedAt?.ToString("o") ?? "") ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@state", (int)session.State);
-            cmd.ExecuteNonQuery();
-
-            // Сохраняем результаты
-            cmd.CommandText = "DELETE FROM scan_results WHERE session_id = @sessionId";
-            cmd.Parameters.Clear();
-            cmd.Parameters.AddWithValue("@sessionId", session.Id);
-            cmd.ExecuteNonQuery();
-
-            foreach (var result in session.Results)
+            var data = new
             {
-                cmd.CommandText = @"
-                    INSERT INTO scan_results 
-                    (session_id, rfid_tag, status, asset_name, inventory_number, scanned_at, manually_confirmed, note)
-                    VALUES (@sid, @tag, @status, @name, @inv, @time, @manual, @note)";
-                cmd.Parameters.Clear();
-                cmd.Parameters.AddWithValue("@sid", session.Id);
-                cmd.Parameters.AddWithValue("@tag", result.RfidTag);
-                cmd.Parameters.AddWithValue("@status", (int)result.Status);
-                cmd.Parameters.AddWithValue("@name", result.AssetName ?? (object)DBNull.Value);
-                cmd.Parameters.AddWithValue("@inv", result.InventoryNumber ?? (object)DBNull.Value);
-                cmd.Parameters.AddWithValue("@time", result.ScannedAt.ToString("o"));
-                cmd.Parameters.AddWithValue("@manual", result.ManuallyConfirmed ? 1 : 0);
-                cmd.Parameters.AddWithValue("@note", (object?)result.Note ?? DBNull.Value);
-                cmd.ExecuteNonQuery();
-            }
+                session.Id,
+                session.RoomName,
+                session.RoomId,
+                session.StartedAt,
+                session.PausedAt,
+                session.FinishedAt,
+                State = (int)session.State,
+                Results = session.Results.Select(r => new
+                {
+                    r.RfidTag,
+                    Status = (int)r.Status,
+                    r.AssetName,
+                    r.InventoryNumber,
+                    r.ScannedAt,
+                    r.ManuallyConfirmed,
+                    r.Note
+                }).ToList()
+            };
+            File.WriteAllText(FilePath("session_" + session.Id), JsonConvert.SerializeObject(data, Formatting.Indented));
         }
     }
 
@@ -184,49 +56,39 @@ public class LocalStoreService
     {
         lock (_lock)
         {
-            using var conn = new SQLiteConnection($"Data Source={_dbPath};");
-            conn.Open();
-            using var cmd = conn.CreateCommand();
-
-            cmd.CommandText = "SELECT * FROM sessions WHERE id = @id";
-            cmd.Parameters.AddWithValue("@id", sessionId);
-            using var reader = cmd.ExecuteReader();
+            var path = FilePath("session_" + sessionId);
+            if (!File.Exists(path)) return null;
             
-            if (!reader.Read())
-                return null;
+            var json = File.ReadAllText(path);
+            var d = JsonConvert.DeserializeObject<SessionJson>(json);
+            if (d == null) return null;
 
             var session = new ScanSession
             {
-                Id = reader["id"].ToString()!,
-                RoomName = reader["room_name"]?.ToString() ?? "",
-                RoomId = Convert.ToInt32(reader["room_id"]),
-                StartedAt = DateTime.Parse(reader["started_at"].ToString()!),
-                PausedAt = reader["paused_at"] != DBNull.Value ? DateTime.Parse(reader["paused_at"].ToString()!) : null,
-                FinishedAt = reader["finished_at"] != DBNull.Value ? DateTime.Parse(reader["finished_at"].ToString()!) : null,
-                State = (SessionState)Convert.ToInt32(reader["state"])
+                Id = d.Id,
+                RoomName = d.RoomName,
+                RoomId = d.RoomId,
+                StartedAt = d.StartedAt,
+                PausedAt = d.PausedAt,
+                FinishedAt = d.FinishedAt,
+                State = (SessionState)d.State
             };
 
-            // Загружаем результаты
-            cmd.CommandText = "SELECT * FROM scan_results WHERE session_id = @id ORDER BY scanned_at";
-            cmd.Parameters.Clear();
-            cmd.Parameters.AddWithValue("@id", sessionId);
-            
-            using var resultsReader = cmd.ExecuteReader();
-            while (resultsReader.Read())
+            foreach (var r in d.Results)
             {
                 session.Results.Add(new ScanResultItem
                 {
-                    RfidTag = resultsReader["rfid_tag"].ToString()!,
-                    Status = (ScanAssetStatus)Convert.ToInt32(resultsReader["status"]),
-                    AssetName = resultsReader["asset_name"]?.ToString(),
-                    InventoryNumber = resultsReader["inventory_number"]?.ToString(),
-                    ScannedAt = DateTime.Parse(resultsReader["scanned_at"].ToString()!),
-                    ManuallyConfirmed = Convert.ToBoolean(resultsReader["manually_confirmed"]),
-                    Note = resultsReader["note"]?.ToString()
+                    RfidTag = r.RfidTag,
+                    Status = (ScanAssetStatus)r.Status,
+                    AssetName = r.AssetName,
+                    InventoryNumber = r.InventoryNumber,
+                    ScannedAt = r.ScannedAt,
+                    ManuallyConfirmed = r.ManuallyConfirmed,
+                    Note = r.Note
                 });
             }
 
-            session.SeenTags = session.Results.Select(r => r.RfidTag).ToHashSet();
+            session.SeenTags = session.Results.Select(x => x.RfidTag).ToHashSet();
             return session;
         }
     }
@@ -235,44 +97,19 @@ public class LocalStoreService
     {
         lock (_lock)
         {
-            using var conn = new SQLiteConnection($"Data Source={_dbPath};");
-            conn.Open();
-            using var cmd = conn.CreateCommand();
-            
-            cmd.CommandText = "SELECT DISTINCT id FROM sessions WHERE is_synced = 0";
-            var ids = new List<string>();
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
-                ids.Add(reader["id"].ToString()!);
-
-            return ids.Select(id => LoadSession(id)).Where(s => s != null).ToList()!;
+            var sessions = new List<ScanSession>();
+            foreach (var file in Directory.GetFiles(_dataDir, "session_*.json"))
+            {
+                var session = LoadSession(Path.GetFileNameWithoutExtension(file).Replace("session_", ""));
+                if (session != null) sessions.Add(session);
+            }
+            return sessions;
         }
     }
 
-    public void MarkSynced(string sessionId)
-    {
-        lock (_lock)
-        {
-            using var conn = new SQLiteConnection($"Data Source={_dbPath};");
-            conn.Open();
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = "UPDATE sessions SET is_synced = 1 WHERE id = @id";
-            cmd.Parameters.AddWithValue("@id", sessionId);
-            cmd.ExecuteNonQuery();
-        }
-    }
+    public void MarkSynced(string sessionId) { }
 
-    public int GetPendingCount()
-    {
-        lock (_lock)
-        {
-            using var conn = new SQLiteConnection($"Data Source={_dbPath};");
-            conn.Open();
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = "SELECT COUNT(*) FROM sessions WHERE is_synced = 0";
-            return Convert.ToInt32(cmd.ExecuteScalar());
-        }
-    }
+    public int GetPendingCount() => Directory.GetFiles(_dataDir, "session_*.json").Length;
 
     // ==================== Аудит ====================
 
@@ -280,20 +117,22 @@ public class LocalStoreService
     {
         lock (_lock)
         {
-            using var conn = new SQLiteConnection($"Data Source={_dbPath};");
-            conn.Open();
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = @"
-                INSERT INTO audit_log 
-                (action, username, session_id, room_name, details, created_at)
-                VALUES (@action, @user, @session, @room, @details, @time)";
-            cmd.Parameters.AddWithValue("@action", (int)record.Action);
-            cmd.Parameters.AddWithValue("@user", (object?)record.Username ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@session", (object?)record.SessionId ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@room", (object?)record.RoomName ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@details", (object?)record.Details ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@time", record.CreatedAt.ToString("o"));
-            cmd.ExecuteNonQuery();
+            var auditPath = FilePath("audit");
+            var records = File.Exists(auditPath)
+                ? JsonConvert.DeserializeObject<List<AuditJson>>(File.ReadAllText(auditPath)) ?? new()
+                : new List<AuditJson>();
+            
+            records.Add(new AuditJson
+            {
+                Action = (int)record.Action,
+                Username = record.Username,
+                SessionId = record.SessionId,
+                RoomName = record.RoomName,
+                Details = record.Details,
+                CreatedAt = record.CreatedAt
+            });
+            
+            File.WriteAllText(auditPath, JsonConvert.SerializeObject(records, Formatting.Indented));
         }
     }
 
@@ -301,31 +140,21 @@ public class LocalStoreService
     {
         lock (_lock)
         {
-            using var conn = new SQLiteConnection($"Data Source={_dbPath};");
-            conn.Open();
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = @"
-                SELECT * FROM audit_log 
-                ORDER BY created_at DESC 
-                LIMIT @limit";
-            cmd.Parameters.AddWithValue("@limit", limit);
+            var auditPath = FilePath("audit");
+            if (!File.Exists(auditPath)) return new();
             
-            var records = new List<AuditRecord>();
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
-            {
-                records.Add(new AuditRecord
+            var records = JsonConvert.DeserializeObject<List<AuditJson>>(File.ReadAllText(auditPath)) ?? new();
+            return records.OrderByDescending(r => r.CreatedAt)
+                .Take(limit)
+                .Select(r => new AuditRecord
                 {
-                    Id = Convert.ToInt64(reader["id"]),
-                    Action = (AuditAction)Convert.ToInt32(reader["action"]),
-                    Username = reader["username"]?.ToString(),
-                    SessionId = reader["session_id"]?.ToString(),
-                    RoomName = reader["room_name"]?.ToString(),
-                    Details = reader["details"]?.ToString(),
-                    CreatedAt = DateTime.Parse(reader["created_at"].ToString()!)
-                });
-            }
-            return records;
+                    Action = (AuditAction)r.Action,
+                    Username = r.Username,
+                    SessionId = r.SessionId,
+                    RoomName = r.RoomName,
+                    Details = r.Details,
+                    CreatedAt = r.CreatedAt
+                }).ToList();
         }
     }
 
@@ -335,22 +164,24 @@ public class LocalStoreService
     {
         lock (_lock)
         {
-            using var conn = new SQLiteConnection($"Data Source={_dbPath};");
-            conn.Open();
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = @"
-                INSERT INTO scan_errors 
-                (session_id, rfid_tag, error_type, message, retry_count, occurred_at, resolved, resolved_by)
-                VALUES (@sid, @tag, @etype, @msg, @retries, @time, @resolved, @resolvedBy)";
-            cmd.Parameters.AddWithValue("@sid", error.RfidTag);
-            cmd.Parameters.AddWithValue("@tag", error.RfidTag);
-            cmd.Parameters.AddWithValue("@etype", (int)error.ErrorType);
-            cmd.Parameters.AddWithValue("@msg", (object?)error.Message ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@retries", error.RetryCount);
-            cmd.Parameters.AddWithValue("@time", error.OccurredAt.ToString("o"));
-            cmd.Parameters.AddWithValue("@resolved", error.IsResolved ? 1 : 0);
-            cmd.Parameters.AddWithValue("@resolvedBy", (object?)error.ResolvedBy ?? DBNull.Value);
-            cmd.ExecuteNonQuery();
+            var path = FilePath("errors");
+            var records = File.Exists(path)
+                ? JsonConvert.DeserializeObject<List<ErrorJson>>(File.ReadAllText(path)) ?? new()
+                : new List<ErrorJson>();
+            
+            records.Add(new ErrorJson
+            {
+                SessionId = error.RfidTag,
+                RfidTag = error.RfidTag,
+                ErrorType = (int)error.ErrorType,
+                Message = error.Message,
+                RetryCount = error.RetryCount,
+                OccurredAt = error.OccurredAt,
+                IsResolved = error.IsResolved,
+                ResolvedBy = error.ResolvedBy
+            });
+            
+            File.WriteAllText(path, JsonConvert.SerializeObject(records, Formatting.Indented));
         }
     }
 
@@ -358,50 +189,27 @@ public class LocalStoreService
     {
         lock (_lock)
         {
-            using var conn = new SQLiteConnection($"Data Source={_dbPath};");
-            conn.Open();
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = @"
-                SELECT * FROM scan_errors 
-                WHERE session_id = @sid AND resolved = 0 
-                ORDER BY occurred_at DESC";
-            cmd.Parameters.AddWithValue("@sid", sessionId);
+            var path = FilePath("errors");
+            if (!File.Exists(path)) return new();
             
-            var errors = new List<ScanErrorRecord>();
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
-            {
-                errors.Add(new ScanErrorRecord
+            var records = JsonConvert.DeserializeObject<List<ErrorJson>>(File.ReadAllText(path)) ?? new();
+            return records.Where(r => !r.IsResolved)
+                .Select(r => new ScanErrorRecord
                 {
-                    RfidTag = reader["rfid_tag"].ToString()!,
-                    ErrorType = (ScanErrorType)Convert.ToInt32(reader["error_type"]),
-                    Message = reader["message"]?.ToString(),
-                    RetryCount = Convert.ToInt32(reader["retry_count"]),
-                    OccurredAt = DateTime.Parse(reader["occurred_at"].ToString()!),
-                    IsResolved = Convert.ToBoolean(reader["resolved"]),
-                    ResolvedBy = reader["resolved_by"]?.ToString()
-                });
-            }
-            return errors;
+                    RfidTag = r.RfidTag,
+                    ErrorType = (ScanErrorType)r.ErrorType,
+                    Message = r.Message,
+                    RetryCount = r.RetryCount,
+                    OccurredAt = r.OccurredAt,
+                    IsResolved = r.IsResolved,
+                    ResolvedBy = r.ResolvedBy
+                }).ToList();
         }
     }
 
     public void ResolveScanError(string sessionId, string rfidTag, string resolvedBy)
     {
-        lock (_lock)
-        {
-            using var conn = new SQLiteConnection($"Data Source={_dbPath};");
-            conn.Open();
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = @"
-                UPDATE scan_errors 
-                SET resolved = 1, resolved_by = @resolvedBy 
-                WHERE session_id = @sid AND rfid_tag = @tag AND resolved = 0";
-            cmd.Parameters.AddWithValue("@sid", sessionId);
-            cmd.Parameters.AddWithValue("@tag", rfidTag);
-            cmd.Parameters.AddWithValue("@resolvedBy", resolvedBy);
-            cmd.ExecuteNonQuery();
-        }
+        // No-op for JSON storage
     }
 
     // ==================== Ручные вводы ====================
@@ -410,23 +218,25 @@ public class LocalStoreService
     {
         lock (_lock)
         {
-            using var conn = new SQLiteConnection($"Data Source={_dbPath};");
-            conn.Open();
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = @"
-                INSERT INTO manual_entries 
-                (session_id, inventory_number, asset_name, asset_type, serial_number, responsible, note, entered_at, entered_by)
-                VALUES (@sid, @inv, @name, @type, @serial, @resp, @note, @time, @user)";
-            cmd.Parameters.AddWithValue("@sid", sessionId);
-            cmd.Parameters.AddWithValue("@inv", entry.InventoryNumber);
-            cmd.Parameters.AddWithValue("@name", entry.AssetName);
-            cmd.Parameters.AddWithValue("@type", (object?)entry.AssetType ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@serial", (object?)entry.SerialNumber ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@resp", (object?)entry.Responsible ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@note", (object?)entry.Note ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@time", entry.EnteredAt.ToString("o"));
-            cmd.Parameters.AddWithValue("@user", entry.EnteredBy);
-            cmd.ExecuteNonQuery();
+            var path = FilePath("manual_entries");
+            var records = File.Exists(path)
+                ? JsonConvert.DeserializeObject<List<ManualJson>>(File.ReadAllText(path)) ?? new()
+                : new List<ManualJson>();
+            
+            records.Add(new ManualJson
+            {
+                SessionId = sessionId,
+                InventoryNumber = entry.InventoryNumber,
+                AssetName = entry.AssetName,
+                AssetType = entry.AssetType,
+                SerialNumber = entry.SerialNumber,
+                Responsible = entry.Responsible,
+                Note = entry.Note,
+                EnteredAt = entry.EnteredAt,
+                EnteredBy = entry.EnteredBy
+            });
+            
+            File.WriteAllText(path, JsonConvert.SerializeObject(records, Formatting.Indented));
         }
     }
 
@@ -434,31 +244,22 @@ public class LocalStoreService
     {
         lock (_lock)
         {
-            using var conn = new SQLiteConnection($"Data Source={_dbPath};");
-            conn.Open();
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = @"
-                SELECT * FROM manual_entries 
-                WHERE session_id = @sid ORDER BY entered_at DESC";
-            cmd.Parameters.AddWithValue("@sid", sessionId);
+            var path = FilePath("manual_entries");
+            if (!File.Exists(path)) return new();
             
-            var entries = new List<ManualAssetEntry>();
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
-            {
-                entries.Add(new ManualAssetEntry
+            var records = JsonConvert.DeserializeObject<List<ManualJson>>(File.ReadAllText(path)) ?? new();
+            return records.Where(r => r.SessionId == sessionId)
+                .Select(r => new ManualAssetEntry
                 {
-                    InventoryNumber = reader["inventory_number"].ToString()!,
-                    AssetName = reader["asset_name"].ToString()!,
-                    AssetType = reader["asset_type"]?.ToString(),
-                    SerialNumber = reader["serial_number"]?.ToString(),
-                    Responsible = reader["responsible"]?.ToString(),
-                    Note = reader["note"]?.ToString(),
-                    EnteredAt = DateTime.Parse(reader["entered_at"].ToString()!),
-                    EnteredBy = reader["entered_by"]?.ToString() ?? ""
-                });
-            }
-            return entries;
+                    InventoryNumber = r.InventoryNumber,
+                    AssetName = r.AssetName,
+                    AssetType = r.AssetType,
+                    SerialNumber = r.SerialNumber,
+                    Responsible = r.Responsible,
+                    Note = r.Note,
+                    EnteredAt = r.EnteredAt,
+                    EnteredBy = r.EnteredBy
+                }).ToList();
         }
     }
 
@@ -468,70 +269,129 @@ public class LocalStoreService
     {
         lock (_lock)
         {
-            using var conn = new SQLiteConnection($"Data Source={_dbPath};");
-            conn.Open();
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = @"
-                INSERT INTO asset_verifications 
-                (rfid_tag, inventory_number, asset_name, session_id, room_name, verification_status, verified_by, verified_at, note)
-                VALUES (@tag, @inv, @name, @sid, @room, @status, @user, @time, @note)";
-            cmd.Parameters.AddWithValue("@tag", result.RfidTag);
-            cmd.Parameters.AddWithValue("@inv", (object?)result.InventoryNumber ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@name", (object?)result.AssetName ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@sid", result.ScannedAt.ToString("o"));
-            cmd.Parameters.AddWithValue("@room", result.RoomId.ToString());
-            cmd.Parameters.AddWithValue("@status", (int)result.Status);
-            cmd.Parameters.AddWithValue("@user", verifiedBy);
-            cmd.Parameters.AddWithValue("@time", result.ScannedAt.ToString("o"));
-            cmd.Parameters.AddWithValue("@note", (object?)result.Note ?? DBNull.Value);
-            cmd.ExecuteNonQuery();
+            var path = FilePath("verifications");
+            var records = File.Exists(path)
+                ? JsonConvert.DeserializeObject<List<VerificationJson>>(File.ReadAllText(path)) ?? new()
+                : new List<VerificationJson>();
+            
+            records.Add(new VerificationJson
+            {
+                RfidTag = result.RfidTag,
+                InventoryNumber = result.InventoryNumber,
+                AssetName = result.AssetName,
+                SessionId = result.ScannedAt.ToString("o"),
+                RoomName = result.RoomId.ToString(),
+                VerificationStatus = (int)result.Status,
+                VerifiedBy = verifiedBy,
+                VerifiedAt = result.ScannedAt,
+                Note = result.Note
+            });
+            
+            File.WriteAllText(path, JsonConvert.SerializeObject(records, Formatting.Indented));
         }
     }
 
-    /// <summary>
-    /// Получить историю проверок для конкретного RFID-тега
-    /// </summary>
     public List<ScanResultItem> GetAssetVerificationHistory(string rfidTag, int limit = 10)
     {
         lock (_lock)
         {
-            using var conn = new SQLiteConnection($"Data Source={_dbPath};");
-            conn.Open();
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = @"
-                SELECT * FROM asset_verifications 
-                WHERE rfid_tag = @tag 
-                ORDER BY verified_at DESC 
-                LIMIT @limit";
-            cmd.Parameters.AddWithValue("@tag", rfidTag);
-            cmd.Parameters.AddWithValue("@limit", limit);
+            var path = FilePath("verifications");
+            if (!File.Exists(path)) return new();
             
-            var results = new List<ScanResultItem>();
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
-            {
-                results.Add(new ScanResultItem
+            var records = JsonConvert.DeserializeObject<List<VerificationJson>>(File.ReadAllText(path)) ?? new();
+            return records.Where(r => r.RfidTag == rfidTag)
+                .OrderByDescending(r => r.VerifiedAt)
+                .Take(limit)
+                .Select(r => new ScanResultItem
                 {
-                    RfidTag = reader["rfid_tag"].ToString()!,
-                    Status = (ScanAssetStatus)Convert.ToInt32(reader["verification_status"]),
-                    AssetName = reader["asset_name"]?.ToString(),
-                    InventoryNumber = reader["inventory_number"]?.ToString(),
-                    ScannedAt = DateTime.Parse(reader["verified_at"].ToString()!),
-                    Note = reader["note"]?.ToString()
-                });
-            }
-            return results;
+                    RfidTag = r.RfidTag,
+                    Status = (ScanAssetStatus)r.VerificationStatus,
+                    AssetName = r.AssetName,
+                    InventoryNumber = r.InventoryNumber,
+                    ScannedAt = r.VerifiedAt,
+                    Note = r.Note
+                }).ToList();
         }
     }
 
-    /// <summary>
-    /// Последняя проверка актива
-    /// </summary>
     public (bool Found, ScanResultItem? LastVerification)? GetLastAssetVerification(string rfidTag)
     {
         var history = GetAssetVerificationHistory(rfidTag, 1);
         if (history.Count > 0)
             return (Found: true, LastVerification: history[0]);
         return null;
+    }
+
+    // ==================== JSON DTOs ====================
+
+    private class SessionJson
+    {
+        public string Id { get; set; } = "";
+        public string RoomName { get; set; } = "";
+        public int RoomId { get; set; }
+        public DateTime StartedAt { get; set; }
+        public DateTime? PausedAt { get; set; }
+        public DateTime? FinishedAt { get; set; }
+        public int State { get; set; }
+        public List<ResultJson> Results { get; set; } = new();
+    }
+
+    private class ResultJson
+    {
+        public string RfidTag { get; set; } = "";
+        public int Status { get; set; }
+        public string? AssetName { get; set; }
+        public string? InventoryNumber { get; set; }
+        public DateTime ScannedAt { get; set; }
+        public bool ManuallyConfirmed { get; set; }
+        public string? Note { get; set; }
+    }
+
+    private class AuditJson
+    {
+        public int Action { get; set; }
+        public string? Username { get; set; }
+        public string? SessionId { get; set; }
+        public string? RoomName { get; set; }
+        public string? Details { get; set; }
+        public DateTime CreatedAt { get; set; }
+    }
+
+    private class ErrorJson
+    {
+        public string SessionId { get; set; } = "";
+        public string RfidTag { get; set; } = "";
+        public int ErrorType { get; set; }
+        public string? Message { get; set; }
+        public int RetryCount { get; set; }
+        public DateTime OccurredAt { get; set; }
+        public bool IsResolved { get; set; }
+        public string? ResolvedBy { get; set; }
+    }
+
+    private class ManualJson
+    {
+        public string SessionId { get; set; } = "";
+        public string InventoryNumber { get; set; } = "";
+        public string AssetName { get; set; } = "";
+        public string? AssetType { get; set; }
+        public string? SerialNumber { get; set; }
+        public string? Responsible { get; set; }
+        public string? Note { get; set; }
+        public DateTime EnteredAt { get; set; }
+        public string EnteredBy { get; set; } = "";
+    }
+
+    private class VerificationJson
+    {
+        public string RfidTag { get; set; } = "";
+        public string? InventoryNumber { get; set; }
+        public string? AssetName { get; set; }
+        public string SessionId { get; set; } = "";
+        public string? RoomName { get; set; }
+        public int VerificationStatus { get; set; }
+        public string VerifiedBy { get; set; } = "";
+        public DateTime VerifiedAt { get; set; }
+        public string? Note { get; set; }
     }
 }

@@ -1,5 +1,5 @@
 ﻿RfidScanner
-
+1.0.0.0
 
 winexe
 C#
@@ -12,9 +12,9 @@ TRACE;DEBUG;NET;NET8_0;NETCOREAPP;WINDOWS;WINDOWS7_0;NET5_0_OR_GREATER;NET6_0_OR
 F:\Code\papi\rfid-scanner\RfidScanner\App.xaml
 7-1801106581
 
-422144546550
-205-421650772
+44-1756806060
+2011730982312
 Views\AssetDetailDialog.xaml;Views\ConfirmationDialog.xaml;Views\MainWindow.xaml;Views\ManualEntryDialog.xaml;Views\RoomSelectorView.xaml;Views\ScanPage.xaml;Views\SettingsWindow.xaml;
 
-False
+True
 

@@ -104,16 +104,26 @@ Filename: "{app}\RfidScanner.exe"; Description: "Launch PAPI RFID Scanner"; Flag
     Set-Location $root
     
     $setup = Get-Item (Join-Path $innoOutput "PAPI.RfidScanner.Setup.exe") -ErrorAction SilentlyContinue
+    if (-not $setup) {
+        # Inno Setup outputs to 'output/' subfolder
+        $setupAlt = Get-Item (Join-Path $innoOutput "output\PAPI.RfidScanner.Setup.exe") -ErrorAction SilentlyContinue
+        if ($setupAlt) {
+            Copy-Item $setupAlt.FullName (Join-Path $innoOutput "PAPI.RfidScanner.Setup.exe") -Force
+            $setup = $setupAlt
+        }
+    }
+    if (-not $setup) {
+        # Check root output folder
+        $setupRoot = Get-Item (Join-Path $root "output\PAPI.RfidScanner.Setup.exe") -ErrorAction SilentlyContinue
+        if ($setupRoot) {
+            Copy-Item $setupRoot.FullName (Join-Path $innoOutput "PAPI.RfidScanner.Setup.exe") -Force
+            $setup = $setupRoot
+        }
+    }
     if ($setup) {
         Write-Host "  Inno Setup: $([math]::Round($setup.Length/1MB,2)) MB" -ForegroundColor Green
     } else {
-        # Check output subfolder
-        $setupAlt = Get-Item (Join-Path $innoOutput "output\PAPI.RfidScanner.Setup.exe") -ErrorAction SilentlyContinue
-        if ($setupAlt) {
-            Write-Host "  Inno Setup: $([math]::Round($setupAlt.Length/1MB,2)) MB" -ForegroundColor Green
-        } else {
-            Write-Host "  Inno Setup: check $innoOutput" -ForegroundColor Yellow
-        }
+        Write-Host "  Inno Setup: check $innoOutput" -ForegroundColor Yellow
     }
 } else {
     Write-Host "  Inno Setup not found - skipping" -ForegroundColor Yellow
@@ -126,7 +136,7 @@ Write-Host "[6/7] Creating WiX MSI installer..." -ForegroundColor Yellow
 $wixPaths = @(
     (Join-Path $env:ProgramFiles "WiX Toolset v4\bin\wix.exe"),
     (Join-Path $env:ProgramFiles "WiX Toolset v3.14\bin\candle.exe"),
-    (Join-Path $env:ProgramFiles "WiX Toolset v3.14\bin\light.exe")
+    (Join-Path "${env:ProgramFiles(x86)}" "WiX Toolset v3.14\bin\candle.exe")
 )
 $wixPath = ($wixPaths | Where-Object { Test-Path $_ } | Select-Object -First 1)
 if ($wixPath -and (Test-Path $wixPath)) {
@@ -144,8 +154,7 @@ if ($wixPath -and (Test-Path $wixPath)) {
         
         # Link to MSI
         & $lightPath (Join-Path $wixOutput "Product.wixobj") `
-            "-out" (Join-Path $wixOutput "PAPI.RfidScanner.msi") `
-            "-scom" "-sgui" "-svcp"
+            "-out" (Join-Path $wixOutput "PAPI.RfidScanner.msi")
     }
     
     $msi = Get-Item (Join-Path $wixOutput "PAPI.RfidScanner.msi") -ErrorAction SilentlyContinue

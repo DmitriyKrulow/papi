@@ -107,7 +107,7 @@ namespace RfidScanner.Views {
                 return;
             }
             _contentLoaded = true;
-            System.Uri resourceLocater = new System.Uri("/RfidScanner;component/views/assetdetaildialog.xaml", System.UriKind.Relative);
+            System.Uri resourceLocater = new System.Uri("/RfidScanner;V1.0.0.0;component/views/assetdetaildialog.xaml", System.UriKind.Relative);
             
             #line 1 "..\..\..\..\Views\AssetDetailDialog.xaml"
             System.Windows.Application.LoadComponent(this, resourceLocater);

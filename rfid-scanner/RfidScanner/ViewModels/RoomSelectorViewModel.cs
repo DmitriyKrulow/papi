@@ -49,7 +49,7 @@ public class RoomSelectorViewModel : INotifyPropertyChanged
     public string SearchText
     {
         get => _searchText;
-        private set
+        set
         {
             if (SetProperty(ref _searchText, value))
                 FilterRooms();
@@ -84,11 +84,13 @@ public class RoomSelectorViewModel : INotifyPropertyChanged
             foreach (var room in rooms)
                 Rooms.Add(room);
             
-            StatusMessage = $"Загружено {rooms.Count} помещений";
+            StatusMessage = rooms.Count > 0 
+                ? $"✅ Загружено {rooms.Count} помещений" 
+                : "⚠ Помещения не найдены";
         }
-        catch (Exception ex)
+        catch
         {
-            StatusMessage = $"Ошибка: {ex.Message}";
+            StatusMessage = "⚠ Сервер недоступен — проверьте подключение";
         }
         finally
         {
@@ -143,9 +145,9 @@ public class RoomSelectorViewModel : INotifyPropertyChanged
             
             StatusMessage = $"✅ Начата инвентаризация: {SelectedRoom.Name}";
         }
-        catch (Exception ex)
+        catch
         {
-            StatusMessage = $"Ошибка: {ex.Message}";
+            StatusMessage = "⚠ Ошибка загрузки — повторите попытку";
         }
         finally
         {
