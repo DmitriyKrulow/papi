@@ -82,7 +82,7 @@ app = FastAPI(
     version="2.0.0",
     contact={
         "name": "PAPI Support",
-        "email": "support@papi.local",
+        "url": "https://papi.local",
     },
     license_info={
         "name": "Proprietary",
@@ -430,10 +430,12 @@ async def add_trailing_slash(request: Request, call_next):
     logger.info(f"[Request] Headers: {headers_dict}")
     content_type = headers_dict.get('content-type', '')
     logger.info(f"[Request] Content-Type: {content_type}")
-    if 'authorization' not in headers_dict:
-        logger.error("[Request] ❌ NO AUTHORIZATION HEADER - This is the problem!")
+    # Публичные endpoints не требуют авторизации
+    public_paths = ("/docs", "/openapi.json", "/redoc", "/health", "/api/db-check")
+    if 'authorization' not in headers_dict and not request.url.path.startswith(public_paths):
+        logger.warning(f"[Request] ⚠️ No Authorization header for {request.url.path}")
     else:
-        logger.info(f"[Request] ✅ Authorization header present: {headers_dict['authorization'][:50]}...")
+        logger.info(f"[Request] ✅ Authorization header present: {headers_dict.get('authorization', 'N/A')[:50]}...")
     response = await call_next(request)
     return response
 
