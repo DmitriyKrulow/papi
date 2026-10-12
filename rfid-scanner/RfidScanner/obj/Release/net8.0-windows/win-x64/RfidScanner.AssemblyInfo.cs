@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyDescriptionAttribute("RFID Scanner for PAPI Asset Management System")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+4ddd6495886e760a8839878bcd9b5250e6cce2ea")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+78e5ba72ce190d3aa14993512bdea7bd06b22106")]
 [assembly: System.Reflection.AssemblyProductAttribute("RfidScanner")]
 [assembly: System.Reflection.AssemblyTitleAttribute("RfidScanner")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

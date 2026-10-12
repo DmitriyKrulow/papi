@@ -144,13 +144,17 @@
                             </Style>
                         </TabItem.Style>
                         <Border Padding="15" Background="White">
-                            <ListView ItemsSource="{Binding Inventories}" 
-                                      SelectedItem="{Binding SelectedInventory}"
-                                      BorderThickness="0"
-                                      MaxHeight="500"
-                                      ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                      ScrollViewer.CanContentScroll="True">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                <ListView Grid.Row="1" ItemsSource="{Binding Inventories}" 
+                                          SelectedItem="{Binding SelectedInventory}"
+                                          BorderThickness="0"
+                                          ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                          ScrollViewer.CanContentScroll="True">
                                 <ListView.ItemContainerStyle>
                                     <Style TargetType="ListViewItem">
                                         <Setter Property="Padding" Value="0"/>
@@ -196,6 +200,7 @@
                                     </DataTemplate>
                                 </ListView.ItemTemplate>
                             </ListView>
+                        </Grid>
                         </Border>
                     </TabItem>
                 </TabControl>

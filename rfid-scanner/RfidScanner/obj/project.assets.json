@@ -330,9 +330,9 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "F:\\Code\\papi\\rfid-scanner\\RfidScanner\\RfidScanner.csproj",
+      "projectUniqueName": "f:\\Code\\papi\\rfid-scanner\\RfidScanner\\RfidScanner_lau442q5_wpftmp.csproj",
       "projectName": "RfidScanner",
-      "projectPath": "F:\\Code\\papi\\rfid-scanner\\RfidScanner\\RfidScanner.csproj",
+      "projectPath": "f:\\Code\\papi\\rfid-scanner\\RfidScanner\\RfidScanner_lau442q5_wpftmp.csproj",
       "packagesPath": "C:\\Users\\kdw\\.nuget\\packages\\",
       "outputPath": "F:\\Code\\papi\\rfid-scanner\\RfidScanner\\obj\\",
       "projectStyle": "PackageReference",
