@@ -13,8 +13,12 @@ public partial class RoomSelectorView : UserControl
 {
     private RoomSelectorViewModel? _viewModel;
     private SessionManager? _sessionManager;
-    private Action<ScanSession>? _onInventoryStarted;
     private TabControl? _tabControl;
+
+    /// <summary>
+    /// ViewModel для подписки на события из MainWindow
+    /// </summary>
+    public RoomSelectorViewModel? ViewModel => _viewModel;
 
     public RoomSelectorView()
     {
@@ -22,12 +26,11 @@ public partial class RoomSelectorView : UserControl
     }
 
     public void Initialize(RfidApiClient apiClient, SessionManager sessionManager, 
-        AssetCacheService assetCache, AuditService audit, Action<ScanSession> onInventoryStarted)
+        AssetCacheService assetCache, AuditService audit)
     {
-        _onInventoryStarted = onInventoryStarted;
         _sessionManager = sessionManager;
         
-        _viewModel = new RoomSelectorViewModel(apiClient, sessionManager, assetCache, audit, onInventoryStarted);
+        _viewModel = new RoomSelectorViewModel(apiClient, sessionManager, assetCache, audit);
         DataContext = _viewModel;
         
         // Автоматическая загрузка помещений и инвентаризаций
@@ -66,6 +69,8 @@ public partial class RoomSelectorView : UserControl
 
     private void StartButton_Click(object sender, RoutedEventArgs e)
     {
+        System.Diagnostics.Debug.WriteLine($"[StartButton_Click] ShowInventories={_viewModel?.ShowInventories}, SelectedInventory={_viewModel?.SelectedInventory?.Name ?? "null"}");
+        
         if (_viewModel.ShowInventories)
         {
             _viewModel.ContinueInventoryCommand.Execute(null);

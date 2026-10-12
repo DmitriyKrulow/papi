@@ -150,7 +150,8 @@
                                     <RowDefinition Height="*"/>
                                 </Grid.RowDefinitions>
                                 <ListView Grid.Row="1" ItemsSource="{Binding Inventories}" 
-                                          SelectedItem="{Binding SelectedInventory}"
+                                          SelectedItem="{Binding SelectedInventory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                          SelectionMode="Single"
                                           BorderThickness="0"
                                           ScrollViewer.VerticalScrollBarVisibility="Auto"
                                           ScrollViewer.HorizontalScrollBarVisibility="Disabled"
@@ -160,6 +161,27 @@
                                         <Setter Property="Padding" Value="0"/>
                                         <Setter Property="Margin" Value="0,2"/>
                                         <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                        <Setter Property="Focusable" Value="True"/>
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="ListViewItem">
+                                                    <Border x:Name="ItemBorder"
+                                                            Background="Transparent"
+                                                            BorderBrush="{TemplateBinding BorderBrush}"
+                                                            BorderThickness="{TemplateBinding BorderThickness}">
+                                                        <ContentPresenter x:Name="ContentPresenter"/>
+                                                    </Border>
+                                                    <ControlTemplate.Triggers>
+                                                        <Trigger Property="IsSelected" Value="True">
+                                                            <Setter TargetName="ItemBorder" Property="Background" Value="#E3F2FD"/>
+                                                        </Trigger>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter TargetName="ItemBorder" Property="Background" Value="#F5F5F5"/>
+                                                        </Trigger>
+                                                    </ControlTemplate.Triggers>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
                                     </Style>
                                 </ListView.ItemContainerStyle>
                                 <ListView.ItemTemplate>
@@ -185,18 +207,17 @@
                                                 </TextBlock>
                                             </StackPanel>
                                         </Border>
-                                        <DataTemplate.Triggers>
-                                            <!-- Выбранная инвентаризация -->
-                                            <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListViewItem}, Path=IsSelected}" Value="True">
-                                                <Setter TargetName="ItemBorder" Property="Background" Value="#E3F2FD"/>
-                                                <Setter TargetName="ItemBorder" Property="BorderBrush" Value="#2196F3"/>
-                                            </DataTrigger>
-                                            <!-- Наведение -->
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="ItemBorder" Property="Background" Value="#F5F5F5"/>
-                                                <Setter TargetName="ItemBorder" Property="BorderBrush" Value="#90CAF9"/>
-                                            </Trigger>
-                                        </DataTemplate.Triggers>
+                                         <DataTemplate.Triggers>
+                                             <!-- Выделение выбранного элемента -->
+                                             <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListViewItem}, Path=IsSelected}" Value="True">
+                                                 <Setter TargetName="ItemBorder" Property="Background" Value="#E3F2FD"/>
+                                                 <Setter TargetName="ItemBorder" Property="BorderBrush" Value="#2196F3"/>
+                                             </DataTrigger>
+                                             <!-- Наведение на содержимое -->
+                                             <Trigger Property="IsMouseOver" Value="True">
+                                                 <Setter TargetName="ItemBorder" Property="BorderBrush" Value="#90CAF9"/>
+                                             </Trigger>
+                                         </DataTemplate.Triggers>
                                     </DataTemplate>
                                 </ListView.ItemTemplate>
                             </ListView>
@@ -226,7 +247,7 @@
                             Background="#4CAF50" Foreground="White"
                             FontSize="14" Padding="20,10"
                             Width="220" Height="42"
-                            IsEnabled="{Binding !IsLoading}"
+                            IsEnabled="{Binding IsLoading, Converter={StaticResource InverseBooleanConverter}}"
                             Margin="0,0,8,0"
                             Visibility="{Binding ShowInventories, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}">
                         <Button.Style>

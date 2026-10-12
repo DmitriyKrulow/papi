@@ -66,7 +66,7 @@ public class InventoryViewModel : BaseViewModel
             foreach (var item in items)
                 _items.Add(item);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             // Показать ошибку
         }

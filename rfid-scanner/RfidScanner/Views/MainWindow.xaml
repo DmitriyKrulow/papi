@@ -60,7 +60,9 @@
         <TabControl x:Name="TabControl" Grid.Row="1" Margin="10" SelectionChanged="TabControl_SelectionChanged">
             <!-- Режим Инвентаризация -->
             <TabItem Header="📋 Инвентаризация" FontSize="16" x:Name="InventoryTab">
-                <ContentControl x:Name="RoomSelectorHost"/>
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <ContentControl x:Name="RoomSelectorHost"/>
+                </ScrollViewer>
             </TabItem>
 
             <!-- Режим Поиск -->
@@ -90,11 +92,11 @@
 
                     <!-- Результат -->
                     <Border Grid.Row="1" Background="White" BorderThickness="2" 
-                           BorderBrush="#4CAF50" CornerRadius="10" Padding="30">
+                            BorderBrush="#4CAF50" CornerRadius="10" Padding="30">
                         <StackPanel>
                             <TextBlock Text="{Binding SearchStatus, FallbackValue='Введите запрос'}" 
                                       FontSize="18" Foreground="Gray" Margin="0,0,0,20"/>
-                            <TextBlock Text="{Binding SearchResult.InventoryNumber, FallbackValue=''}" 
+                            <TextBlock Text="{Binding SearchResult.InventoryNumber, FallbackValue='Не найдено'}" 
                                       FontSize="32" FontWeight="Bold" Foreground="Green" Margin="0,0,0,10"/>
                             <TextBlock Text="{Binding SearchResult.Name, FallbackValue=''}" 
                                       FontSize="20" Foreground="Gray" Margin="0,0,0,10"/>

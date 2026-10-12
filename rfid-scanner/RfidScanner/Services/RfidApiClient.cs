@@ -98,20 +98,55 @@ public class RfidApiClient
     {
         try
         {
-            var result = await GetJsonAsync<Dictionary<string, object>>($"/api/rfid/inventories/{inventoryId}");
-            if (result == null || !result.ContainsKey("items"))
-                return new();
-
-            var json = JsonConvert.SerializeObject(result["items"]);
-            var settings = new JsonSerializerSettings
+            var url = $"/api/rfid/inventories/{inventoryId}/assets";
+            System.Diagnostics.Debug.WriteLine($"[API] GET {url}");
+            
+            var response = await SendAsync(HttpMethod.Get, url);
+            var json = await response.Content.ReadAsStringAsync();
+            System.Diagnostics.Debug.WriteLine($"[API] Response: {json}");
+            
+            if (!response.IsSuccessStatusCode)
             {
-                NullValueHandling = NullValueHandling.Ignore
-            };
-            return JsonConvert.DeserializeObject<List<InventoryItem>>(json, settings) ?? new();
+                throw new HttpRequestException($"HTTP {response.StatusCode}: {json}");
+            }
+            
+            var result = JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
+            if (result == null)
+            {
+                System.Diagnostics.Debug.WriteLine($"[API] Response is null");
+                return new();
+            }
+
+            System.Diagnostics.Debug.WriteLine($"[API] Keys: {string.Join(", ", result.Keys)}");
+            
+            List<InventoryItem>? assets = null;
+            if (result.ContainsKey("items"))
+            {
+                assets = JsonConvert.DeserializeObject<List<InventoryItem>>(JsonConvert.SerializeObject(result["items"])) ?? new();
+            }
+            else if (result.ContainsKey("assets"))
+            {
+                assets = JsonConvert.DeserializeObject<List<InventoryItem>>(JsonConvert.SerializeObject(result["assets"])) ?? new();
+            }
+            else if (result.ContainsKey("data"))
+            {
+                assets = JsonConvert.DeserializeObject<List<InventoryItem>>(JsonConvert.SerializeObject(result["data"])) ?? new();
+            }
+            else if (result.ContainsKey("inventory_items"))
+            {
+                assets = JsonConvert.DeserializeObject<List<InventoryItem>>(JsonConvert.SerializeObject(result["inventory_items"])) ?? new();
+            }
+            
+            assets ??= new();
+            System.Diagnostics.Debug.WriteLine($"[API] Got {assets.Count} assets");
+            return assets;
         }
-        catch
+        catch (Exception ex)
         {
-            return new();
+            System.Diagnostics.Debug.WriteLine($"[API] ERROR: {ex.GetType().Name}: {ex.Message}");
+            if (ex.InnerException != null)
+                System.Diagnostics.Debug.WriteLine($"[API] Inner: {ex.InnerException.Message}");
+            throw;
         }
     }
 

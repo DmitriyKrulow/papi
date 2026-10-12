@@ -146,6 +146,8 @@ public class ScanViewModel : INotifyPropertyChanged
     public ObservableCollection<ScanResultItem> ExtraItems { get; } = new();
     public ObservableCollection<ScanResultItem> MissingItems { get; } = new();
     public ObservableCollection<ScanResultItem> AllResults { get; } = new();
+    
+    public ObservableCollection<ScanResultItem> History { get; } = new();
 
     /// <summary>
     /// Отфильтрованный список результатов для отображения
@@ -242,6 +244,14 @@ public class ScanViewModel : INotifyPropertyChanged
     {
         get => _isPaused;
         private set => SetProperty(ref _isPaused, value);
+    }
+
+    /// <summary>
+    /// Переключить паузу сканирования
+    /// </summary>
+    public void TogglePause()
+    {
+        IsPaused = !IsPaused;
     }
 
     public bool IsFinished
@@ -455,7 +465,7 @@ public class ScanViewModel : INotifyPropertyChanged
             // Загружаем активы при создании новой сессии
             if (session.State == SessionState.Active && session.InventoryId > 0)
             {
-                LoadSessionAssetsAsync();
+                _ = LoadSessionAssetsAsync();
             }
 
             // Цветовой статус

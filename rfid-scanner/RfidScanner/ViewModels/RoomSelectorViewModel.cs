@@ -18,7 +18,6 @@ public class RoomSelectorViewModel : INotifyPropertyChanged
     private readonly SessionManager _sessionManager;
     private readonly AssetCacheService _assetCache;
     private readonly AuditService _audit;
-    private readonly Action<ScanSession> _onInventoryStarted;
 
     private ObservableCollection<Room> _rooms = new();
     private ObservableCollection<Inventory> _inventories = new();
@@ -28,15 +27,17 @@ public class RoomSelectorViewModel : INotifyPropertyChanged
     private bool _isLoading;
     private string _statusMessage = "Выберите помещение или инвентаризацию";
     private bool _showInventories;
+    private ScanSession? _currentSession;
+    private bool _isScanning;
+    private bool _isInventoryInProgress;
 
     public RoomSelectorViewModel(RfidApiClient apiClient, SessionManager sessionManager, 
-        AssetCacheService assetCache, AuditService audit, Action<ScanSession> onInventoryStarted)
+        AssetCacheService assetCache, AuditService audit)
     {
         _apiClient = apiClient;
         _sessionManager = sessionManager;
         _assetCache = assetCache;
         _audit = audit;
-        _onInventoryStarted = onInventoryStarted;
     }
 
     public ObservableCollection<Room> Rooms
@@ -60,7 +61,19 @@ public class RoomSelectorViewModel : INotifyPropertyChanged
     public Inventory? SelectedInventory
     {
         get => _selectedInventory;
-        set => SetProperty(ref _selectedInventory, value);
+        set
+        {
+            if (SetProperty(ref _selectedInventory, value))
+            {
+                System.Diagnostics.Debug.WriteLine($"[RoomSelectorViewModel] SelectedInventory changed to: {value?.Name ?? "null"}");
+            }
+        }
+    }
+
+    // Метод для явного установки выбранной инвентаризации из code-behind
+    public void SetSelectedInventory(Inventory inventory)
+    {
+        SelectedInventory = inventory;
     }
 
     public string SearchText
@@ -89,6 +102,18 @@ public class RoomSelectorViewModel : INotifyPropertyChanged
     {
         get => _showInventories;
         set => SetProperty(ref _showInventories, value);
+    }
+
+    public ScanSession? CurrentSession
+    {
+        get => _currentSession;
+        private set => SetProperty(ref _currentSession, value);
+    }
+
+    public bool IsScanning
+    {
+        get => _isScanning;
+        private set => SetProperty(ref _isScanning, value);
     }
 
     public ICommand LoadRoomsCommand => new RelayCommand(LoadRooms);
@@ -205,13 +230,14 @@ public class RoomSelectorViewModel : INotifyPropertyChanged
             
             StatusMessage = $"✅ Инвентаризация создана: {SelectedRoom.Name}";
             
-            // Переключаемся на сканирование
-            if (_sessionManager.CurrentSession != null)
-                _onInventoryStarted(_sessionManager.CurrentSession);
+            // SessionManager.CreateSession уже вызвал SessionChanged → OnSessionCreated
+            IsScanning = true;
+            _isInventoryInProgress = false;
         }
         catch (Exception ex)
         {
             StatusMessage = $"⚠ Ошибка: {ex.Message}";
+            _isInventoryInProgress = false;
         }
         finally
         {
@@ -221,19 +247,34 @@ public class RoomSelectorViewModel : INotifyPropertyChanged
 
     private async void ContinueInventory()
     {
+        // Блокировка от повторных вызовов
+        if (_isInventoryInProgress)
+        {
+            System.Diagnostics.Debug.WriteLine("[ContinueInventory] SKIPPED: Already in progress");
+            return;
+        }
+        
+        System.Diagnostics.Debug.WriteLine($"[ContinueInventory] SelectedInventory={SelectedInventory?.Name ?? "null"}, Id={SelectedInventory?.Id}");
+        
         if (SelectedInventory == null)
         {
             StatusMessage = "⚠ Выберите инвентаризацию";
+            System.Diagnostics.Debug.WriteLine("[ContinueInventory] ERROR: No inventory selected");
             return;
         }
 
+        _isInventoryInProgress = true;
         IsLoading = true;
         StatusMessage = $"Загрузка активов для инвентаризации: {SelectedInventory.Name}...";
+        System.Diagnostics.Debug.WriteLine($"[ContinueInventory] Starting inventory: {SelectedInventory.Name}");
 
         try
         {
             // Загружаем активы инвентаризации
+            System.Diagnostics.Debug.WriteLine($"[ContinueInventory] Calling API: /api/rfid/inventories/{SelectedInventory.Id}");
             var assets = await _apiClient.GetInventoryAssetsAsync(SelectedInventory.Id);
+            
+            System.Diagnostics.Debug.WriteLine($"[ContinueInventory] Got {assets.Count} assets");
             
             // Создаём локальную сессию
             _sessionManager.CreateSession(SelectedInventory.Name, 0, SelectedInventory.Id);
@@ -245,17 +286,24 @@ public class RoomSelectorViewModel : INotifyPropertyChanged
             
             StatusMessage = $"✅ Продолжена инвентаризация: {SelectedInventory.Name} ({assets.Count} активов)";
             
-            // Переключаемся на сканирование
-            if (_sessionManager.CurrentSession != null)
-                _onInventoryStarted(_sessionManager.CurrentSession);
+            // SessionManager.CreateSession уже вызвал SessionChanged → OnSessionCreated
+            CurrentSession = _sessionManager.CurrentSession;
+            IsScanning = true;
+            
+            // Сбрасываем выбранную инвентаризацию, чтобы избежать повторных вызовов
+            SelectedInventory = null;
         }
         catch (Exception ex)
         {
+            System.Diagnostics.Debug.WriteLine($"[ContinueInventory] ERROR: {ex.GetType().Name}: {ex.Message}");
+            if (ex.InnerException != null)
+                System.Diagnostics.Debug.WriteLine($"[ContinueInventory] Inner: {ex.InnerException.Message}");
             StatusMessage = $"⚠ Ошибка: {ex.Message}";
         }
         finally
         {
             IsLoading = false;
+            _isInventoryInProgress = false;
         }
     }
 
