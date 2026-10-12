@@ -48,3 +48,24 @@ backups/
 *.dump
 *.sql.gz
 *.bak
+
+# Build output - C# / .NET
+rfid-scanner/RfidScanner/bin/
+rfid-scanner/RfidScanner/obj/
+rfid-scanner/RfidScanner/publish/
+rfid-scanner/installer_output/
+rfid-scanner/singlefile/
+rfid-scanner/output/
+*.dll
+*.exe
+*.pdb
+*.nupkg
+
+# Build output - Node.js
+node_modules/
+dist/
+
+# Build output - Python
+__pycache__/
+*.pyc
+*.pyo

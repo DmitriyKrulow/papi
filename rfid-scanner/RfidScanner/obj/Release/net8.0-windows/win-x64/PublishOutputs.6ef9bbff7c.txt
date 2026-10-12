@@ -1,8 +1,0 @@
-F:\Code\papi\rfid-scanner\RfidScanner\publish\RfidScanner.exe
-F:\Code\papi\rfid-scanner\RfidScanner\publish\RfidScanner.dll
-F:\Code\papi\rfid-scanner\RfidScanner\publish\RfidScanner.deps.json
-F:\Code\papi\rfid-scanner\RfidScanner\publish\RfidScanner.runtimeconfig.json
-F:\Code\papi\rfid-scanner\RfidScanner\publish\RfidScanner.pdb
-F:\Code\papi\rfid-scanner\RfidScanner\publish\CommunityToolkit.Mvvm.dll
-F:\Code\papi\rfid-scanner\RfidScanner\publish\Newtonsoft.Json.dll
-F:\Code\papi\rfid-scanner\RfidScanner\publish\System.IO.Ports.dll
