@@ -4,7 +4,8 @@ import logging
 from datetime import datetime
 from typing import Optional, List
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from src.infrastructure.db.init_db import get_db
@@ -79,15 +80,20 @@ async def get_active_inventories(
             "name": inv.name,
             "check_date": inv.check_date.isoformat() if inv.check_date else None,
             "check_type": inv.check_type,
+            "scope_id": inv.scope_id or 0,
             "scope_name": inv.scope_name or "",
             "department": inv.department.name if inv.department else "",
             "status": inv.status,
             "total_checked": inv.total_checked,
             "found": inv.found,
             "missing": inv.missing,
+            "surplus": inv.surplus,
             "creator": inv.creator.full_name if inv.creator else "",
             "responsible": inv.responsible.full_name if inv.responsible else "",
             "started_at": inv.started_at.isoformat() if inv.started_at else None,
+            "progress_percent": round(
+                (inv.found + inv.missing) / inv.total_checked * 100, 1
+            ) if inv.total_checked > 0 else 0,
         })
     
     return {
@@ -236,22 +242,40 @@ async def get_asset_by_rfid(
 @router.post("/inventories/{inventory_id}/scan")
 async def scan_rfid_for_inventory(
     inventory_id: int,
-    rfid_tag: str = Query(..., description="RFID-метка сканированного актива"),
+    request: Request,
+    rfid_tag: Optional[str] = Query(None, description="RFID-метка сканированного актива"),
+    result: str = Query("found", description="Результат: found / missing / surplus"),
     scanner: dict = Depends(get_rfid_scanner),
     db: Session = Depends(get_db),
 ):
     """
     Отправка результата сканирования RFID-метки.
-    
-    Header: X-API-Key: rfid_abc123...
-    Query: rfid_tag=xxx
-    
+
+    Метку можно передать query-параметром (?rfid_tag=xxx) или в JSON-теле
+    ({"rfid_tag": "xxx", "result": "found"}).
+
     Логика:
     1. Ищем актив по RFID-метке
-    2. Проверяем, есть ли он в инвентаризации
-    3. Если есть — отмечаем как "found"
-    4. Если нет — создаём запись и отмечаем как "missing" для остальных
+    2. Если актив есть в инвентаризации — проставляем result (found/missing)
+    3. Если актива нет в инвентаризации — фиксируем как "surplus" (лишний)
     """
+    # Метка может прийти из query или из JSON-тела
+    if not rfid_tag:
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = None
+        if isinstance(payload, dict):
+            rfid_tag = payload.get("rfid_tag") or payload.get("tag")
+            result = payload.get("result") or result
+
+    if not rfid_tag:
+        raise HTTPException(status_code=400, detail="Не указана RFID-метка (rfid_tag)")
+
+    result = (result or "found").lower()
+    if result not in ("found", "missing", "surplus"):
+        raise HTTPException(status_code=400, detail=f"Недопустимый результат: {result}")
+
     # Проверяем инвентаризацию
     inv_check = db.query(InventoryCheck).filter(
         InventoryCheck.id == inventory_id,
@@ -277,23 +301,46 @@ async def scan_rfid_for_inventory(
             "rfid_tag": rfid_tag,
             "inventory_id": inventory_id
         }
-    
+
     # Проверяем, есть ли актив в инвентаризации
     item = db.query(InventoryCheckItem).filter(
         InventoryCheckItem.inventory_check_id == inventory_id,
         InventoryCheckItem.asset_id == asset.id
     ).first()
-    
+
+    # Актива нет в списке — фиксируем как лишний (surplus)
     if not item:
+        item = InventoryCheckItem(
+            inventory_check_id=inventory_id,
+            asset_id=asset.id,
+            result="surplus",
+            comment="Найден при сканировании, не был в списке инвентаризации",
+            confirmed_at=datetime.now(),
+        )
+        db.add(item)
+        inv_check.surplus = (inv_check.surplus or 0) + 1
+        inv_check.total_checked += 1
+        asset.last_inventory_date = datetime.now()
+        asset.last_inventory_confirmed = True
+        asset.last_inventory_source = 'rfid'
+        db.commit()
+
         return {
-            "success": False,
-            "message": f"Актив '{asset.name}' (инв. {asset.inventory_number}) не включён в эту инвентаризацию",
-            "rfid_tag": rfid_tag,
-            "inventory_id": inventory_id
+            "success": True,
+            "message": "Актив не был в списке — зафиксирован как лишний (surplus)",
+            "asset_id": asset.id,
+            "inventory_number": asset.inventory_number,
+            "asset_name": asset.name,
+            "result": "surplus",
+            "is_surplus": True,
+            "inventory_id": inventory_id,
+            "found_count": inv_check.found,
+            "missing_count": inv_check.missing,
+            "surplus_count": inv_check.surplus,
         }
-    
-    # Если уже подтверждён
-    if item.result != "pending":
+
+    # Уже отмечен тем же результатом — ничего не делаем
+    if item.result == result:
         return {
             "success": True,
             "message": f"Актив уже отмечен как '{item.result}'",
@@ -301,34 +348,54 @@ async def scan_rfid_for_inventory(
             "inventory_number": asset.inventory_number,
             "asset_name": asset.name,
             "result": item.result,
-            "inventory_id": inventory_id
+            "already_marked": True,
+            "inventory_id": inventory_id,
+            "found_count": inv_check.found,
+            "missing_count": inv_check.missing,
+            "remaining": inv_check.total_checked - inv_check.found - inv_check.missing
         }
-    
-    # Отмечаем как найденный
-    item.result = "found"
+
+    # Снимаем предыдущий счётчик
+    if item.result == "found":
+        inv_check.found = max(0, inv_check.found - 1)
+    elif item.result == "missing":
+        inv_check.missing = max(0, inv_check.missing - 1)
+
+    if result == "missing":
+        item.result = "missing"
+        inv_check.missing += 1
+        asset_status = "отсутствует"
+        confirmed_flag = False
+    else:
+        item.result = "found"
+        inv_check.found += 1
+        asset_status = "найден"
+        confirmed_flag = True
+
     item.confirmed_by = None  # RFID-сканер не имеет user_id
     item.confirmed_at = datetime.now()
-    
-    inv_check.found += 1
-    
+
     # Обновляем актив
     asset.last_inventory_date = datetime.now()
-    asset.last_inventory_confirmed = True
-    
+    asset.last_inventory_confirmed = confirmed_flag
+    asset.last_inventory_source = 'rfid'
+
     db.commit()
     
     return {
         "success": True,
-        "message": "Актив найден и отмечен",
+        "message": f"Актив {asset_status} и отмечен",
         "asset_id": asset.id,
         "inventory_number": asset.inventory_number,
         "asset_name": asset.name,
         "location": asset.location_address or "",
         "responsible": asset.responsible_person or "",
         "rfid_tag": rfid_tag,
+        "result": item.result,
         "inventory_id": inventory_id,
         "found_count": inv_check.found,
         "missing_count": inv_check.missing,
+        "surplus_count": inv_check.surplus,
         "remaining": inv_check.total_checked - inv_check.found - inv_check.missing
     }
 
@@ -412,6 +479,7 @@ async def scan_rfid_batch(
         inv_check.found += 1
         asset.last_inventory_date = datetime.now()
         asset.last_inventory_confirmed = True
+        asset.last_inventory_source = 'rfid'
         
         results["found"].append({
             "rfid_tag": rfid_tag,
@@ -554,6 +622,7 @@ async def create_inventory_for_scanner(
     # Проверяем, нет ли уже активной инвентаризации для этого помещения
     existing = db.query(InventoryCheck).filter(
         InventoryCheck.status == "in_progress",
+        InventoryCheck.check_type == "by_room",
         InventoryCheck.scope_id == room_id
     ).first()
     
@@ -588,19 +657,29 @@ async def create_inventory_for_scanner(
     db.commit()  # Фиксируем инвентаризацию чтобы получить ID
     db.refresh(inv_check)
     
-    # Добавляем все активы помещения (ищем по location_address как подстрока)
+    # Добавляем все активы помещения
     from sqlalchemy import or_
     import re
     
-    room_name_pattern = re.escape(room_name)
-    assets = db.query(Asset).filter(
+    # Сначала ищем по room_id (более надёжно), затем по location_address
+    room_assets = db.query(Asset).filter(
         Asset.is_active == True,
-        or_(
-            Asset.location_address == room_name,
-            Asset.location_address.like(f"%{room_name_pattern} -%"),
-            Asset.location_address.like(f"%{room_name_pattern} ("),
-        )
+        Asset.room_id == room_id
     ).all()
+    
+    # Если по room_id ничего не найдено, ищем по location_address (старые данные)
+    if not room_assets:
+        room_name_pattern = re.escape(room_name)
+        room_assets = db.query(Asset).filter(
+            Asset.is_active == True,
+            or_(
+                Asset.location_address == room_name,
+                Asset.location_address.like(f"%{room_name_pattern} -%"),
+                Asset.location_address.like(f"%{room_name_pattern} ("),
+            )
+        ).all()
+    
+    assets = room_assets
     
     for a in assets:
         item = InventoryCheckItem(
@@ -628,44 +707,156 @@ async def create_inventory_for_scanner(
     }
 
 
-@router.get("/inventories")
-async def get_scanner_inventories(
+# ======================================================================
+# Пропуск непроверенных и пакетная синхронизация результатов
+# ======================================================================
+
+@router.post("/inventories/{inventory_id}/skip-all")
+async def skip_all_pending(
+    inventory_id: int,
+    scanner: dict = Depends(get_rfid_scanner),
+    db: Session = Depends(get_db),
+):
+    """Пометить все pending-элементы инвентаризации как отсутствующие."""
+    inv_check = db.query(InventoryCheck).filter(
+        InventoryCheck.id == inventory_id,
+        InventoryCheck.status == "in_progress"
+    ).first()
+
+    if not inv_check:
+        raise HTTPException(status_code=404, detail="Инвентаризация не найдена или не активна")
+
+    pending_items = db.query(InventoryCheckItem).filter(
+        InventoryCheckItem.inventory_check_id == inventory_id,
+        InventoryCheckItem.result == "pending",
+    ).all()
+
+    for item in pending_items:
+        item.result = "missing"
+        item.comment = "Пропущено сканером"
+        item.confirmed_at = datetime.now()
+
+    inv_check.missing += len(pending_items)
+    db.commit()
+
+    return {
+        "success": True,
+        "inventory_id": inventory_id,
+        "skipped": len(pending_items),
+        "found": inv_check.found,
+        "missing": inv_check.missing,
+        "remaining": inv_check.total_checked - inv_check.found - inv_check.missing
+    }
+
+
+@router.post("/inventories/{inventory_id}/sync")
+async def sync_scan_results(
+    inventory_id: int,
+    request: Request,
     scanner: dict = Depends(get_rfid_scanner),
     db: Session = Depends(get_db),
 ):
     """
-    Получить список активных инвентаризаций для сканера.
-    Можно выбрать существующую для продолжения или создать новую.
-    
-    Header: X-API-Key: rfid_abc123...
+    Пакетная синхронизация результатов сканирования с ТСД.
+
+    Тело: [{"rfid_tag": "...", "result": "found"|"missing"|"surplus"}, ...]
+    Позволяет дослать всё, что не удалось отправить в момент сканирования.
     """
-    inventories = db.query(InventoryCheck).options(
-        joinedload(InventoryCheck.department),
-    ).filter(
+    inv_check = db.query(InventoryCheck).filter(
+        InventoryCheck.id == inventory_id,
         InventoryCheck.status == "in_progress"
-    ).order_by(InventoryCheck.created_at.desc()).all()
-    
-    result = []
-    for inv in inventories:
-        result.append({
-            "id": inv.id,
-            "name": inv.name,
-            "check_date": inv.check_date.isoformat() if inv.check_date else None,
-            "check_type": inv.check_type,
-            "scope_name": inv.scope_name or "",
-            "status": inv.status,
-            "total_checked": inv.total_checked,
-            "found": inv.found,
-            "missing": inv.missing,
-            "started_at": inv.started_at.isoformat() if inv.started_at else None,
-            "progress_percent": round(
-                (inv.found + inv.missing) / inv.total_checked * 100, 1
-            ) if inv.total_checked > 0 else 0,
-        })
-    
+    ).first()
+
+    if not inv_check:
+        raise HTTPException(status_code=404, detail="Инвентаризация не найдена или не активна")
+
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = None
+
+    if isinstance(payload, dict):
+        payload = payload.get("results", [])
+    if not isinstance(payload, list):
+        raise HTTPException(status_code=400, detail="Ожидается JSON-массив результатов")
+
+    stats = {"found": 0, "missing": 0, "surplus": 0, "already": 0, "unknown": 0}
+
+    for entry in payload:
+        if not isinstance(entry, dict):
+            continue
+        tag = entry.get("rfid_tag") or entry.get("tag")
+        if not tag:
+            continue
+
+        res = (entry.get("result") or "found").lower()
+        if res not in ("found", "missing", "surplus"):
+            res = "found"
+
+        asset = db.query(Asset).filter(
+            Asset.rfid_tag == tag,
+            Asset.is_active == True
+        ).first()
+
+        if not asset:
+            stats["unknown"] += 1
+            continue
+
+        item = db.query(InventoryCheckItem).filter(
+            InventoryCheckItem.inventory_check_id == inventory_id,
+            InventoryCheckItem.asset_id == asset.id
+        ).first()
+
+        # Актив вне списка — лишняя находка
+        if not item:
+            db.add(InventoryCheckItem(
+                inventory_check_id=inventory_id,
+                asset_id=asset.id,
+                result="surplus",
+                comment="Найден при сканировании, не был в списке инвентаризации",
+                confirmed_at=datetime.now(),
+            ))
+            inv_check.surplus = (inv_check.surplus or 0) + 1
+            inv_check.total_checked += 1
+            asset.last_inventory_date = datetime.now()
+            asset.last_inventory_confirmed = True
+            asset.last_inventory_source = 'rfid'
+            stats["surplus"] += 1
+            continue
+
+        if item.result == res:
+            stats["already"] += 1
+            continue
+
+        if item.result == "found":
+            inv_check.found = max(0, inv_check.found - 1)
+        elif item.result == "missing":
+            inv_check.missing = max(0, inv_check.missing - 1)
+
+        item.result = res
+        item.confirmed_at = datetime.now()
+
+        if res == "missing":
+            inv_check.missing += 1
+            asset.last_inventory_confirmed = False
+            stats["missing"] += 1
+        else:
+            inv_check.found += 1
+            asset.last_inventory_confirmed = True
+            stats["found"] += 1
+
+        asset.last_inventory_date = datetime.now()
+        asset.last_inventory_source = 'rfid'
+
+    db.commit()
+
     return {
-        "inventories": result,
-        "count": len(result)
+        "success": True,
+        "inventory_id": inventory_id,
+        **stats,
+        "found": inv_check.found,
+        "missing": inv_check.missing,
+        "surplus": inv_check.surplus,
     }
 
 
@@ -897,6 +1088,133 @@ async def get_inventory_status(
         "progress_percent": round(
             (inv_check.found + inv_check.missing) / inv_check.total_checked * 100, 1
         ) if inv_check.total_checked > 0 else 0
+    }
+
+
+# ======================================================================
+# Завершение инвентаризации через RFID-сканер
+# ======================================================================
+
+@router.post("/inventories/{inventory_id}/finish")
+async def finish_inventory_check(
+    inventory_id: int,
+    skip_pending: bool = Query(True, description="Пометить непроверенные активы как пропущенные"),
+    scanner: dict = Depends(get_rfid_scanner),
+    db: Session = Depends(get_db),
+):
+    """
+    Завершить инвентаризацию через RFID-сканер.
+
+    При завершении:
+    1. Непроверенные активы помечаются как "missing" (если skip_pending=true)
+    2. Счётчики пересчитываются из элементов
+    3. У активов проставляются last_inventory_date / last_inventory_confirmed
+    4. Статус инвентаризации меняется на "completed"
+    """
+    inv_check = db.query(InventoryCheck).filter(
+        InventoryCheck.id == inventory_id
+    ).first()
+
+    if not inv_check:
+        raise HTTPException(status_code=404, detail="Инвентаризация не найдена")
+
+    # Идемпотентность: если уже завершена — возвращаем сводку без ошибки
+    if inv_check.status == "completed":
+        counts = (
+            db.query(InventoryCheckItem.result, func.count(InventoryCheckItem.id))
+            .filter(InventoryCheckItem.inventory_check_id == inventory_id)
+            .group_by(InventoryCheckItem.result)
+            .all()
+        )
+        return {
+            "success": True,
+            "inventory_id": inv_check.id,
+            "name": inv_check.name,
+            "status": "completed",
+            "already_completed": True,
+            "completed_at": inv_check.completed_at.isoformat() if inv_check.completed_at else None,
+        }
+
+    if inv_check.status == "cancelled":
+        raise HTTPException(status_code=400, detail="Нельзя завершить отменённую инвентаризацию")
+
+    skipped_count = 0
+    if skip_pending:
+        pending_items = db.query(InventoryCheckItem).filter(
+            InventoryCheckItem.inventory_check_id == inventory_id,
+            InventoryCheckItem.result == "pending",
+        ).all()
+
+        for item in pending_items:
+            item.result = "missing"
+            item.comment = "Пропущено при завершении инвентаризации"
+            item.confirmed_at = datetime.now()
+            skipped_count += 1
+
+    # Пересчёт счётчиков из элементов (надёжнее, чем накопление в переменной)
+    counts = (
+        db.query(InventoryCheckItem.result, func.count(InventoryCheckItem.id))
+        .filter(InventoryCheckItem.inventory_check_id == inventory_id)
+        .group_by(InventoryCheckItem.result)
+        .all()
+    )
+    for result_type, cnt in counts:
+        if result_type == "found":
+            inv_check.found = cnt
+        elif result_type == "missing":
+            inv_check.missing = cnt
+        elif result_type == "surplus":
+            inv_check.surplus = cnt
+
+    # Обновляем активы: проставляем дату проверки и флаг подтверждения
+    items = (
+        db.query(InventoryCheckItem)
+        .options(joinedload(InventoryCheckItem.asset))
+        .filter(InventoryCheckItem.inventory_check_id == inventory_id)
+        .all()
+    )
+    updated_count = 0
+    for item in items:
+        if item.asset:
+            item.asset.last_inventory_date = datetime.now()
+            item.asset.last_inventory_confirmed = item.result == "found"
+            item.asset.last_inventory_source = 'rfid'
+            updated_count += 1
+    logger.info(f"[finish_inventory_check] Updated last_inventory_date for {updated_count} assets in inventory {inventory_id}")
+
+    inv_check.status = "completed"
+    inv_check.completed_at = datetime.now()
+    db.commit()
+
+    # Запись в системный аудит
+    try:
+        from src.core.services.audit_service import AuditService
+        audit_service = AuditService(db)
+        audit_service.log_inventory_complete(
+            inv_check.id,
+            inv_check.name,
+            user_id=inv_check.responsible_id or inv_check.created_by,
+        )
+    except Exception as e:
+        logger.warning(f"Failed to log inventory completion to audit: {e}")
+
+    return {
+        "success": True,
+        "inventory_id": inv_check.id,
+        "name": inv_check.name,
+        "status": inv_check.status,
+        "total_checked": inv_check.total_checked,
+        "found": inv_check.found,
+        "missing": inv_check.missing,
+        "surplus": inv_check.surplus,
+        "skipped": skipped_count,
+        "completed_at": inv_check.completed_at.isoformat() if inv_check.completed_at else None,
+        "message": (
+            f"Инвентаризация завершена. "
+            f"Найдено: {inv_check.found}, "
+            f"Отсутствует: {inv_check.missing}"
+            + (f" (пропущено: {skipped_count})" if skipped_count > 0 else "")
+        )
     }
 
 

@@ -70,6 +70,9 @@ class Asset(Base):
     last_inventory_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     last_inventory_confirmed = Column(Boolean, nullable=False, default=False)
     
+    # Источник последней проверки: 'manual' (вручную) | 'rfid' (сканер)
+    last_inventory_source = Column(String(20), nullable=True)
+    
     # RFID — метка для сканера
     rfid_tag = Column(String(100), nullable=True, unique=True, index=True)
     

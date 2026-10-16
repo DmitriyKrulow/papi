@@ -39,6 +39,7 @@ def init_db():
     _ensure_document_links_table()
     _ensure_inventory_check_columns()
     _ensure_asset_inventory_columns()
+    _ensure_asset_inventory_source_column()
     _ensure_brute_force_table()
     _ensure_user_allowed_ips_column()
     _ensure_user_max_user_id_column()
@@ -118,6 +119,21 @@ def _ensure_asset_inventory_columns():
             print("Added inventory columns to assets table")
     except Exception as e:
         print(f"Could not check/add asset inventory columns: {e}")
+
+
+def _ensure_asset_inventory_source_column():
+    """Добавляет колонку last_inventory_source в assets, если её нет"""
+    from sqlalchemy import text, inspect
+    try:
+        inspector = inspect(engine)
+        columns = [c['name'] for c in inspector.get_columns('assets')]
+        if 'last_inventory_source' not in columns:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE assets ADD COLUMN last_inventory_source VARCHAR(20)"))
+                conn.commit()
+            print("Added last_inventory_source column to assets table")
+    except Exception as e:
+        print(f"Could not check/add last_inventory_source column: {e}")
 
 
 def get_or_create_admin() -> Optional[User]:

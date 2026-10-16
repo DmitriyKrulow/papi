@@ -18,6 +18,9 @@ public class Inventory
     [JsonProperty("check_type")]
     public string CheckType { get; set; } = string.Empty;
     
+    [JsonProperty("scope_id")]
+    public int ScopeId { get; set; }
+    
     [JsonProperty("scope_name")]
     public string ScopeName { get; set; } = string.Empty;
     

@@ -11,6 +11,19 @@ interface Stats {
   written_off: number;
 }
 
+interface InventoryCheckItem {
+  id: number;
+  asset_id: number;
+  inventory_number: string;
+  asset_name: string;
+  asset_type: string;
+  model: string;
+  location: string;
+  responsible: string;
+  result: 'pending' | 'found' | 'missing';
+  comment: string | null;
+}
+
 interface InventoryCheck {
   id: number;
   name: string;
@@ -19,6 +32,7 @@ interface InventoryCheck {
   found: number;
   missing: number;
   total_checked: number;
+  items?: InventoryCheckItem[];
 }
 
 const Dashboard: React.FC = () => {
@@ -297,6 +311,49 @@ const Dashboard: React.FC = () => {
                     ></div>
                   </div>
                 </div>
+
+                {/* Список активов */}
+                {activeInventory.items && activeInventory.items.length > 0 && (
+                  <div className="mt-4">
+                    <h4 className="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-2">
+                      Проверяемые активы ({activeInventory.items.length})
+                    </h4>
+                    <div className="max-h-60 overflow-y-auto space-y-1.5 pr-1 custom-scrollbar">
+                      {activeInventory.items.map((item) => (
+                        <div
+                          key={item.id}
+                          className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs transition ${
+                            item.result === 'found'
+                              ? 'border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/10'
+                              : item.result === 'missing'
+                              ? 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/10'
+                              : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50'
+                          }`}
+                        >
+                          {item.result === 'found' ? (
+                            <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
+                          ) : item.result === 'missing' ? (
+                            <Clock className="w-4 h-4 text-red-400 flex-shrink-0" />
+                          ) : (
+                            <Clock className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <span className="font-mono text-gray-500 dark:text-gray-400">
+                              {item.inventory_number}
+                            </span>
+                            <span className="ml-2 font-medium text-gray-800 dark:text-gray-200 truncate">
+                              {item.asset_name}
+                            </span>
+                          </div>
+                          <div className="flex-shrink-0 text-xs text-gray-400 dark:text-gray-500">
+                            {item.model && <span className="mr-2">{item.model}</span>}
+                            {item.location && <span>📍 {item.location}</span>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="mt-4 flex gap-2">
                   <button

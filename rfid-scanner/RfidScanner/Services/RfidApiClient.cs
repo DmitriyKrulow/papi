@@ -22,7 +22,7 @@ public class RfidApiClient
         _httpClient.Timeout = TimeSpan.FromSeconds(30);
     }
 
-    private async Task<HttpResponseMessage> SendAsync(HttpMethod method, string url, StringContent? content = null)
+    public async Task<HttpResponseMessage> SendAsync(HttpMethod method, string url, StringContent? content = null)
     {
         var fullUrl = $"{_baseUrl}{url}";
         var request = new HttpRequestMessage(method, fullUrl);
@@ -168,10 +168,105 @@ public class RfidApiClient
 
     public async Task<Dictionary<string, object>> CreateInventoryAsync(int roomId, string roomName)
     {
-        var url = $"/api/rfid/inventories?room_id={roomId}&room_name={Uri.EscapeDataString(roomName)}";
-        var response = await SendAsync(HttpMethod.Post, url);
-        var json = await response.Content.ReadAsStringAsync();
-        return JsonConvert.DeserializeObject<Dictionary<string, object>>(json) ?? new();
+        try
+        {
+            var url = $"/api/rfid/inventories?room_id={roomId}&room_name={Uri.EscapeDataString(roomName)}";
+            var response = await SendAsync(HttpMethod.Post, url);
+            var json = await response.Content.ReadAsStringAsync();
+            System.Diagnostics.Debug.WriteLine($"[API] CreateInventory response: {(int)response.StatusCode} {json}");
+
+            if (!response.IsSuccessStatusCode)
+            {
+                string detail = json;
+                try
+                {
+                    var errObj = Newtonsoft.Json.Linq.JObject.Parse(json);
+                    detail = errObj["detail"]?.ToString() ?? json;
+                }
+                catch { }
+                throw new InvalidOperationException($"Не удалось создать инвентаризацию: HTTP {(int)response.StatusCode} — {detail}");
+            }
+
+            return JsonConvert.DeserializeObject<Dictionary<string, object>>(json) ?? new();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[API] CreateInventory ERROR: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Пометить все pending-элементы инвентаризации как отсутствующие
+    /// </summary>
+    public async Task<Dictionary<string, object>> SkipAllAsync(int inventoryId)
+    {
+        try
+        {
+            var url = $"/api/rfid/inventories/{inventoryId}/skip-all";
+            System.Diagnostics.Debug.WriteLine($"[API] POST {url}");
+            var response = await SendAsync(HttpMethod.Post, url);
+            var json = await response.Content.ReadAsStringAsync();
+            System.Diagnostics.Debug.WriteLine($"[API] SkipAll response: {(int)response.StatusCode} {json}");
+
+            if (!response.IsSuccessStatusCode)
+            {
+                string detail = json;
+                try
+                {
+                    var errObj = Newtonsoft.Json.Linq.JObject.Parse(json);
+                    detail = errObj["detail"]?.ToString() ?? json;
+                }
+                catch { }
+                System.Diagnostics.Debug.WriteLine($"[API] SkipAll ERROR: {(int)response.StatusCode} {detail}");
+                return new Dictionary<string, object> { { "success", false }, { "message", $"HTTP {(int)response.StatusCode}: {detail}" } };
+            }
+
+            return JsonConvert.DeserializeObject<Dictionary<string, object>>(json) ?? new();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[API] SkipAllAsync ERROR: {ex.Message}");
+            return new Dictionary<string, object> { { "success", false }, { "message", $"Ошибка соединения: {ex.Message}" } };
+        }
+    }
+
+    /// <summary>
+    /// Пакетная отправка результатов сканирования на сервер
+    /// </summary>
+    public async Task<Dictionary<string, object>> SyncResultsAsync(int inventoryId, List<Dictionary<string, string>> results)
+    {
+        try
+        {
+            var body = JsonConvert.SerializeObject(new { results = results });
+            var content = new StringContent(body, Encoding.UTF8, "application/json");
+            var url = $"/api/rfid/inventories/{inventoryId}/sync";
+            System.Diagnostics.Debug.WriteLine($"[API] POST {url}");
+
+            var response = await SendAsync(HttpMethod.Post, url, content);
+            var json = await response.Content.ReadAsStringAsync();
+            System.Diagnostics.Debug.WriteLine($"[API] Sync response: {(int)response.StatusCode} {json}");
+
+            if (!response.IsSuccessStatusCode)
+            {
+                string detail = json;
+                try
+                {
+                    var errObj = Newtonsoft.Json.Linq.JObject.Parse(json);
+                    detail = errObj["detail"]?.ToString() ?? json;
+                }
+                catch { }
+                System.Diagnostics.Debug.WriteLine($"[API] Sync ERROR: {(int)response.StatusCode} {detail}");
+                return new Dictionary<string, object> { { "success", false }, { "message", $"HTTP {(int)response.StatusCode}: {detail}" } };
+            }
+
+            return JsonConvert.DeserializeObject<Dictionary<string, object>>(json) ?? new();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[API] SyncResultsAsync ERROR: {ex.Message}");
+            return new Dictionary<string, object> { { "success", false }, { "message", $"Ошибка соединения: {ex.Message}" } };
+        }
     }
 
     // ==================== Помещения ====================
@@ -235,27 +330,107 @@ public class RfidApiClient
 
     // ==================== Сканер ====================
 
-    public async Task<ScanResult> ScanAsync(int inventoryId, string rfidTag)
+    public async Task<ScanResult> ScanAsync(int inventoryId, string rfidTag, string result = "found")
     {
         try
         {
-            var body = JsonConvert.SerializeObject(new { rfid_tag = rfidTag });
-            var content = new StringContent(body, Encoding.UTF8, "application/json");
-            var response = await SendAsync(HttpMethod.Post, $"/api/rfid/inventories/{inventoryId}/scan", content);
-            response.EnsureSuccessStatusCode();
+            var url = $"/api/rfid/inventories/{inventoryId}/scan?rfid_tag={Uri.EscapeDataString(rfidTag)}&result={result}";
+            System.Diagnostics.Debug.WriteLine($"[API] POST {url}");
+            var response = await SendAsync(HttpMethod.Post, url);
             var json = await response.Content.ReadAsStringAsync();
-            var result = JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
-            return new ScanResult { Success = result != null && result.ContainsKey("success") && result["success"].ToString() == "True" };
+            System.Diagnostics.Debug.WriteLine($"[API] Scan response: {(int)response.StatusCode} {json}");
+
+            if (!response.IsSuccessStatusCode)
+            {
+                string detail = json;
+                try
+                {
+                    var errObj = Newtonsoft.Json.Linq.JObject.Parse(json);
+                    detail = errObj["detail"]?.ToString() ?? json;
+                }
+                catch { }
+                System.Diagnostics.Debug.WriteLine($"[API] Scan ERROR: {(int)response.StatusCode} {detail}");
+                return new ScanResult { Success = false, Message = $"HTTP {(int)response.StatusCode}: {detail}" };
+            }
+            
+            var resultObj = JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
+            bool success = resultObj != null
+                           && resultObj.TryGetValue("success", out var s)
+                           && (s is bool b ? b : string.Equals(s?.ToString(), "True", StringComparison.OrdinalIgnoreCase));
+            
+            string message = "";
+            bool isSurplus = false;
+            if (resultObj != null)
+            {
+                if (resultObj.TryGetValue("message", out var m))
+                    message = m?.ToString() ?? "";
+                if (resultObj.TryGetValue("is_surplus", out var sur))
+                    isSurplus = sur is bool sb ? sb : string.Equals(sur?.ToString(), "True", StringComparison.OrdinalIgnoreCase);
+            }
+            
+            return new ScanResult
+            {
+                Success = success,
+                Message = message,
+                IsSurplus = isSurplus,
+            };
         }
-        catch
+        catch (Exception ex)
         {
-            return new ScanResult { Success = false };
+            System.Diagnostics.Debug.WriteLine($"[API] ScanAsync ERROR: {ex.Message}");
+            return new ScanResult { Success = false, Message = $"Ошибка соединения: {ex.Message}" };
         }
     }
 
     public class ScanResult
     {
         public bool Success { get; set; }
+        public string Message { get; set; } = string.Empty;
+        public bool IsSurplus { get; set; }
+    }
+
+    // ==================== Завершение инвентаризации ====================
+
+    public async Task<Dictionary<string, object>> FinishInventoryAsync(int inventoryId, bool skipPending = true)
+    {
+        try
+        {
+            var url = $"/api/rfid/inventories/{inventoryId}/finish?skip_pending={(skipPending ? "true" : "false")}";
+            System.Diagnostics.Debug.WriteLine($"[API] POST {url}");
+            
+            var response = await SendAsync(HttpMethod.Post, url);
+            var json = await response.Content.ReadAsStringAsync();
+            System.Diagnostics.Debug.WriteLine($"[API] Finish response: {(int)response.StatusCode} {json}");
+            
+            if (!response.IsSuccessStatusCode)
+            {
+                // Пытаемся извлечь detail из ответа FastAPI
+                string detail = json;
+                try
+                {
+                    var errObj = Newtonsoft.Json.Linq.JObject.Parse(json);
+                    detail = errObj["detail"]?.ToString() ?? json;
+                }
+                catch { }
+                return new Dictionary<string, object>
+                {
+                    { "success", false },
+                    { "message", $"HTTP {(int)response.StatusCode}: {detail}" }
+                };
+            }
+            
+            var result = JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
+            return result ?? new();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[API] FinishInventoryAsync ERROR: {ex.Message}");
+            return new Dictionary<string, object>
+            {
+                { "success", false },
+                { "message", $"Ошибка соединения: {ex.Message}" }
+            };
+        }
     }
 
     public async Task<bool> AuthenticateAsync(string apiKey)

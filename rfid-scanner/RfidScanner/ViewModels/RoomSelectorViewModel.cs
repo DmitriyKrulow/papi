@@ -98,10 +98,15 @@ public class RoomSelectorViewModel : INotifyPropertyChanged
         private set => SetProperty(ref _statusMessage, value);
     }
 
+    /// <summary>
+    /// true — показывать список инвентаризаций (кнопка "Продолжить"),
+    /// false — показывать помещения (кнопка "Начать инвентаризацию").
+    /// Устанавливается ТОЛЬКО выбранной вкладкой через SetShowInventoriesList.
+    /// </summary>
     public bool ShowInventories
     {
         get => _showInventories;
-        set => SetProperty(ref _showInventories, value);
+        private set => SetProperty(ref _showInventories, value);
     }
 
     public ScanSession? CurrentSession
@@ -122,12 +127,63 @@ public class RoomSelectorViewModel : INotifyPropertyChanged
     public ICommand ContinueInventoryCommand => new RelayCommand(ContinueInventory);
 
     public event Action? RoomsLoaded;
+    
+    /// <summary>
+    /// Установить режим отображения (определяется выбранной вкладкой)
+    /// </summary>
+    public void SetShowInventoriesList(bool value)
+    {
+        if (SetProperty(ref _showInventories, value))
+        {
+            System.Diagnostics.Debug.WriteLine($"[SetShowInventoriesList] Now: {value}");
+        }
+    }
+    
+    /// <summary>
+    /// Перезагрузка всех данных (вызывается при входе в режим выбора)
+    /// НЕ меняет ShowInventories — это определяет выбранная вкладка
+    /// </summary>
+    public async void RefreshOnEnter()
+    {
+        System.Diagnostics.Debug.WriteLine("[RefreshOnEnter] START");
+        try
+        {
+            await LoadInventoriesAsync();
+            await LoadRoomsAsync();
+            System.Diagnostics.Debug.WriteLine($"[RefreshOnEnter] DONE: Inventories={Inventories.Count}, Rooms={Rooms.Count}");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[RefreshOnEnter] ERROR: {ex.GetType().Name}: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"[RefreshOnEnter] StackTrace: {ex.StackTrace}");
+            StatusMessage = $"⚠ Не удалось обновить данные: {ex.Message}";
+        }
+    }
 
-    private async void LoadRooms()
+    /// <summary>
+    /// Обновить только список инвентаризаций
+    /// </summary>
+    public async void RefreshInventories()
+    {
+        try
+        {
+            await LoadInventoriesAsync();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[RefreshInventories] ERROR: {ex.Message}");
+            StatusMessage = $"⚠ Не удалось обновить список: {ex.Message}";
+        }
+    }
+
+    private void LoadRooms() => _ = LoadRoomsAsync();
+    private void LoadInventories() => _ = LoadInventoriesAsync();
+
+    private async Task LoadRoomsAsync()
     {
         IsLoading = true;
         StatusMessage = "Загрузка помещений...";
-        ShowInventories = false;
+        // ShowInventories НЕ трогаем — его задаёт выбранная вкладка
 
         try
         {
@@ -152,11 +208,11 @@ public class RoomSelectorViewModel : INotifyPropertyChanged
         }
     }
 
-    private async void LoadInventories()
+    private async Task LoadInventoriesAsync()
     {
         IsLoading = true;
         StatusMessage = "Загрузка инвентаризаций...";
-        ShowInventories = true;
+        // ShowInventories НЕ трогаем — его задаёт выбранная вкладка
 
         try
         {
@@ -168,6 +224,8 @@ public class RoomSelectorViewModel : INotifyPropertyChanged
             StatusMessage = inventories.Count > 0 
                 ? $"✅ Найдено {inventories.Count} активных инвентаризаций" 
                 : "⚠ Нет активных инвентаризаций";
+            
+            System.Diagnostics.Debug.WriteLine($"[LoadInventoriesAsync] Loaded {inventories.Count} inventories");
         }
         catch (Exception ex)
         {
@@ -202,12 +260,19 @@ public class RoomSelectorViewModel : INotifyPropertyChanged
 
     private async void StartInventory()
     {
+        if (_isInventoryInProgress)
+        {
+            System.Diagnostics.Debug.WriteLine("[StartInventory] SKIPPED: Already in progress");
+            return;
+        }
+
         if (SelectedRoom == null)
         {
             StatusMessage = "⚠ Выберите помещение";
             return;
         }
 
+        _isInventoryInProgress = true;
         IsLoading = true;
         StatusMessage = $"Создание инвентаризации для {SelectedRoom.Name}...";
 
@@ -220,28 +285,50 @@ public class RoomSelectorViewModel : INotifyPropertyChanged
             if (result.ContainsKey("id"))
                 inventoryId = Convert.ToInt32(result["id"]);
 
-            // Создаём локальную сессию
-            _sessionManager.CreateSession(SelectedRoom.Name, SelectedRoom.Id, inventoryId);
+            if (inventoryId == 0)
+            {
+                StatusMessage = "⚠ Не удалось создать инвентаризацию на сервере";
+                System.Diagnostics.Debug.WriteLine($"[StartInventory] ERROR: inventoryId=0, result keys: {string.Join(", ", result.Keys)}");
+                return;
+            }
+
+            // Загружаем активы из созданной инвентаризации (те же, что сервер добавил)
+            var inventoryItems = await _apiClient.GetInventoryAssetsAsync(inventoryId);
+            
+            System.Diagnostics.Debug.WriteLine($"[StartInventory] Got {inventoryItems.Count} items from server for room {SelectedRoom.Name}");
+
+            // Конвертируем InventoryItem в Asset для кэша
+            var assets = inventoryItems.Select(item => new Asset
+            {
+                RfidTag = item.RfidTag,
+                Name = item.Name,
+                InventoryNumber = item.InventoryNumber
+            }).ToList();
+            
+            System.Diagnostics.Debug.WriteLine($"[StartInventory] Converted to {assets.Count} Assets");
+
+            // Создаём локальную сессию с активами
+            _sessionManager.CreateSession(SelectedRoom.Name, SelectedRoom.Id, inventoryId, assets);
             
             // Логируем начало
             _audit.Log(AuditAction.SessionStart, 
                 roomName: SelectedRoom.Name,
-                details: $"Инвентаризация создана: {SelectedRoom.Name}");
+                details: $"Инвентаризация создана: {SelectedRoom.Name} с {assets.Count} активами");
             
-            StatusMessage = $"✅ Инвентаризация создана: {SelectedRoom.Name}";
+            StatusMessage = $"✅ Инвентаризация создана: {SelectedRoom.Name} ({assets.Count} активов)";
             
             // SessionManager.CreateSession уже вызвал SessionChanged → OnSessionCreated
             IsScanning = true;
-            _isInventoryInProgress = false;
         }
         catch (Exception ex)
         {
             StatusMessage = $"⚠ Ошибка: {ex.Message}";
-            _isInventoryInProgress = false;
+            System.Diagnostics.Debug.WriteLine($"[StartInventory] ERROR: {ex.GetType().Name}: {ex.Message}");
         }
         finally
         {
             IsLoading = false;
+            _isInventoryInProgress = false;
         }
     }
 
@@ -271,13 +358,39 @@ public class RoomSelectorViewModel : INotifyPropertyChanged
         try
         {
             // Загружаем активы инвентаризации
-            System.Diagnostics.Debug.WriteLine($"[ContinueInventory] Calling API: /api/rfid/inventories/{SelectedInventory.Id}");
+            System.Diagnostics.Debug.WriteLine($"[ContinueInventory] Calling API: /api/rfid/inventories/{SelectedInventory.Id}/assets");
             var assets = await _apiClient.GetInventoryAssetsAsync(SelectedInventory.Id);
             
             System.Diagnostics.Debug.WriteLine($"[ContinueInventory] Got {assets.Count} assets");
             
-            // Создаём локальную сессию
-            _sessionManager.CreateSession(SelectedInventory.Name, 0, SelectedInventory.Id);
+            // Используем scope_id из инвентаризации (надёжно)
+            int roomId = SelectedInventory.ScopeId;
+            
+            // Fallback: если scope_id=0, пробуем распарсить из location первого актива
+            if (roomId == 0 && assets.Count > 0 && !string.IsNullOrEmpty(assets[0].Location))
+            {
+                var parts = assets[0].Location.Split(new[] { " - " }, StringSplitOptions.None);
+                if (parts.Length >= 2)
+                {
+                    int.TryParse(parts[1], out roomId);
+                }
+            }
+            
+            System.Diagnostics.Debug.WriteLine($"[ContinueInventory] Using roomId={roomId}");
+            
+            // Конвертируем InventoryItem в Asset для кэша
+            var assetList = assets.Select(item => new Asset
+            {
+                RfidTag = item.RfidTag,
+                Name = item.Name,
+                InventoryNumber = item.InventoryNumber
+            }).ToList();
+            
+            System.Diagnostics.Debug.WriteLine($"[ContinueInventory] Converted to {assetList.Count} Assets");
+            
+            // Создаём локальную сессию с активами
+            _sessionManager.CreateSession(SelectedInventory.Name, roomId, SelectedInventory.Id, assetList);
+            System.Diagnostics.Debug.WriteLine($"[ContinueInventory] Session created: Id={_sessionManager.CurrentSession?.Id}, State={_sessionManager.CurrentSession?.State}");
             
             // Логируем продолжение
             _audit.Log(AuditAction.SessionStart, 

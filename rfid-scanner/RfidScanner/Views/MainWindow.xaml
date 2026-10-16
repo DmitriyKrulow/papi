@@ -3,8 +3,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:RfidScanner.ViewModels"
         xmlns:views="clr-namespace:RfidScanner.Views"
-        Title="PAPI RFID Scanner" Height="580" Width="900"
-        MinHeight="500" MinWidth="700"
+        Title="PAPI RFID Scanner" Height="820" Width="1000"
+        MinHeight="660" MinWidth="760"
         WindowStartupLocation="CenterScreen">
     
     <Window.Resources>
@@ -60,9 +60,10 @@
         <TabControl x:Name="TabControl" Grid.Row="1" Margin="10" SelectionChanged="TabControl_SelectionChanged">
             <!-- Режим Инвентаризация -->
             <TabItem Header="📋 Инвентаризация" FontSize="16" x:Name="InventoryTab">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                    <ContentControl x:Name="RoomSelectorHost"/>
-                </ScrollViewer>
+                <Grid>
+                    <views:RoomSelectorView x:Name="RoomSelectorHostView" Visibility="Visible"/>
+                    <views:ScanView x:Name="ScanHostView" Visibility="Collapsed"/>
+                </Grid>
             </TabItem>
 
             <!-- Режим Поиск -->

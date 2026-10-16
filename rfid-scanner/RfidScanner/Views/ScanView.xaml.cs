@@ -22,28 +22,18 @@ public partial class ScanView : UserControl
     
     private void ScanView_Loaded(object sender, RoutedEventArgs e)
     {
-        if (_isInitialized || _viewModel == null) return;
-        _isInitialized = true;
-        
-        try
-        {
-            InitializeViewModel();
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"[ScanView_Loaded] ERROR: {ex.Message}");
-        }
+        // Инициализация теперь происходит в Initialize(), этот метод больше не нужен
+        // Оставляем для совместимости
     }
 
     public void Initialize(ScanViewModel viewModel)
     {
         _viewModel = viewModel;
         DataContext = viewModel;
-        // Инициализация произойдёт в Loaded
-    }
-    
-    private void InitializeViewModel()
-    {
+        
+        // Подписываемся на событие обновления результатов
+        _viewModel.ResultsUpdated += UpdateResultsList;
+        
         // Подписываемся на события изменения свойств для обновления UI
         _viewModel.PropertyChanged += (s, e) =>
         {
@@ -70,8 +60,30 @@ public partial class ScanView : UserControl
         // Обновляем имя помещения
         RoomNameText.Text = $"🏢 Помещение: {_viewModel!.SessionRoomName}";
         
+        // ВРУЧНУЮ обновляем UI текущими значениями (потому что TotalCount мог установиться ДО подписки)
+        MatchedCountText.Text = _viewModel.MatchedCount.ToString();
+        ExtraCountText.Text = _viewModel.ExtraCount.ToString();
+        MissingCountText.Text = _viewModel.MissingCount.ToString();
+        TotalCountText.Text = _viewModel.TotalCount.ToString();
+        StatusText.Text = _viewModel.StatusText;
+        LastTagText.Text = string.IsNullOrEmpty(_viewModel.LastTag) ? "—" : _viewModel.LastTag;
+        
+        // Привязываем список активов помещения
+        RoomAssetsList.ItemsSource = _viewModel.RoomAssets;
+        TotalAssetsText.Text = _viewModel.RoomAssets.Count.ToString();
+        EmptyAssetsText.Visibility = _viewModel.RoomAssets.Count > 0 ? Visibility.Collapsed : Visibility.Visible;
+        
+        // Подписываемся на изменение количества активов (ObservableCollection не вызывает PropertyChanged при добавлении)
+        _viewModel.RoomAssets.CollectionChanged += (s, e) =>
+        {
+            TotalAssetsText.Text = _viewModel.RoomAssets.Count.ToString();
+            EmptyAssetsText.Visibility = _viewModel.RoomAssets.Count > 0 ? Visibility.Collapsed : Visibility.Visible;
+        };
+        
         // Обновляем прогресс
         UpdateProgress();
+        
+        System.Diagnostics.Debug.WriteLine($"[ScanView.Initialize] UI updated: TotalCount={_viewModel.TotalCount}, RoomAssets={_viewModel.RoomAssets.Count}, Matched={_viewModel.MatchedCount}");
     }
     
     private void UpdateProgress()
@@ -84,17 +96,20 @@ public partial class ScanView : UserControl
     
     private void UpdateResultsList()
     {
+        System.Diagnostics.Debug.WriteLine($"[UpdateResultsList] Called, viewModel={_viewModel != null}, AllResults={_viewModel?.AllResults.Count ?? 0}");
         if (_viewModel == null) return;
         
         ResultsList.Items.Clear();
         
         // Добавляем последние 50 результатов
         var results = _viewModel.AllResults.ToList();
+        System.Diagnostics.Debug.WriteLine($"[UpdateResultsList] Adding {results.Count} results to ListView");
         var start = Math.Max(0, results.Count - 50);
         for (int i = start; i < results.Count; i++)
         {
             ResultsList.Items.Add(results[i]);
         }
+        System.Diagnostics.Debug.WriteLine($"[UpdateResultsList] ListView Items count: {ResultsList.Items.Count}");
     }
 
     private void PauseButton_Click(object sender, RoutedEventArgs e)
@@ -113,6 +128,34 @@ public partial class ScanView : UserControl
             PauseButton.Content = "⏸ Пауза";
             StatusText.Text = "🔄 Сканирование продолжено";
         }
+    }
+
+    private void SkipUncheckedButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_viewModel == null) return;
+        
+        var uncheckedCount = _viewModel.RoomAssets.Count(i => !i.IsChecked);
+        
+        if (uncheckedCount == 0)
+        {
+            StatusText.Text = "✅ Все активы проверены";
+            return;
+        }
+        
+        if (MessageBox.Show(
+            $"Пропустить {uncheckedCount} непроверенных активов?\n\n" +
+            $"Они будут помечены как отсутствующие в инвентаризации.\n\n" +
+            $"Найдено: {_viewModel.MatchedCount}\n" +
+            $"Пропущено: {_viewModel.MissingCount}\n" +
+            $"Осталось проверить: {uncheckedCount}",
+            "Пропуск непроверенных",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question) == MessageBoxResult.No)
+        {
+            return;
+        }
+        
+        _viewModel.SkipAllUnchecked();
     }
 
     private void ContinueButton_Click(object sender, RoutedEventArgs e)

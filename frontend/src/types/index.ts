@@ -68,6 +68,7 @@ export interface Asset {
   last_inventory_date?: string;
   last_inventory_by_id?: number;
   last_inventory_confirmed?: boolean;
+  last_inventory_source?: 'manual' | 'rfid';
   // RFID
   rfid_tag?: string;
   // Адрес хранения

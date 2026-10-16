@@ -190,13 +190,31 @@ async def get_active_inventory_check(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Получить текущую активную инвентаризацию (если есть)"""
-    active_check = db.query(InventoryCheck).filter(
+    """Получить текущую активную инвентаризацию (если есть) со списком активов"""
+    active_check = db.query(InventoryCheck).options(
+        joinedload(InventoryCheck.items).joinedload(InventoryCheckItem.asset),
+    ).filter(
         InventoryCheck.status == "in_progress"
     ).order_by(InventoryCheck.created_at.desc()).first()
 
     if not active_check:
         return JSONResponse(content=None)
+
+    items_list = []
+    for item in active_check.items:
+        a = item.asset
+        items_list.append({
+            "id": item.id,
+            "asset_id": item.asset_id,
+            "inventory_number": safe_str(a.inventory_number),
+            "asset_name": safe_str(a.name),
+            "asset_type": safe_str(a.asset_type),
+            "model": safe_str(a.model),
+            "location": safe_str(a.location_address),
+            "responsible": safe_str(a.responsible_person),
+            "result": item.result,
+            "comment": item.comment,
+        })
 
     return JSONResponse(content={
         "id": active_check.id,
@@ -206,6 +224,7 @@ async def get_active_inventory_check(
         "found": active_check.found,
         "missing": active_check.missing,
         "total_checked": active_check.total_checked,
+        "items": items_list,
     })
 
 
@@ -520,6 +539,7 @@ async def confirm_asset(
         asset.last_inventory_date = datetime.now()
         asset.last_inventory_by_id = current_user.id
         asset.last_inventory_confirmed = found
+        asset.last_inventory_source = 'manual'
 
     db.commit()
 
@@ -536,6 +556,7 @@ async def confirm_asset(
 @router.post("/{check_id}/complete")
 async def complete_inventory_check(
     check_id: int,
+    skip_pending: bool = Query(True, description="Пометить непроверенные активы как отсутствующие"),
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin),
 ):
@@ -546,6 +567,22 @@ async def complete_inventory_check(
 
     if inv_check.status != "in_progress":
         raise HTTPException(status_code=400, detail="Инвентаризация не в процессе или уже завершена")
+
+    # Помечаем непроверенные активы как отсутствующие
+    skipped_count = 0
+    if skip_pending:
+        pending_items = db.query(InventoryCheckItem).filter(
+            InventoryCheckItem.inventory_check_id == check_id,
+            InventoryCheckItem.result == "pending",
+        ).all()
+
+        for item in pending_items:
+            item.result = "missing"
+            item.comment = "Пропущено при завершении инвентаризации"
+            item.confirmed_at = datetime.now()
+            skipped_count += 1
+
+        inv_check.missing += skipped_count
 
     inv_check.status = "completed"
     inv_check.completed_at = datetime.now()
@@ -584,6 +621,7 @@ async def complete_inventory_check(
         "total": inv_check.total_checked,
         "found": inv_check.found,
         "missing": inv_check.missing,
+        "skipped": skipped_count,
         "accuracy": f"{(inv_check.found / inv_check.total_checked * 100):.1f}%" if inv_check.total_checked > 0 else "0%",
     })
 
@@ -831,6 +869,7 @@ async def scan_qr_for_inventory(
     asset.last_inventory_date = datetime.now()
     asset.last_inventory_by_id = current_user.id
     asset.last_inventory_confirmed = found
+    asset.last_inventory_source = 'manual'
     
     db.commit()
     

@@ -95,7 +95,7 @@ public class OfflineQueueService
         return pending.Count;
     }
 
-    private void MarkAsSynced(List<OfflineQueueItem> items)
+    public void MarkAsSynced(List<OfflineQueueItem> items)
     {
         lock (_lock)
         {

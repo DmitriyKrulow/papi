@@ -459,6 +459,29 @@ return (
               </div>
             </div>
           </div>
+
+          {/* Источник проверки */}
+          {asset.last_inventory_date && (
+            <div className="p-3 rounded-lg border border-gray-200 dark:border-gray-600">
+              <div className="flex items-center gap-2">
+                {asset.last_inventory_source === 'rfid' ? (
+                  <Radio className="w-5 h-5 text-blue-500" />
+                ) : (
+                  <User className="w-5 h-5 text-green-500" />
+                )}
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Источник</p>
+                  <p className={`text-sm font-medium ${
+                    asset.last_inventory_source === 'rfid'
+                      ? 'text-blue-700 dark:text-blue-300'
+                      : 'text-green-700 dark:text-green-300'
+                  }`}>
+                    {asset.last_inventory_source === 'rfid' ? 'RFID-сканер' : 'Ручная проверка'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -695,6 +718,7 @@ return (
               printRow('Статус', asset.last_inventory_confirmed ? 'Подтверждён' : asset.last_inventory_date ? 'Ожидает' : 'Не проверен'),
               printRow('Дата проверки', asset.last_inventory_date ? formatDate(asset.last_inventory_date) : undefined),
               printRow('Проверял (ID)', asset.last_inventory_by_id != null ? String(asset.last_inventory_by_id) : undefined),
+              printRow('Источник', asset.last_inventory_source === 'rfid' ? 'RFID-сканер' : asset.last_inventory_source === 'manual' ? 'Ручная проверка' : undefined),
             ])}
 
             {printPhotos.length > 0 && (

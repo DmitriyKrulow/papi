@@ -30,7 +30,7 @@
                 </Grid.RowDefinitions>
 
                 <!-- Табы -->
-                <TabControl Grid.Row="0" Margin="0,0,0,10" Background="Transparent" BorderThickness="0">
+                <TabControl Grid.Row="1" Margin="0,0,0,10" Background="Transparent" BorderThickness="0">
                     <TabControl.ItemContainerStyle>
                         <Style TargetType="TabItem">
                             <Setter Property="Template">
@@ -56,7 +56,7 @@
                         </Style>
                     </TabControl.ItemContainerStyle>
                     <TabItem Header="🏢 Помещения" IsSelected="True" x:Name="RoomsTab">
-                        <Border Padding="15" Background="White" MaxHeight="500">
+                        <Border Padding="15" Background="White">
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
@@ -138,11 +138,6 @@
                         </Border>
                     </TabItem>
                     <TabItem Header="📦 Инвентаризации" x:Name="InventoriesTab">
-                        <TabItem.Style>
-                            <Style TargetType="TabItem">
-                                <Setter Property="MaxHeight" Value="550"/>
-                            </Style>
-                        </TabItem.Style>
                         <Border Padding="15" Background="White">
                             <Grid>
                                 <Grid.RowDefinitions>
@@ -271,7 +266,7 @@
                             Background="#2196F3" Foreground="White"
                             FontSize="14" Padding="20,10"
                             Width="180" Height="42"
-                            IsEnabled="{Binding !IsLoading}"
+                            IsEnabled="{Binding IsLoading, Converter={StaticResource InverseBooleanConverter}}"
                             Visibility="{Binding ShowInventories, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <Button.Style>
                             <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">

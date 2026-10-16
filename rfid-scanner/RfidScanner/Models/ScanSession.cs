@@ -44,6 +44,9 @@ public class ScanSession
     public List<ScanResultItem> Results { get; set; } = new();
     public HashSet<string> SeenTags { get; set; } = new();
 
+    // Ожидаемые активы (для локального кэша)
+    public List<Asset>? PendingAssets { get; set; }
+
     // Статистика
     public int TotalScanned => Results.Count;
     public int MatchedCount => Results.Count(r => r.Status == ScanAssetStatus.Matched);

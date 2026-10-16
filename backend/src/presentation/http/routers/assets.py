@@ -120,6 +120,7 @@ def asset_to_dict(asset, db: Optional[Session] = None):
         "last_inventory_date": safe_isoformat(getattr(asset, 'last_inventory_date', None)),
         "last_inventory_by_id": getattr(asset, 'last_inventory_by_id', None),
         "last_inventory_confirmed": getattr(asset, 'last_inventory_confirmed', False),
+        "last_inventory_source": getattr(asset, 'last_inventory_source', None),
     }
 
 

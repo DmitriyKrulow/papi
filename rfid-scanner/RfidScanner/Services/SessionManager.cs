@@ -27,13 +27,14 @@ public class SessionManager
         _audit = audit;
     }
 
-    public void CreateSession(string roomName, int roomId, int inventoryId = 0)
+    public void CreateSession(string roomName, int roomId, int inventoryId = 0, List<Asset>? pendingAssets = null)
     {
         _currentSession = new ScanSession
         {
             RoomName = roomName,
             RoomId = roomId,
-            InventoryId = inventoryId
+            InventoryId = inventoryId,
+            PendingAssets = pendingAssets
         };
         SessionChanged?.Invoke(_currentSession);
         _audit.Log(AuditAction.SessionStart, sessionId: _currentSession.Id, roomName: roomName, 
@@ -61,7 +62,9 @@ public class SessionManager
 
     public void FinishSession()
     {
+        System.Diagnostics.Debug.WriteLine($"[SessionManager.FinishSession] BEFORE: State={_currentSession?.State}, HasActiveSession={HasActiveSession}");
         _currentSession?.Finish();
+        System.Diagnostics.Debug.WriteLine($"[SessionManager.FinishSession] AFTER: State={_currentSession?.State}, HasActiveSession={HasActiveSession}");
         SessionChanged?.Invoke(_currentSession!);
         _audit.Log(AuditAction.SessionFinish, sessionId: _currentSession?.Id, 
             roomName: _currentSession?.RoomName, 
@@ -86,6 +89,8 @@ public class SessionManager
         if (_currentSession.SeenTags.Contains(rfidTag))
             return; // Дубликат
 
+        System.Diagnostics.Debug.WriteLine($"[SessionManager.AddTag] Adding: Tag='{rfidTag}', Status={status}, Name='{assetName}'");
+        
         _currentSession.SeenTags.Add(rfidTag);
         
         var result = new ScanResultItem
@@ -97,6 +102,8 @@ public class SessionManager
         };
 
         _currentSession.Results.Add(result);
+        System.Diagnostics.Debug.WriteLine($"[SessionManager.AddTag] Results count now: {_currentSession.Results.Count}");
+        
         TagScanned?.Invoke(rfidTag);
         SessionChanged?.Invoke(_currentSession);
         
