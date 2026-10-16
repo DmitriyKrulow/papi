@@ -110,6 +110,12 @@ public partial class ScanView : UserControl
             ResultsList.Items.Add(results[i]);
         }
         System.Diagnostics.Debug.WriteLine($"[UpdateResultsList] ListView Items count: {ResultsList.Items.Count}");
+        
+        // Автопрокрутка к последнему результату
+        if (ResultsList.Items.Count > 0)
+        {
+            ResultsList.ScrollIntoView(ResultsList.Items[ResultsList.Items.Count - 1]);
+        }
     }
 
     private void PauseButton_Click(object sender, RoutedEventArgs e)

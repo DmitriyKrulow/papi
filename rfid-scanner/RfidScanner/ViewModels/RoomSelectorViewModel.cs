@@ -123,8 +123,8 @@ public class RoomSelectorViewModel : INotifyPropertyChanged
 
     public ICommand LoadRoomsCommand => new RelayCommand(LoadRooms);
     public ICommand LoadInventoriesCommand => new RelayCommand(LoadInventories);
-    public ICommand StartInventoryCommand => new RelayCommand(StartInventory);
-    public ICommand ContinueInventoryCommand => new RelayCommand(ContinueInventory);
+    public IAsyncRelayCommand StartInventoryCommand => new AsyncRelayCommand(StartInventory, () => !_isInventoryInProgress);
+    public IAsyncRelayCommand ContinueInventoryCommand => new AsyncRelayCommand(ContinueInventory, () => !_isInventoryInProgress);
 
     public event Action? RoomsLoaded;
     
@@ -258,7 +258,7 @@ public class RoomSelectorViewModel : INotifyPropertyChanged
         };
     }
 
-    private async void StartInventory()
+    private async Task StartInventory()
     {
         if (_isInventoryInProgress)
         {
@@ -332,7 +332,7 @@ public class RoomSelectorViewModel : INotifyPropertyChanged
         }
     }
 
-    private async void ContinueInventory()
+    private async Task ContinueInventory()
     {
         // Блокировка от повторных вызовов
         if (_isInventoryInProgress)

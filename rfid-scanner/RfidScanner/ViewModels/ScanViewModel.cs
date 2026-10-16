@@ -40,6 +40,10 @@ public class ScanViewModel : INotifyPropertyChanged
     private bool _isPaused;
     private bool _isFinished;
     private string _syncStatus = "Готово к работе";
+    private bool _isOnline = true;
+    private string _networkIndicatorColor = "#4CAF50"; // Green by default
+    private DateTime _lastDialogTime = DateTime.MinValue;
+    private bool _isDialogShowing = false;
     private int _pendingSyncCount;
     private string _sessionRoomName = "Помещение не выбрано";
     private string _hintText = "💡 Поднесите RFID-сканер на 1-3 см к метке и дождитесь сигнала";
@@ -51,6 +55,7 @@ public class ScanViewModel : INotifyPropertyChanged
     private ScanResultItem? _selectedResult;
     private int _readErrorCount; // Счётчик ошибок считывания подряд
     private string _currentUser = "Пользователь";
+    private bool _autoConfirm;
 
     public ScanViewModel(SessionManager sessionManager, SilentModeService silentMode, 
         RfidApiClient apiClient, LocalStoreService localStore, AssetCacheService assetCache,
@@ -381,6 +386,30 @@ public class ScanViewModel : INotifyPropertyChanged
         private set => SetProperty(ref _pendingSyncCount, value);
     }
 
+    public string NetworkIndicatorColor
+    {
+        get => _networkIndicatorColor;
+        private set => SetProperty(ref _networkIndicatorColor, value);
+    }
+
+    public bool IsOnline
+    {
+        get => _isOnline;
+        private set
+        {
+            if (SetProperty(ref _isOnline, value))
+            {
+                NetworkIndicatorColor = value ? "#4CAF50" : "#F44336"; // Green or Red
+            }
+        }
+    }
+
+    public bool IsDialogShowing
+    {
+        get => _isDialogShowing;
+        private set => SetProperty(ref _isDialogShowing, value);
+    }
+
     public bool IsPaused
     {
         get => _isPaused;
@@ -416,6 +445,12 @@ public class ScanViewModel : INotifyPropertyChanged
     public bool CanExportReports => _roleService.CanExportReports();
 
     public bool CanManageRooms => _roleService.CanManageRooms();
+
+    public bool AutoConfirm
+    {
+        get => _autoConfirm;
+        set => SetProperty(ref _autoConfirm, value);
+    }
 
     // ==================== Команды ====================
 
@@ -455,29 +490,69 @@ public class ScanViewModel : INotifyPropertyChanged
 
     /// <summary>
     /// Показать диалог подтверждения (для Matched активов)
+    /// Если включено AutoConfirm — пропускает диалог
+    /// Debounce: не показывать чаще 2 секунд
     /// </summary>
     private void ShowConfirmationDialog(string rfidTag, string assetName, string inventoryNumber)
     {
+        if (_autoConfirm)
+        {
+            // Автоподтверждение — сразу отмечаем без диалога
+            _sessionManager.AddTag(rfidTag, ScanAssetStatus.Matched, assetName, inventoryNumber);
+            _silentMode.PlayMatch();
+            StatusText = $"✅ {assetName} — подтверждено";
+            HintText = "✅ Актив найден! Следующая метка...";
+            ReadErrorCount = 0;
+            _ = SendToServerAsync(rfidTag, "found", assetName, inventoryNumber);
+            return;
+        }
+
+        // Debounce: не показывать диалог чаще 2 секунд
+        var now = DateTime.Now;
+        if ((now - _lastDialogTime).TotalSeconds < 2)
+        {
+            StatusText = $"⏳ Обработка... (повторное сканирование)";
+            return;
+        }
+
+        if (_isDialogShowing)
+        {
+            StatusText = $"⏳ Диалог уже открыт...";
+            return;
+        }
+
         System.Windows.Application.Current.Dispatcher.Invoke(() =>
         {
-            var dialog = new ConfirmationDialog(_localStore, _currentUser, rfidTag, assetName, inventoryNumber);
+            _isDialogShowing = true;
+            IsDialogShowing = true;
             
-            if (dialog.ShowDialog() == true)
+            try
             {
-                // Подтверждено — отмечаем локально
-                _sessionManager.AddTag(rfidTag, ScanAssetStatus.Matched, assetName, inventoryNumber);
-                _silentMode.PlayMatch();
-                StatusText = $"✅ {assetName} — подтверждено";
-                HintText = "✅ Актив найден! Следующая метка...";
-                ReadErrorCount = 0;
+                var dialog = new ConfirmationDialog(_localStore, _currentUser, rfidTag, assetName, inventoryNumber);
+                
+                if (dialog.ShowDialog() == true)
+                {
+                    // Подтверждено — отмечаем локально
+                    _sessionManager.AddTag(rfidTag, ScanAssetStatus.Matched, assetName, inventoryNumber);
+                    _silentMode.PlayMatch();
+                    StatusText = $"✅ {assetName} — подтверждено";
+                    HintText = "✅ Актив найден! Следующая метка...";
+                    ReadErrorCount = 0;
 
-                // Отправляем на сервер асинхронно
-                _ = SendToServerAsync(rfidTag, "found", assetName, inventoryNumber);
+                    // Отправляем на сервер асинхронно
+                    _ = SendToServerAsync(rfidTag, "found", assetName, inventoryNumber);
+                }
+                else
+                {
+                    // Отменено пользователем — отдельный тип ошибки
+                    HandleReadError(rfidTag, ScanErrorType.UserCancelled);
+                }
             }
-            else
+            finally
             {
-                // Отменено — помечаем как ошибку считывания
-                HandleReadError(rfidTag, ScanErrorType.NoRead);
+                _lastDialogTime = DateTime.Now;
+                _isDialogShowing = false;
+                IsDialogShowing = false;
             }
         });
     }
@@ -707,13 +782,13 @@ public class ScanViewModel : INotifyPropertyChanged
             var session = _sessionManager.CurrentSession;
             if (session == null) return;
 
-            // 1. Отправляем все Matched/Missing результаты
+            // 1. Отправляем все Non-Matched результаты (Missing/Extra)
             var resultsToSend = session.Results
-                .Where(r => r.Status != ScanAssetStatus.Matched || true)
+                .Where(r => r.Status != ScanAssetStatus.Matched)
                 .Select(r => new Dictionary<string, string>
                 {
                     ["rfid_tag"] = r.RfidTag,
-                    ["result"] = r.Status == ScanAssetStatus.Matched ? "found" : "missing"
+                    ["result"] = r.Status == ScanAssetStatus.Missing ? "missing" : "surplus"
                 })
                 .ToList();
 
@@ -764,7 +839,7 @@ public class ScanViewModel : INotifyPropertyChanged
     /// <summary>
     /// Пропустить все непроверенные активы (с отправкой на сервер)
     /// </summary>
-    public async void SkipAllUnchecked()
+    public async Task SkipAllUnchecked()
     {
         if (_sessionManager.CurrentSession == null) return;
 
@@ -1026,6 +1101,9 @@ public class ScanViewModel : INotifyPropertyChanged
         var pending = _localStore.GetPendingCount();
         PendingSyncCount = pending;
         SyncStatus = pending > 0 ? $"⏳ В очереди: {pending}" : "✅ Готово к работе";
+        
+        // Обновляем индикатор сети
+        IsOnline = pending == 0 || _offlineQueue.GetPendingItems().Count == 0;
     }
 
     // ==================== INotifyPropertyChanged ====================

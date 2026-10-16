@@ -31,6 +31,7 @@ public enum ScanErrorType
     Interference,     // Помехи (металл, объекты)
     Duplicate,        // Дубликат (повторное считывание)
     WeakSignal,       // Слабый сигнал
+    UserCancelled,    // Пользователь отменил подтверждение
     Unknown           // Неизвестная ошибка
 }
 

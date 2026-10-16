@@ -3,16 +3,17 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Background="#F5F5F5">
     
-    <Grid Margin="15,12,15,12">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <!-- Список проверяемого имущества получает основной объём -->
-            <RowDefinition Height="2*" MinHeight="150"/>
-            <RowDefinition Height="*" MinHeight="70"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
+        <Grid Margin="15,12,15,12">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <!-- Список проверяемого имущества получает основной объём -->
+                <RowDefinition Height="2*" MinHeight="150"/>
+                <RowDefinition Height="*" MinHeight="70"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
 
         <!-- Заголовок -->
         <Border Grid.Row="0" Background="White" Padding="14,8" CornerRadius="8" Margin="0,0,0,8">
@@ -23,7 +24,13 @@
                 </Grid.ColumnDefinitions>
                 
                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                    <TextBlock Text="📡 Режим сканирования" FontSize="17" FontWeight="Bold" Foreground="#1976D2"/>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="📡 Режим сканирования" FontSize="17" FontWeight="Bold" Foreground="#1976D2"/>
+                        <!-- Индикатор сети -->
+                        <Ellipse Width="10" Height="10" Fill="{Binding NetworkIndicatorColor, Mode=OneWay}" 
+                                 Margin="8,0,0,0" VerticalAlignment="Center"
+                                 ToolTip="{Binding SyncStatus}"/>
+                    </StackPanel>
                     <TextBlock x:Name="RoomNameText" Text="Помещение: ..." FontSize="12" Foreground="#757575" Margin="0,2,0,0"/>
                 </StackPanel>
                 
@@ -80,8 +87,26 @@
             </Border>
         </Grid>
 
+        <!-- Прогресс-бар -->
+        <Border Grid.Row="3" Background="White" Padding="12,8" CornerRadius="8" Margin="0,0,0,8">
+            <StackPanel>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Прогресс сканирования" FontSize="11" Foreground="#757575"/>
+                    <TextBlock Grid.Column="1" x:Name="ProgressPercentText" Text="0%" FontSize="12" FontWeight="Bold" Foreground="#1976D2" Margin="10,0,0,0"/>
+                </Grid>
+                <ProgressBar Height="8" Margin="0,4,0,0" Minimum="0" Maximum="100"
+                             Value="{Binding ProgressPercent, Mode=OneWay}"
+                             Background="#E0E0E0" Foreground="#1976D2"
+                             BorderBrush="#BDBDBD" BorderThickness="1"/>
+            </StackPanel>
+        </Border>
+
         <!-- Список активов помещения -->
-        <Border Grid.Row="3" Background="White" Padding="15" CornerRadius="8" Margin="0,0,0,15">
+        <Border Grid.Row="4" Background="White" Padding="15" CornerRadius="8" Margin="0,0,0,15">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -100,10 +125,9 @@
                            HorizontalAlignment="Center" VerticalAlignment="Center" Margin="10"
                            Text="Список имущества пуст или ещё не загружен" Visibility="Collapsed"/>
 
-                <ListView Grid.Row="1" x:Name="RoomAssetsList" BorderThickness="0" Background="Transparent"
-                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                          ScrollViewer.VerticalScrollBarVisibility="Auto"
-                          HorizontalContentAlignment="Stretch">
+                <ScrollViewer Grid.Row="1" x:Name="RoomAssetsScrollViewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <ListView x:Name="RoomAssetsList" BorderThickness="0" Background="Transparent"
+                              HorizontalContentAlignment="Stretch">
                     <ListView.ItemContainerStyle>
                         <Style TargetType="ListViewItem">
                             <Setter Property="Padding" Value="0"/>
@@ -140,12 +164,13 @@
                             </Border>
                         </DataTemplate>
                     </ListView.ItemTemplate>
-                </ListView>
+                    </ListView>
+                </ScrollViewer>
             </Grid>
         </Border>
 
         <!-- Результаты сканирования -->
-        <Border Grid.Row="4" Background="White" Padding="15" CornerRadius="8" Margin="0,0,0,15">
+        <Border Grid.Row="5" Background="White" Padding="15" CornerRadius="8" Margin="0,0,0,15">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -177,20 +202,32 @@
         </Border>
 
         <!-- Кнопки управления -->
-        <Border Grid.Row="5" Background="White" Padding="12">
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button Content="⏭ Пропустить непроверенные" x:Name="SkipUncheckedButton" Click="SkipUncheckedButton_Click" 
-                        Background="#9C27B0" Foreground="White" Padding="10,6" Margin="0,0,8,0" FontSize="12"
-                        ToolTip="Пометить все непроверенные активы как отсутствующие"/>
-                <Button Content="↩ Выйти" Click="ExitButton_Click" 
-                        Background="#607D8B" Foreground="White" Padding="10,6" Margin="0,0,8,0" Width="95" FontSize="13"/>
-                <Button Content="⏸ Пауза" x:Name="PauseButton" Click="PauseButton_Click" 
-                        Background="#FF9800" Foreground="White" Padding="10,6" Margin="0,0,8,0" Width="115" FontSize="13"/>
-                <Button Content="🔄 Сбросить" Click="ResetButton_Click" 
-                        Background="#F44336" Foreground="White" Padding="10,6" Margin="0,0,8,0" Width="115" FontSize="13"/>
-                <Button Content="✅ Завершить" Click="FinishButton_Click" 
-                        Background="#4CAF50" Foreground="White" Padding="10,6" Width="140" FontWeight="Bold" FontSize="13"/>
-            </StackPanel>
+        <Border Grid.Row="6" Background="White" Padding="12">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                
+                <!-- Основные кнопки -->
+                <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,6">
+                    <Button Content="⏸ Пауза" x:Name="PauseButton" Click="PauseButton_Click" 
+                            Background="#FF9800" Foreground="White" Padding="16,8" Margin="0,0,8,0" Width="130" FontSize="13" FontWeight="Bold"/>
+                    <Button Content="✅ Завершить" Click="FinishButton_Click" 
+                            Background="#4CAF50" Foreground="White" Padding="16,8" Width="150" FontWeight="Bold" FontSize="13"/>
+                </StackPanel>
+                
+                <!-- Дополнительные кнопки -->
+                <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="⏭ Пропустить непроверенные" x:Name="SkipUncheckedButton" Click="SkipUncheckedButton_Click" 
+                            Background="#9C27B0" Foreground="White" Padding="10,5" Margin="0,0,6,0" FontSize="11"
+                            ToolTip="Пометить все непроверенные активы как отсутствующие"/>
+                    <Button Content="🔄 Сбросить" Click="ResetButton_Click" 
+                            Background="#F44336" Foreground="White" Padding="10,5" Margin="0,0,6,0" Width="100" FontSize="11"/>
+                    <Button Content="↩ Выйти" Click="ExitButton_Click" 
+                            Background="#757575" Foreground="White" Padding="10,5" Width="90" FontSize="11"/>
+                </StackPanel>
+            </Grid>
         </Border>
     </Grid>
 </UserControl>
