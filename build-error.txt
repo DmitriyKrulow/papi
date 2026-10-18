@@ -1,0 +1,148 @@
+﻿docker :  Image papi-frontend Building 
+строка:1 знак:18
++ cd F:/Code/papi; docker compose build frontend 2>&1 | Out-File -FileP ...
++                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ( Image papi-frontend Building :String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+#1 [internal] load local bake definitions
+#1 reading from stdin 894B 0.0s done
+#1 DONE 0.0s
+
+#2 [internal] load build definition from Dockerfile
+#2 transferring dockerfile: 1.13kB done
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/nginx:1.27-alpine
+#3 ...
+
+#4 [internal] load metadata for docker.io/library/node:22-alpine
+#4 DONE 0.5s
+
+#3 [internal] load metadata for docker.io/library/nginx:1.27-alpine
+#3 DONE 0.9s
+
+#5 [internal] load .dockerignore
+#5 transferring context: 167B done
+#5 DONE 0.0s
+
+#6 [stage-1 1/7] FROM docker.io/library/nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10
+#6 resolve docker.io/library/nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10 0.0s done
+#6 DONE 0.0s
+
+#7 [build 1/7] FROM docker.io/library/node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402
+#7 resolve docker.io/library/node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402 0.0s done
+#7 DONE 0.0s
+
+#8 [internal] load build context
+#8 transferring context: 5.22kB done
+#8 DONE 0.0s
+
+#9 [build 5/7] RUN npm install
+#9 CACHED
+
+#10 [build 2/7] WORKDIR /app
+#10 CACHED
+
+#11 [build 3/7] RUN npm config set registry https://registry.npmmirror.com
+#11 CACHED
+
+#12 [build 4/7] COPY package.json package-lock.json ./
+#12 CACHED
+
+#13 [build 6/7] COPY . .
+#13 CACHED
+
+#14 [build 7/7] RUN npm run build
+#14 0.959 
+#14 0.959 > frontend@0.0.0 build
+#14 0.959 > tsc --noEmit && vite build
+#14 0.959 
+#14 1.605 vite v8.2.0 building client environment for production...
+#14 1.627 [2K
+transforming...✓ 1998 modules transformed.
+#14 3.115 ✗ Build failed in 1.51s
+#14 3.116 error during build:
+#14 3.116 Build failed with 4 errors:
+#14 3.116 
+#14 3.116 [31m[builtin:vite-transform] [0mExpected a semicolon or an implicit semicolon after a statement, but found none
+#14 3.116  -  in src/pages/SchedulePage.tsx at 7594..7594
+#14 3.116  [38;5;240m │[0m 
+#14 3.116  [38;5;240m │[0m [38;5;115mHelp[0m: Try inserting a semicolon here
+#14 3.116 
+#14 3.116 [31m[builtin:vite-transform] [0m'const' modifier cannot appear on a type member.
+#14 3.116      [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/api/client.ts:454:7 [38;5;246m][0m
+#14 3.116      [38;5;246m│[0m
+#14 3.116  [38;5;246m454 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0mconst[38;5;249m [0m[38;5;249mq[0m[38;5;249mu[0m[38;5;249me[0m[38;5;249mr[0m[38;5;249my[0m[38;5;249m [0m[38;5;249m=[0m[38;5;249m [0m[38;5;249mn[0m[38;5;249me[0m[38;5;249mw[0m[38;5;249m [0m[38;5;249mU[0m[38;5;249mR[0m[38;5;249mL[0m[38;5;249mS[0m[38;5;249me[0m[38;5;249ma[0m[38;5;249mr[0m[38;5;249mc[0m[38;5;249mh[0m[38;5;249mP[0m[38;5;249ma[0m[38;5;249mr[0m[38;5;249ma[0m[38;5;249mm[0m[38;5;249ms[0m[38;5;249m([0m[38;5;249mp[0m[38;5;249ma[0m[38;5;249mr[0m[38;5;249ma[0m[38;5;249mm[0m[38;5;249ms[0m[38;5;249m [0m[38;5;249ma[0m[38;5;249ms[0m[38;5;249m [0m[38;5;249ma[0m[38;5;249mn[0m[38;5;249my[0m[38;5;249m)[0m[38;5;249m.[0m[38;5;249mt[0m[38;5;249mo[0m[38;5;249mS[0m[38;5;249mt[0m[38;5;249mr[0m[38;5;249mi[0m[38;5;249mn[0m[38;5;249mg[0m[38;5;249m([0m[38;5;249m)[0m[38;5;249m;[0m
+#14 3.116  [38;5;240m    │[0m       ──┬──  
+#14 3.116  [38;5;240m    │[0m         ╰──── 
+#14 3.116  [38;5;240m    │[0m 
+#14 3.116  [38;5;240m    │[0m [38;5;115mHelp[0m: Only 'readonly' modifier is allowed here.
+#14 3.116 [38;5;246m─────╯[0m
+#14 3.116 
+#14 3.116 [31m[builtin:vite-transform] [0mUnexpected token
+#14 3.116      [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/api/client.ts:454:19 [38;5;246m][0m
+#14 3.116      [38;5;246m│[0m
+#14 3.116  [38;5;246m454 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249mc[0m[38;5;249mo[0m[38;5;249mn[0m[38;5;249ms[0m[38;5;249mt[0m[38;5;249m [0m[38;5;249mq[0m[38;5;249mu[0m[38;5;249me[0m[38;5;249mr[0m[38;5;249my[0m[38;5;249m [0m=[38;5;249m [0m[38;5;249mn[0m[38;5;249me[0m[38;5;249mw[0m[38;5;249m [0m[38;5;249mU[0m[38;5;249mR[0m[38;5;249mL[0m[38;5;249mS[0m[38;5;249me[0m[38;5;249ma[0m[38;5;249mr[0m[38;5;249mc[0m[38;5;249mh[0m[38;5;249mP[0m[38;5;249ma[0m[38;5;249mr[0m[38;5;249ma[0m[38;5;249mm[0m[38;5;249ms[0m[38;5;249m([0m[38;5;249mp[0m[38;5;249ma[0m[38;5;249mr[0m[38;5;249ma[0m[38;5;249mm[0m[38;5;249ms[0m[38;5;249m [0m[38;5;249ma[0m[38;5;249ms[0m[38;5;249m [0m[38;5;249ma[0m[38;5;249mn[0m[38;5;249my[0m[38;5;249m)[0m[38;5;249m.[0m[38;5;249mt[0m[38;5;249mo[0m[38;5;249mS[0m[38;5;249mt[0m[38;5;249mr[0m[38;5;249mi[0m[38;5;249mn[0m[38;5;249mg[0m[38;5;249m([0m[38;5;249m)[0m[38;5;249m;[0m
+#14 3.116  [38;5;240m    │[0m                   ┬  
+#14 3.116  [38;5;240m    │[0m                   ╰── 
+#14 3.116 [38;5;246m─────╯[0m
+#14 3.116 
+#14 3.116 [31m[builtin:vite-transform] [0mUnexpected token
+#14 3.116     [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/pages/RegulatoryPage.tsx:78:7 [38;5;246m][0m
+#14 3.116     [38;5;246m│[0m
+#14 3.116  [38;5;246m78 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m)[38;5;249m;[0m
+#14 3.116  [38;5;240m   │[0m       ┬  
+#14 3.116  [38;5;240m   │[0m       ╰── 
+#14 3.116 [38;5;246m────╯[0m
+#14 3.116 
+#14 3.116     at aggregateBindingErrorsIntoJsError (file:///app/node_modules/rolldown/dist/shared/error-BgfXq0Tb.mjs:48:18)
+#14 3.116     at unwrapBindingResult (file:///app/node_modules/rolldown/dist/shared/error-BgfXq0Tb.mjs:18:128)
+#14 3.116     at #build (file:///app/node_modules/rolldown/dist/shared/rolldown-DP_p9pd3.mjs:132:34)
+#14 3.116     at async buildEnvironment (file:///app/node_modules/vite/dist/node/chunks/node.js:33669:66)
+#14 3.116     at async Object.build (file:///app/node_modules/vite/dist/node/chunks/node.js:34091:19)
+#14 3.116     at async Object.buildApp (file:///app/node_modules/vite/dist/node/chunks/node.js:34088:153)
+#14 3.116     at async CAC.<anonymous> (file:///app/node_modules/vite/dist/node/cli.js:776:3) {
+#14 3.116   errors: [Getter/Setter]
+#14 3.116 }
+#14 3.182 npm notice
+#14 3.182 npm notice New major version of npm available! 10.9.9 -> 12.2.0
+#14 3.182 npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.0
+#14 3.182 npm notice To update run: npm install -g npm@12.2.0
+#14 3.182 npm notice
+#14 ERROR: process "/bin/sh -c npm run build" did not complete successfully: exit code: 1
+------
+ > [build 7/7] RUN npm run build:
+3.116     at async Object.build (file:///app/node_modules/vite/dist/node/chunks/node.js:34091:19)
+3.116     at async Object.buildApp (file:///app/node_modules/vite/dist/node/chunks/node.js:34088:153)
+3.116     at async CAC.<anonymous> (file:///app/node_modules/vite/dist/node/cli.js:776:3) {
+3.116   errors: [Getter/Setter]
+3.116 }
+3.182 npm notice
+3.182 npm notice New major version of npm available! 10.9.9 -> 12.2.0
+3.182 npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.0
+3.182 npm notice To update run: npm install -g npm@12.2.0
+3.182 npm notice
+------
+Dockerfile:17
+
+--------------------
+
+  15 |     # Copy source and build static assets
+
+  16 |     COPY . .
+
+  17 | >>> RUN npm run build
+
+  18 |     
+
+  19 |     # ---- Serve stage ----
+
+--------------------
+
+failed to solve: process "/bin/sh -c npm run build" did not complete successfully: exit code: 1
+
+
+
+View build details: docker-desktop://dashboard/build/default/default/k7t4bkzgxmn9xvdu1s1bimya3
+

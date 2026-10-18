@@ -14,7 +14,7 @@ from src.infrastructure.db.models.inventory_check_item import InventoryCheckItem
 from src.infrastructure.db.models.asset import Asset
 from src.infrastructure.db.models.department import Department
 from src.infrastructure.db.models.rfid_api_key import RfidApiKey
-from src.presentation.http.dependencies.rfid_auth import get_rfid_scanner
+from src.presentation.http.dependencies.rfid_auth import get_rfid_scanner, get_optional_user
 from src.infrastructure.db.models.user import User
 
 logger = logging.getLogger(__name__)
@@ -246,6 +246,7 @@ async def scan_rfid_for_inventory(
     rfid_tag: Optional[str] = Query(None, description="RFID-метка сканированного актива"),
     result: str = Query("found", description="Результат: found / missing / surplus"),
     scanner: dict = Depends(get_rfid_scanner),
+    current_user: Optional[User] = Depends(get_optional_user),
     db: Session = Depends(get_db),
 ):
     """
@@ -323,6 +324,9 @@ async def scan_rfid_for_inventory(
         asset.last_inventory_date = datetime.now()
         asset.last_inventory_confirmed = True
         asset.last_inventory_source = 'rfid'
+        if current_user:
+            item.confirmed_by = current_user.id
+            asset.last_inventory_by_id = current_user.id
         db.commit()
 
         return {
@@ -372,13 +376,15 @@ async def scan_rfid_for_inventory(
         asset_status = "найден"
         confirmed_flag = True
 
-    item.confirmed_by = None  # RFID-сканер не имеет user_id
+    item.confirmed_by = current_user.id if current_user else None
     item.confirmed_at = datetime.now()
 
     # Обновляем актив
     asset.last_inventory_date = datetime.now()
     asset.last_inventory_confirmed = confirmed_flag
     asset.last_inventory_source = 'rfid'
+    if current_user:
+        asset.last_inventory_by_id = current_user.id
 
     db.commit()
     
@@ -690,6 +696,7 @@ async def create_inventory_for_scanner(
         db.add(item)
         a.last_inventory_confirmed = False
         a.last_inventory_date = None
+        a.last_inventory_by_id = None
     
     inv_check.total_checked = len(assets)
     db.commit()
@@ -715,6 +722,7 @@ async def create_inventory_for_scanner(
 async def skip_all_pending(
     inventory_id: int,
     scanner: dict = Depends(get_rfid_scanner),
+    current_user: Optional[User] = Depends(get_optional_user),
     db: Session = Depends(get_db),
 ):
     """Пометить все pending-элементы инвентаризации как отсутствующие."""
@@ -735,6 +743,10 @@ async def skip_all_pending(
         item.result = "missing"
         item.comment = "Пропущено сканером"
         item.confirmed_at = datetime.now()
+        if current_user:
+            item.confirmed_by = current_user.id
+            if item.asset:
+                item.asset.last_inventory_by_id = current_user.id
 
     inv_check.missing += len(pending_items)
     db.commit()
@@ -754,6 +766,7 @@ async def sync_scan_results(
     inventory_id: int,
     request: Request,
     scanner: dict = Depends(get_rfid_scanner),
+    current_user: Optional[User] = Depends(get_optional_user),
     db: Session = Depends(get_db),
 ):
     """
@@ -821,6 +834,8 @@ async def sync_scan_results(
             asset.last_inventory_date = datetime.now()
             asset.last_inventory_confirmed = True
             asset.last_inventory_source = 'rfid'
+            if current_user:
+                asset.last_inventory_by_id = current_user.id
             stats["surplus"] += 1
             continue
 
@@ -835,6 +850,7 @@ async def sync_scan_results(
 
         item.result = res
         item.confirmed_at = datetime.now()
+        item.confirmed_by = current_user.id if current_user else None
 
         if res == "missing":
             inv_check.missing += 1
@@ -847,6 +863,8 @@ async def sync_scan_results(
 
         asset.last_inventory_date = datetime.now()
         asset.last_inventory_source = 'rfid'
+        if current_user:
+            asset.last_inventory_by_id = current_user.id
 
     db.commit()
 
@@ -1100,6 +1118,7 @@ async def finish_inventory_check(
     inventory_id: int,
     skip_pending: bool = Query(True, description="Пометить непроверенные активы как пропущенные"),
     scanner: dict = Depends(get_rfid_scanner),
+    current_user: Optional[User] = Depends(get_optional_user),
     db: Session = Depends(get_db),
 ):
     """
@@ -1118,8 +1137,34 @@ async def finish_inventory_check(
     if not inv_check:
         raise HTTPException(status_code=404, detail="Инвентаризация не найдена")
 
-    # Идемпотентность: если уже завершена — возвращаем сводку без ошибки
+    # Идемпотентность: если уже завершена — возвращаем сводку без ошибки.
+    # При наличии авторизованного пользователя дописываем проверяющего
+    # туда, где он не был проставлен (старые инвентаризации, завершённые
+    # до появления учёта проверяющего).
     if inv_check.status == "completed":
+        backfilled = 0
+        if current_user:
+            stale_items = (
+                db.query(InventoryCheckItem)
+                .options(joinedload(InventoryCheckItem.asset))
+                .filter(
+                    InventoryCheckItem.inventory_check_id == inventory_id,
+                    InventoryCheckItem.confirmed_by.is_(None),
+                )
+                .all()
+            )
+            for item in stale_items:
+                item.confirmed_by = current_user.id
+                if item.asset:
+                    item.asset.last_inventory_by_id = current_user.id
+                    backfilled += 1
+            if backfilled:
+                db.commit()
+                logger.info(
+                    f"[finish_inventory_check] Backfilled checker {current_user.id} "
+                    f"for {backfilled} items in completed inventory {inventory_id}"
+                )
+
         counts = (
             db.query(InventoryCheckItem.result, func.count(InventoryCheckItem.id))
             .filter(InventoryCheckItem.inventory_check_id == inventory_id)
@@ -1132,6 +1177,7 @@ async def finish_inventory_check(
             "name": inv_check.name,
             "status": "completed",
             "already_completed": True,
+            "backfilled_checker": backfilled,
             "completed_at": inv_check.completed_at.isoformat() if inv_check.completed_at else None,
         }
 
@@ -1149,6 +1195,8 @@ async def finish_inventory_check(
             item.result = "missing"
             item.comment = "Пропущено при завершении инвентаризации"
             item.confirmed_at = datetime.now()
+            if current_user:
+                item.confirmed_by = current_user.id
             skipped_count += 1
 
     # Пересчёт счётчиков из элементов (надёжнее, чем накопление в переменной)
@@ -1179,6 +1227,8 @@ async def finish_inventory_check(
             item.asset.last_inventory_date = datetime.now()
             item.asset.last_inventory_confirmed = item.result == "found"
             item.asset.last_inventory_source = 'rfid'
+            if current_user:
+                item.asset.last_inventory_by_id = current_user.id
             updated_count += 1
     logger.info(f"[finish_inventory_check] Updated last_inventory_date for {updated_count} assets in inventory {inventory_id}")
 

@@ -1,3 +1,19 @@
+"""
+Database initialization module for PAPI.
+
+This module provides utilities for database initialization and admin user management.
+For schema changes, use Alembic migrations instead of manual ALTER TABLE statements.
+
+Usage:
+    # Initialize database (creates tables if they don't exist)
+    python -c "from src.infrastructure.db.init_db import init_db; init_db()"
+    
+    # Create admin user
+    python -c "from src.infrastructure.db.init_db import get_or_create_admin; print(get_or_create_admin())"
+    
+    # Generate migration
+    python scripts/generate_migration.py "Add new column to assets"
+"""
 from datetime import datetime
 from typing import Generator, Optional
 import os
@@ -14,17 +30,6 @@ from src.infrastructure.db.models.asset_type_config import seed_asset_types
 logger = logging.getLogger(__name__)
 
 
-# Удаляем papi.db если он был создан ошибочно
-_db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))), 'papi.db')
-if os.path.exists(_db_path):
-    try:
-        if os.getenv("DATABASE_URL", "").startswith("postgresql"):
-            os.remove(_db_path)
-            print(f"Removed erroneous papi.db (using PostgreSQL)")
-    except:
-        pass
-
-
 def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
     try:
@@ -34,324 +39,52 @@ def get_db() -> Generator[Session, None, None]:
 
 
 def init_db():
+    """
+    Initialize database tables.
+    
+    NOTE: This should only be used for initial setup. For schema changes,
+    use Alembic migrations:
+        python scripts/generate_migration.py "Your migration message"
+        alembic upgrade head
+    """
     Base.metadata.create_all(bind=engine)
-    _ensure_photo_category_column()
-    _ensure_document_links_table()
-    _ensure_inventory_check_columns()
-    _ensure_asset_inventory_columns()
-    _ensure_asset_inventory_source_column()
-    _ensure_brute_force_table()
-    _ensure_user_allowed_ips_column()
-    _ensure_user_max_user_id_column()
-    _ensure_password_reset_table()
-    _ensure_notification_table()
-    _ensure_notification_reference_key_column()
-    _ensure_room_id_column()
-    _ensure_notification_settings_tls_columns()
+    logger.info("Database tables verified via Alembic-compatible init")
 
 
-def _ensure_photo_category_column():
-    """Добавляет колонку photo_category в asset_photos, если её нет"""
-    from sqlalchemy import text, inspect
-    try:
-        inspector = inspect(engine)
-        columns = [c['name'] for c in inspector.get_columns('asset_photos')]
-        if 'photo_category' not in columns:
-            with engine.connect() as conn:
-                conn.execute(text("ALTER TABLE asset_photos ADD COLUMN photo_category VARCHAR(50)"))
-                conn.commit()
-            print("Added photo_category column to asset_photos table")
-    except Exception as e:
-        print(f"Could not check/add photo_category column: {e}")
-
-
-def _ensure_document_links_table():
-    """Создаёт таблицу document_links, если её нет"""
-    from sqlalchemy import text, inspect
-    try:
-        inspector = inspect(engine)
-        table_names = inspector.get_table_names()
-        if 'document_links' not in table_names:
-            from src.infrastructure.db.models.document_link import DocumentLink
-            DocumentLink.__table__.create(engine)
-            print("Created document_links table")
-    except Exception as e:
-        print(f"Could not create document_links table: {e}")
-
-
-def _ensure_inventory_check_columns():
-    """Добавляет новые колонки в inventory_checks, если их нет"""
-    from sqlalchemy import text, inspect
-    try:
-        inspector = inspect(engine)
-        columns = [c['name'] for c in inspector.get_columns('inventory_checks')]
-        if 'check_type' not in columns:
-            with engine.connect() as conn:
-                conn.execute(text("ALTER TABLE inventory_checks ADD COLUMN check_type VARCHAR(50) NOT NULL DEFAULT 'full'"))
-                conn.execute(text("ALTER TABLE inventory_checks ADD COLUMN scope_id INTEGER"))
-                conn.execute(text("ALTER TABLE inventory_checks ADD COLUMN scope_name VARCHAR(255)"))
-                conn.execute(text("ALTER TABLE inventory_checks ADD COLUMN created_by INTEGER REFERENCES users(id)"))
-                conn.execute(text("ALTER TABLE inventory_checks ADD COLUMN started_at TIMESTAMP"))
-                conn.commit()
-            print("Added columns to inventory_checks table")
-        # Создаём таблицу inventory_check_items, если её нет
-        table_names = inspector.get_table_names()
-        if 'inventory_check_items' not in table_names:
-            from src.infrastructure.db.models.inventory_check_item import InventoryCheckItem
-            InventoryCheckItem.__table__.create(engine)
-            print("Created inventory_check_items table")
-    except Exception as e:
-        print(f"Could not check/add inventory check columns: {e}")
-
-
-def _ensure_asset_inventory_columns():
-    """Добавляет поля инвентаризации в assets, если их нет"""
-    from sqlalchemy import text, inspect
-    try:
-        inspector = inspect(engine)
-        columns = [c['name'] for c in inspector.get_columns('assets')]
-        if 'last_inventory_date' not in columns:
-            with engine.connect() as conn:
-                conn.execute(text("ALTER TABLE assets ADD COLUMN last_inventory_date TIMESTAMP"))
-                conn.execute(text("ALTER TABLE assets ADD COLUMN last_inventory_by_id INTEGER REFERENCES users(id)"))
-                conn.execute(text("ALTER TABLE assets ADD COLUMN last_inventory_confirmed BOOLEAN NOT NULL DEFAULT FALSE"))
-                conn.commit()
-            print("Added inventory columns to assets table")
-    except Exception as e:
-        print(f"Could not check/add asset inventory columns: {e}")
-
-
-def _ensure_asset_inventory_source_column():
-    """Добавляет колонку last_inventory_source в assets, если её нет"""
-    from sqlalchemy import text, inspect
-    try:
-        inspector = inspect(engine)
-        columns = [c['name'] for c in inspector.get_columns('assets')]
-        if 'last_inventory_source' not in columns:
-            with engine.connect() as conn:
-                conn.execute(text("ALTER TABLE assets ADD COLUMN last_inventory_source VARCHAR(20)"))
-                conn.commit()
-            print("Added last_inventory_source column to assets table")
-    except Exception as e:
-        print(f"Could not check/add last_inventory_source column: {e}")
-
-
-def get_or_create_admin() -> Optional[User]:
-    """Создаёт администратора по умолчанию, если его нет. НЕ изменяет существующий аккаунт."""
+def get_or_create_admin() -> User:
+    """
+    Create or return existing admin user.
+    
+    Default admin credentials:
+        username: admin
+        email: admin@papi.local
+        password: admin123
+    """
     db = SessionLocal()
     try:
-        admin = db.query(User).filter(User.username == "admin").first()
-        if not admin:
-            password_hash = PasswordHash.from_plain_password("admin123")
-            admin = User(
-                username="admin",
-                email="admin@example.com",
-                full_name="Администратор",
-                phone="+79000000000",
-                password_hash=str(password_hash),
-                role="admin",
-                is_active=True,
-                created_at=datetime.now(),
-                updated_at=datetime.now(),
-            )
-            db.add(admin)
-            db.commit()
-            db.refresh(admin)
-            logger.info("[InitDB] Created default admin account (username: admin, password: admin123)")
-        # Существующий аккаунт администратора НЕ изменяем — пользователь мог сменить пароль
-        return admin
-    finally:
-        db.close()
-
-
-def create_user(username: str, email: str, password_hash: str, role: str = "user") -> Optional[User]:
-    db = SessionLocal()
-    try:
-        existing_user = db.query(User).filter(User.username == username).first()
-        if existing_user:
-            return None
-        user = User(
-            username=username,
-            email=email,
-            password_hash=password_hash,
-            role=role,
-            is_active=True,
-            created_at=datetime.now(),
-            updated_at=datetime.now(),
-        )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-        return user
-    finally:
-        db.close()
-
-
-def authenticate_user(db: Session, username: str, password: str) -> Optional[User]:
-    user = db.query(User).filter(User.username == username).first()
-    if not user:
-        return None
-    if not verify_password(password, user.password_hash or ""):  # type: ignore[arg-type]
-        return None
-    return user
-
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    try:
-        password_hash = PasswordHash.from_hash_string(hashed_password)
-        return password_hash.verify(plain_password)
-    except (ValueError, AttributeError):
-        return False
-
-
-def _ensure_brute_force_table():
-    """Создаёт таблицу brute_force_logs, если её нет"""
-    from sqlalchemy import text, inspect
-    try:
-        inspector = inspect(engine)
-        table_names = inspector.get_table_names()
-        if "brute_force_logs" not in table_names:
-            from src.infrastructure.db.models.brute_force_log import BruteForceLog
-            BruteForceLog.__table__.create(engine)
-            print("Created brute_force_logs table")
-    except Exception as e:
-        print(f"Could not create brute_force_logs table: {e}")
-
-
-def _ensure_user_allowed_ips_column():
-    """Добавляет колонку allowed_ips в users, если её нет"""
-    from sqlalchemy import text, inspect
-    try:
-        inspector = inspect(engine)
-        columns = [c["name"] for c in inspector.get_columns("users")]
-        if "allowed_ips" not in columns:
-            with engine.connect() as conn:
-                conn.execute(text("ALTER TABLE users ADD COLUMN allowed_ips TEXT"))
-                conn.commit()
-            print("Added allowed_ips column to users table")
-    except Exception as e:
-        print(f"Could not check/add allowed_ips column: {e}")
-
-
-def _ensure_password_reset_table():
-    """Создаёт таблицу password_reset_requests, если её нет"""
-    from sqlalchemy import inspect
-    try:
-        inspector = inspect(engine)
-        table_names = inspector.get_table_names()
-        if "password_reset_requests" not in table_names:
-            from src.infrastructure.db.models.password_reset_request import PasswordResetRequest
-            PasswordResetRequest.__table__.create(engine)
-            print("Created password_reset_requests table")
-    except Exception as e:
-        print(f"Could not create password_reset_requests table: {e}")
-
-
-def _ensure_notification_table():
-    """Создаёт таблицу notifications, если её нет"""
-    from sqlalchemy import inspect
-    try:
-        inspector = inspect(engine)
-        table_names = inspector.get_table_names()
-        if "notifications" not in table_names:
-            from src.infrastructure.db.models.notification import Notification
-            Notification.__table__.create(engine)
-            print("Created notifications table")
-    except Exception as e:
-        print(f"Could not create notifications table: {e}")
-
-
-def _ensure_notification_reference_key_column():
-    """Добавляет колонку reference_key в notifications, если её нет"""
-    from sqlalchemy import text, inspect
-    try:
-        inspector = inspect(engine)
-        table_names = inspector.get_table_names()
-        if "notifications" not in table_names:
-            return
-        columns = [c["name"] for c in inspector.get_columns("notifications")]
-        if "reference_key" not in columns:
-            with engine.connect() as conn:
-                conn.execute(text("ALTER TABLE notifications ADD COLUMN reference_key VARCHAR(50)"))
-                conn.commit()
-            print("Added reference_key column to notifications table")
-    except Exception as e:
-        print(f"Could not check/add reference_key column: {e}")
-
-
-def _ensure_user_max_user_id_column():
-    """Добавляет колонку max_user_id в users, если её нет"""
-    from sqlalchemy import text, inspect
-    try:
-        inspector = inspect(engine)
-        columns = [c["name"] for c in inspector.get_columns("users")]
-        if "max_user_id" not in columns:
-            with engine.connect() as conn:
-                conn.execute(text("ALTER TABLE users ADD COLUMN max_user_id VARCHAR(100)"))
-                conn.commit()
-            print("Added max_user_id column to users table")
-    except Exception as e:
-        print(f"Could not check/add max_user_id column: {e}")
-
-
-def _ensure_room_id_column():
-    """Добавляет колонку room_id в assets, если её нет, и сопоставляет данные"""
-    from sqlalchemy import text, inspect
-    try:
-        inspector = inspect(engine)
-        columns = [c["name"] for c in inspector.get_columns("assets")]
-        if "room_id" not in columns:
-            with engine.connect() as conn:
-                conn.execute(text("ALTER TABLE assets ADD COLUMN room_id INTEGER REFERENCES rooms(id)"))
-                conn.commit()
-            print("Added room_id column to assets table")
-            
-            # Сопоставляем существующие location_address с room.name
-            from src.infrastructure.db.session import SessionLocal
-            from src.infrastructure.db.models.department import Room
-            from src.infrastructure.db.models.asset import Asset
-            
-            db = SessionLocal()
-            try:
-                rooms = db.query(Room).all()
-                room_map = {r.name: r.id for r in rooms if r.name is not None}
-                
-                updated = 0
-                for asset in db.query(Asset).filter(
-                    Asset.location_address.isnot(None),
-                    Asset.location_address != ""
-                ).all():
-                    room_name = asset.location_address.strip()
-                    if room_name in room_map:
-                        asset.room_id = room_map[room_name]
-                        updated += 1
-                
-                if updated > 0:
-                    db.commit()
-                    print(f"Migrated {updated} assets: linked room_id from location_address")
-                else:
-                    db.rollback()
-                    print("No assets needed migration")
-            finally:
-                db.close()
-    except Exception as e:
-        print(f"Could not check/add room_id column: {e}")
-
-
-def _ensure_notification_settings_tls_columns():
-    """Добавляет колонки mail_use_tls и mail_use_ssl в notification_settings, если их нет"""
-    from sqlalchemy import text, inspect
-    try:
-        inspector = inspect(engine)
-        columns = [c["name"] for c in inspector.get_columns("notification_settings")]
+        admin = db.query(User).filter(User.role == "admin").first()
+        if admin:
+            logger.info(f"Admin user already exists: {admin.username}")
+            return admin
         
-        if "mail_use_tls" not in columns or "mail_use_ssl" not in columns:
-            with engine.connect() as conn:
-                if "mail_use_tls" not in columns:
-                    conn.execute(text("ALTER TABLE notification_settings ADD COLUMN mail_use_tls INTEGER DEFAULT 1"))
-                if "mail_use_ssl" not in columns:
-                    conn.execute(text("ALTER TABLE notification_settings ADD COLUMN mail_use_ssl INTEGER DEFAULT 0"))
-                conn.commit()
-            print("Added mail_use_tls and mail_use_ssl columns to notification_settings table")
+        admin = User(
+            username="admin",
+            email="admin@papi.local",
+            full_name="Administrator",
+            role="admin",
+            is_active=True,
+            password_hash=PasswordHash.hash("admin123"),
+        )
+        db.add(admin)
+        db.commit()
+        db.refresh(admin)
+        logger.info("Admin user created successfully")
+        return admin
     except Exception as e:
-        print(f"Could not check/add mail_use_tls/mail_use_ssl columns: {e}")
+        db.rollback()
+        logger.error(f"Failed to create admin user: {e}")
+        raise
+    finally:
+        db.close()
+
+

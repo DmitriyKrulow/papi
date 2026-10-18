@@ -75,6 +75,15 @@ public class RoleService
     }
 
     /// <summary>
+    /// Проверка права: может ли пользователь проверять имущество
+    /// (Ответственный или Администратор)
+    /// </summary>
+    public bool CanVerifyAssets()
+    {
+        return _currentUser?.Role is UserRole.Administrator or UserRole.Manager;
+    }
+
+    /// <summary>
     /// Получить текст роли для отображения
     /// </summary>
     public static string GetRoleText(UserRole role)

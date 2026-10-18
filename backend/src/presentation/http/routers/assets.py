@@ -64,6 +64,7 @@ def asset_to_dict(asset, db: Optional[Session] = None):
     
     department_name = None
     assigned_employee_name = None
+    assigned_inventory_checker_name = None
     
     if getattr(asset, 'employee_id', None) and db is not None:
         emp = db.query(Employee).filter(Employee.id == asset.employee_id).first()
@@ -81,6 +82,12 @@ def asset_to_dict(asset, db: Optional[Session] = None):
         ).first()
         if dept:
             department_name = f"{dept.name} ({dept.code})"
+
+    if getattr(asset, 'last_inventory_by_id', None) and db is not None:
+        checker = db.query(User).filter(User.id == asset.last_inventory_by_id).first()
+        if checker:
+            # Логин проверяющего — показываем в UI вместо числового ID
+            assigned_inventory_checker_name = checker.username or checker.full_name
 
     return {
         "id": getattr(asset, 'id', None),
@@ -119,6 +126,7 @@ def asset_to_dict(asset, db: Optional[Session] = None):
         # Поля инвентаризации
         "last_inventory_date": safe_isoformat(getattr(asset, 'last_inventory_date', None)),
         "last_inventory_by_id": getattr(asset, 'last_inventory_by_id', None),
+        "last_inventory_by_name": safe_str(assigned_inventory_checker_name) if assigned_inventory_checker_name else None,
         "last_inventory_confirmed": getattr(asset, 'last_inventory_confirmed', False),
         "last_inventory_source": getattr(asset, 'last_inventory_source', None),
     }

@@ -20,6 +20,8 @@ public class AppUser
     public UserRole Role { get; set; } = UserRole.InventoryChecker;
     public string? Department { get; set; }
     public DateTime LastLogin { get; set; } = DateTime.Now;
+    [Newtonsoft.Json.JsonProperty(PropertyName = "PasswordHash")]
+    public string PasswordHash { get; set; } = string.Empty;
 }
 
 /// <summary>

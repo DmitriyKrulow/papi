@@ -52,9 +52,9 @@ public class SearchViewModel : INotifyPropertyChanged
         private set => SetProperty(ref _searchStatus, value);
     }
 
-    public ICommand SearchCommand => new RelayCommand(PerformSearch);
+    public ICommand SearchCommand => new RelayCommand(async () => await PerformSearch());
 
-    private async void PerformSearch()
+    private async Task PerformSearch()
     {
         if (string.IsNullOrWhiteSpace(SearchQuery))
         {

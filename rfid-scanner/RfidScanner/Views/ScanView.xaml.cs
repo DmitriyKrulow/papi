@@ -18,8 +18,6 @@ public partial class ScanView : UserControl
         Loaded += ScanView_Loaded;
     }
     
-    private bool _isInitialized = false;
-    
     private void ScanView_Loaded(object sender, RoutedEventArgs e)
     {
         // Инициализация теперь происходит в Initialize(), этот метод больше не нужен
@@ -161,7 +159,7 @@ public partial class ScanView : UserControl
             return;
         }
         
-        _viewModel.SkipAllUnchecked();
+        _ = _viewModel.SkipAllUnchecked();
     }
 
     private void ContinueButton_Click(object sender, RoutedEventArgs e)

@@ -1,5 +1,5 @@
 # backend/src/presentation/http/dependencies/rfid_auth.py
-"""Зависимость для аутентификации RFID-сканера по API-ключу"""
+"""Зависимости для аутентификации RFID-сканера по API-ключу и пользователю по JWT"""
 import hashlib
 import logging
 from typing import Optional
@@ -8,6 +8,7 @@ from fastapi import Depends, HTTPException, Header, Request
 from sqlalchemy.orm import Session
 
 from src.infrastructure.db.models.rfid_api_key import RfidApiKey
+from src.infrastructure.db.models.user import User
 from src.infrastructure.db.session import SessionLocal
 
 logger = logging.getLogger(__name__)
@@ -80,3 +81,56 @@ async def get_rfid_scanner(
         "name": api_key_record.name,
         "key_prefix": api_key_record.key_prefix,
     }
+
+
+def _get_db():
+    """Вспомогательная функция для получения сессии БД из запроса"""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+async def get_optional_user(
+    request: Request,
+    db: Session = Depends(_get_db),
+) -> Optional[User]:
+    """
+    Попытка извлечь пользователя из Authorization: Bearer <jwt>.
+    Возвращает User если токен валиден, None иначе.
+    Используется в RFID-эндпоинтах для записи проверяющего.
+    """
+    try:
+        import os
+        from dotenv import load_dotenv
+
+        _env_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(
+                os.path.dirname(os.path.abspath(__file__))))),
+            ".env"
+        )
+        if os.path.exists(_env_path):
+            load_dotenv(_env_path)
+
+        from jose import jwt, JWTError
+
+        secret_key = os.getenv("SECRET_KEY")
+        if not secret_key:
+            return None
+
+        authorization = request.headers.get("authorization", "")
+        if not authorization or not authorization.startswith("Bearer "):
+            return None
+
+        token = authorization[7:]  # strip "Bearer "
+
+        payload = jwt.decode(token, secret_key, algorithms=["HS256"])
+        username = payload.get("sub")
+        if not username:
+            return None
+
+        user = db.query(User).filter(User.username == username).first()
+        return user
+    except Exception:
+        return None

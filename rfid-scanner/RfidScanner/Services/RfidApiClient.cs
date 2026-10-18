@@ -14,6 +14,11 @@ public class RfidApiClient
     private readonly string _baseUrl;
     private readonly string _apiKey;
 
+    /// <summary>
+    /// JWT-токен авторизованного пользователя (для Authorization: Bearer)
+    /// </summary>
+    public static string? UserToken { get; set; }
+
     public RfidApiClient(string baseUrl, string apiKey)
     {
         _baseUrl = baseUrl.TrimEnd('/');
@@ -27,6 +32,8 @@ public class RfidApiClient
         var fullUrl = $"{_baseUrl}{url}";
         var request = new HttpRequestMessage(method, fullUrl);
         request.Headers.Add("X-API-Key", _apiKey);
+        if (UserToken != null)
+            request.Headers.Add("Authorization", $"Bearer {UserToken}");
         if (content != null)
             request.Content = content;
         
@@ -451,6 +458,67 @@ public class RfidApiClient
         finally
         {
             client.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Аутентификация пользователя по логину и паролю через бэкенд
+    /// </summary>
+    public async Task<Dictionary<string, object>?> LoginAsync(string username, string password)
+    {
+        try
+        {
+            var body = JsonConvert.SerializeObject(new { username, password });
+            var content = new StringContent(body, Encoding.UTF8, "application/json");
+            
+            // Шаг 1: Получаем JWT токен
+            var response = await SendAsync(HttpMethod.Post, "/api/auth/login", content);
+            if (!response.IsSuccessStatusCode)
+            {
+                return null;
+            }
+            
+            var json = await response.Content.ReadAsStringAsync();
+            var tokenData = JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
+            if (tokenData == null || !tokenData.ContainsKey("access_token"))
+            {
+                return null;
+            }
+            
+            var token = tokenData["access_token"]?.ToString();
+            if (string.IsNullOrEmpty(token))
+            {
+                return null;
+            }
+
+            // Сохраняем токен для всех последующих запросов
+            UserToken = token;
+            
+            // Шаг 2: Получаем данные пользователя через токен
+            var userClient = new HttpClient();
+            userClient.Timeout = TimeSpan.FromSeconds(10);
+            try
+            {
+                var userRequest = new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/api/auth/me");
+                userRequest.Headers.Add("Authorization", $"Bearer {token}");
+                var userResponse = await userClient.SendAsync(userRequest);
+                
+                if (!userResponse.IsSuccessStatusCode)
+                {
+                    return null;
+                }
+                
+                var userJson = await userResponse.Content.ReadAsStringAsync();
+                return JsonConvert.DeserializeObject<Dictionary<string, object>>(userJson);
+            }
+            finally
+            {
+                userClient.Dispose();
+            }
+        }
+        catch
+        {
+            return null;
         }
     }
 }

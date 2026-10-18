@@ -1,0 +1,57 @@
+<Window x:Class="RfidScanner.Views.LoginWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Авторизация" Height="380" Width="400" MinHeight="350"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="SingleBorderWindow"
+        ResizeMode="NoResize"
+        Background="#F5F5F5">
+    
+    <Grid Margin="30">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Заголовок -->
+        <StackPanel Grid.Row="0" HorizontalAlignment="Center" Margin="0,0,0,20">
+            <TextBlock Text="PAPI RFID Scanner" FontSize="20" FontWeight="Bold" 
+                       HorizontalAlignment="Center" Foreground="#212121"/>
+            <TextBlock Text="Введите данные для входа" FontSize="12" 
+                       HorizontalAlignment="Center" Foreground="#757575" Margin="0,5,0,0"/>
+        </StackPanel>
+
+        <!-- Форма входа -->
+        <StackPanel Grid.Row="1">
+            <!-- Имя пользователя -->
+            <TextBlock Text="Логин" FontSize="13" Foreground="#424242" Margin="0,0,0,5"/>
+            <TextBox x:Name="UsernameTextBox"
+                     FontSize="14" Padding="10,8" Margin="0,0,0,15"
+                     BorderBrush="#BDBDBD" BorderThickness="1"/>
+            
+            <!-- Пароль -->
+            <TextBlock Text="Пароль" FontSize="13" Foreground="#424242" Margin="0,0,0,5"/>
+            <PasswordBox x:Name="PasswordBox"
+                         FontSize="14" Padding="10,8" Margin="0,0,0,35"
+                         BorderBrush="#BDBDBD" BorderThickness="1"
+                         KeyDown="PasswordBox_KeyDown"
+                         Height="35"/>
+
+            <!-- Сообщение об ошибке -->
+            <TextBlock x:Name="ErrorTextBlock" FontSize="12" Foreground="#F44336" 
+                       TextWrapping="Wrap" Margin="0,0,0,10"
+                       Visibility="Collapsed"/>
+        </StackPanel>
+
+        <!-- Кнопки -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="Войти" x:Name="LoginButton" Click="LoginButton_Click" 
+                    Background="#2196F3" Foreground="White"
+                    Padding="20,8" Margin="0,0,10,0" Width="80"/>
+            <Button Content="Выход" x:Name="CancelButton" Click="CancelButton_Click" 
+                    Background="#757575" Foreground="White"
+                    Padding="20,8" Width="80"/>
+        </StackPanel>
+    </Grid>
+</Window>

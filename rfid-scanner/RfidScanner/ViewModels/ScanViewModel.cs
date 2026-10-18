@@ -458,6 +458,15 @@ public class ScanViewModel : INotifyPropertyChanged
     {
         if (string.IsNullOrEmpty(tag) || _sessionManager.CurrentSession == null) return;
         
+        // Проверка прав на проверку имущества
+        if (!_roleService.CanVerifyAssets())
+        {
+            StatusText = "⛔ Доступ запрещён";
+            HintText = "У вас нет прав для проверки имущества. Обратитесь к администратору.";
+            System.Diagnostics.Debug.WriteLine($"[ProcessTagCommand] Access denied for user: {_currentUser}");
+            return;
+        }
+        
         System.Diagnostics.Debug.WriteLine($"[ProcessTagCommand] Tag: '{tag}', Session: {_sessionManager.CurrentSession.Id}");
         LastTag = tag;
         
@@ -701,7 +710,7 @@ public class ScanViewModel : INotifyPropertyChanged
         _silentMode.PlayMismatch();
     });
 
-    public ICommand SyncCommand => new RelayCommand(SyncToApi);
+    public ICommand SyncCommand => new RelayCommand(async () => await SyncToApi());
 
     // ==================== Завершение с пропуском ====================
 
@@ -1033,7 +1042,7 @@ public class ScanViewModel : INotifyPropertyChanged
         }
     });
 
-    private async void SyncToApi()
+    private async Task SyncToApi()
     {
         SyncStatus = "🔄 Синхронизация...";
         try

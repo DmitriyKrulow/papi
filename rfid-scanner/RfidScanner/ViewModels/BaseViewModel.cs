@@ -89,11 +89,11 @@ public class MainViewModel : BaseViewModel
         set => SetProperty(ref _isLoading, value);
     }
 
-    public ICommand RefreshInventoriesCommand => new RelayCommand(RefreshInventories);
-    public ICommand SyncOfflineCommand => new RelayCommand(SyncOffline);
+    public ICommand RefreshInventoriesCommand => new RelayCommand(async () => await RefreshInventories());
+    public ICommand SyncOfflineCommand => new RelayCommand(async () => await SyncOffline());
     public ICommand OpenSettingsCommand => new RelayCommand(OpenSettings);
 
-    private async void RefreshInventories()
+    private async Task RefreshInventories()
     {
         IsLoading = true;
         StatusMessage = "Загрузка инвентаризаций...";
@@ -119,7 +119,7 @@ public class MainViewModel : BaseViewModel
         }
     }
 
-    private async void SyncOffline()
+    private async Task SyncOffline()
     {
         StatusMessage = "Синхронизация офлайн-операций...";
         var count = await _offlineQueue.SyncItemsAsync(async items =>

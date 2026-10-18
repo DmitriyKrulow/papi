@@ -21,26 +21,34 @@ public partial class MainWindow : Window
     private readonly AuditViewModel _auditViewModel;
     private readonly RoomSelectorViewModel _roomSelectorViewModel;
     private readonly ScanView _scanView;
+    private readonly RoleService _roleService;
+    private readonly AppUser _currentUser;
     private RoomSelectorView? _roomSelectorView;
     private bool _isSwitchingView;
     private Task? _finishTask;
 
-    public MainWindow(ConfigService config)
+    public MainWindow(ConfigService config, RoleService roleService, AppUser currentUser)
     {
         _config = config;
+        _roleService = roleService;
+        _currentUser = currentUser;
         config.Load();
         
         InitializeComponent();
         
+        // Устанавливаем информацию о пользователе в верхней панели
+        UpdateUserInfo();
+        
         // Инициализация сервисов
         var localStore = new LocalStoreService();
         var auditService = new AuditService(localStore);
+        auditService.SetCurrentUser(_currentUser.Username); // Устанавливаем текущего пользователя
         _assetCache = new AssetCacheService();
         _sessionManager = new SessionManager(localStore, auditService);
         var silentMode = new SilentModeService();
         var apiClient = new RfidApiClient(config.Settings.BackendUrl, config.Settings.ApiKey);
         
-        _scanViewModel = new ScanViewModel(_sessionManager, silentMode, apiClient, localStore, _assetCache);
+        _scanViewModel = new ScanViewModel(_sessionManager, silentMode, apiClient, localStore, _assetCache, _roleService);
         _searchViewModel = new SearchViewModel(apiClient, _assetCache);
         _auditViewModel = new AuditViewModel(localStore, _sessionManager);
         
@@ -124,6 +132,20 @@ public partial class MainWindow : Window
         // Статус по умолчанию
         ConnectionStatus.Text = "Проверка подключения...";
         ConnectionStatus.Foreground = System.Windows.Media.Brushes.Orange;
+    }
+
+    /// <summary>
+    /// Обновляет отображение информации о текущем пользователе
+    /// </summary>
+    private void UpdateUserInfo()
+    {
+        var roleText = RoleService.GetRoleText(_currentUser.Role);
+        var departmentText = string.IsNullOrEmpty(_currentUser.Department) 
+            ? string.Empty 
+            : $" | {_currentUser.Department}";
+        
+        ConnectionStatus.Text = $"👤 {_currentUser.Username} ({roleText}{departmentText})";
+        ConnectionStatus.Foreground = System.Windows.Media.Brushes.White;
     }
 
     // ==================== Завершение инвентаризации ====================
@@ -394,6 +416,16 @@ public partial class MainWindow : Window
     {
         var settingsWindow = new SettingsWindow(_config);
         settingsWindow.ShowDialog();
+    }
+
+    private void LogoutButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (MessageBox.Show("Вы действительно хотите выйти?\n\nВсе несохранённые данные будут потеряны.",
+            "Выход", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+        {
+            _roleService.Logout();
+            Application.Current.Shutdown();
+        }
     }
 
     private void SwitchToRoomSelector()

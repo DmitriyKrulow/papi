@@ -53,10 +53,10 @@ public class InventoryViewModel : BaseViewModel
     public int FoundCount => _items.Count(i => i.CheckStatus == "found");
     public int MissingCount => _items.Count(i => i.CheckStatus == "missing");
 
-    public ICommand LoadInventoryCommand => new RelayCommand<int>(LoadInventory);
-    public ICommand ScanCommand => new RelayCommand<string>(ScanTag);
+    public ICommand LoadInventoryCommand => new RelayCommand<int>(async id => await LoadInventory(id));
+    public ICommand ScanCommand => new RelayCommand<string>(async tag => await ScanTag(tag));
 
-    private async void LoadInventory(int inventoryId)
+    private async Task LoadInventory(int inventoryId)
     {
         IsLoading = true;
         try
@@ -66,9 +66,10 @@ public class InventoryViewModel : BaseViewModel
             foreach (var item in items)
                 _items.Add(item);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
             // Показать ошибку
+            System.Diagnostics.Debug.WriteLine($"[LoadInventory] Error: {ex.Message}");
         }
         finally
         {
@@ -76,7 +77,7 @@ public class InventoryViewModel : BaseViewModel
         }
     }
 
-    private async void ScanTag(string rfidTag)
+    private async Task ScanTag(string rfidTag)
     {
         if (SelectedInventory == null)
             return;

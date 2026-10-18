@@ -107,83 +107,6 @@ async def root():
 # часть без (напр. POST /{department_id}/rooms). При этом фронтенд шлёт пути
 # без завершающего слэша. Чтобы не полагаться на 307-редиректы FastAPI
 # (которые при кросс-ориджин переходе теряют Authorization header и могут
-# зацикливаться), middleware добавляет trailing slash к scope-пути ТОЛЬКО
-# когда маршрут реально объявлен с trailing slash. Иначе роут без слэша
-# совпадает напрямую и редиректа не происходит.
-# ---------------------------------------------------------------------------
-
-# Кэш матчеров маршрутов: список (regex, methods). Строится один раз.
-_route_matcher_cache = None
-
-
-def _build_route_matcher(app):
-    routes = []
-    for r in app.router.routes:
-        if type(r).__name__ == "_IncludedRouter":
-            prefix = getattr(r.include_context, "prefix", "") or ""
-            for rr in r.original_router.routes:
-                pr = getattr(rr, "path_regex", None)
-                if pr is None:
-                    continue
-                pat = pr.pattern
-                if pat.startswith("^"):
-                    pat = pat[1:]
-                if pat.endswith("$"):
-                    pat = pat[:-1]
-                rx = re.compile("^" + re.escape(prefix) + pat + "$")
-                routes.append((rx, getattr(rr, "methods", None)))
-        else:
-            pr = getattr(r, "path_regex", None)
-            if pr is not None:
-                routes.append((pr, getattr(r, "methods", None)))
-    return routes
-
-
-def _get_route_matcher(app):
-    global _route_matcher_cache
-    if _route_matcher_cache is None:
-        _route_matcher_cache = _build_route_matcher(app)
-    return _route_matcher_cache
-
-
-def _route_matches(matcher, path, method):
-    for rx, methods in matcher:
-        if rx.fullmatch(path) and (not methods or method in methods):
-            return True
-    return False
-
-
-@app.middleware("http")
-async def add_trailing_slash_if_missing(request: Request, call_next):
-    """Добавляет trailing slash к POST/PUT/PATCH/DELETE запросам, если его нет —
-    но ТОЛЬКО когда маршрут реально объявлен с trailing slash.
-
-    Раньше слэш добавлялся принудительно ко всем запросам, из-за чего роуты,
-    объявленные БЕЗ trailing slash (например POST /{department_id}/rooms),
-    попадали в бесконечную 307-редирект-петлю (redirect_slashes=True),
-    а при кросс-ориджин редиректе ещё и терялся Authorization header.
-    """
-    path = request.url.path
-    method = request.method
-    if method in ("POST", "PUT", "PATCH", "DELETE") and not path.endswith("/") and path != "/":
-        matcher = _get_route_matcher(request.app)
-        candidate = path + "/"
-        # Есть ли маршрут, объявленный С trailing slash
-        matches_with_slash = _route_matches(matcher, candidate, method)
-        # Есть ли маршрут, объявленный БЕЗ trailing slash
-        matches_without_slash = _route_matches(matcher, path, method)
-
-        # Переписываем путь только если слэш действительно нужен,
-        # иначе оставляем без слэша, чтобы роут без слэша совпал напрямую.
-        if matches_with_slash and not matches_without_slash:
-            scope = request.scope
-            scope["path"] = candidate
-            if scope.get("raw_path"):
-                scope["raw_path"] = candidate.encode("utf-8")
-    response = await call_next(request)
-    return response
-
-
 @app.get("/")
 def root():
     return {"message": "Welcome to PAPI Backend API"}
@@ -381,7 +304,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["http://localhost", "http://localhost:5173", "https://localhost"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -389,7 +312,7 @@ app.add_middleware(
 
 
 @app.middleware("http")
-async def add_trailing_slash(request: Request, call_next):
+async def log_request(request: Request, call_next):
     import logging
     logger = logging.getLogger(__name__)
     
@@ -401,28 +324,6 @@ async def add_trailing_slash(request: Request, call_next):
         response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, PATCH, OPTIONS'
         response.headers['Access-Control-Allow-Headers'] = 'Authorization, Content-Type'
         response.headers['Access-Control-Expose-Headers'] = 'Authorization'
-        return response
-    
-# Добавляем trailing slash, если его нет (кроме корня и статических путей)
-    # Исключаем API пути из редиректа, чтобы избежать проблем с CORS
-    # Также исключаем /docs, /openapi.json, /redoc — у них redirect_slashes=False ломает маршруты
-    if not request.url.path.endswith("/") and request.url.path != "/" and "." not in request.url.path.split("/")[-1] and not request.url.path.startswith("/api") and request.url.path not in ("/docs", "/openapi.json", "/redoc"):
-        from fastapi.responses import RedirectResponse
-        redirect_url = request.url.path + "/"
-        if request.url.query:
-            redirect_url += "?" + request.url.query
-        response = RedirectResponse(url=redirect_url, status_code=308)
-        response.headers['Access-Control-Allow-Credentials'] = 'true'
-        response.headers['Access-Control-Expose-Headers'] = 'Authorization'
-        return response
-    
-    # Редирект /docs/ → /docs (и /redoc/ → /redoc), т.к. redirect_slashes=False
-    if request.url.path in ("/docs/", "/redoc/"):
-        from fastapi.responses import RedirectResponse
-        redirect_url = request.url.path.rstrip("/")
-        if request.url.query:
-            redirect_url += "?" + request.url.query
-        response = RedirectResponse(url=redirect_url, status_code=307)
         return response
     
     logger.info(f"[Request] {request.method} {request.url.path}")
