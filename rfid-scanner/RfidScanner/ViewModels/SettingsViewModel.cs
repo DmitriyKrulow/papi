@@ -92,7 +92,7 @@ public class SettingsViewModel : BaseViewModel
         _config.Save();
     }
 
-    private async Task TestConnection()
+    private async void TestConnection()
     {
         // Реализовать проверку подключения
     }

@@ -175,29 +175,6 @@ public class RoomSelectorViewModel : INotifyPropertyChanged
             StatusMessage = $"⚠ Не удалось обновить список: {ex.Message}";
         }
     }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"[RefreshOnEnter] ERROR: {ex.GetType().Name}: {ex.Message}");
-            System.Diagnostics.Debug.WriteLine($"[RefreshOnEnter] StackTrace: {ex.StackTrace}");
-            StatusMessage = $"⚠ Не удалось обновить данные: {ex.Message}";
-        }
-    }
-
-    /// <summary>
-    /// Обновить только список инвентаризаций (deprecated — используйте RefreshInventoriesAsync)
-    /// </summary>
-    public async Task RefreshInventories()
-    {
-        try
-        {
-            await LoadInventoriesAsync();
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"[RefreshInventories] ERROR: {ex.Message}");
-            StatusMessage = $"⚠ Не удалось обновить список: {ex.Message}";
-        }
-    }
 
     private void LoadRooms() => _ = LoadRoomsAsync();
     private void LoadInventories() => _ = LoadInventoriesAsync();
