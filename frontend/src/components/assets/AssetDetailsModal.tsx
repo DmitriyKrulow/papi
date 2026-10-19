@@ -1,5 +1,5 @@
 // frontend/src/components/assets/AssetDetailsModal.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Calendar, DollarSign, Edit, Trash2, MapPin, User, Wrench, Plus, RefreshCw, Image, ClipboardCheck, CheckCircle2, Clock, Printer, Radio } from 'lucide-react';
 import type { Asset, MaintenanceEvent } from '../../types';
@@ -31,6 +31,12 @@ const AssetDetailsModal: React.FC<AssetDetailsModalProps> = ({ asset, onClose, o
   const [printPhotosMeta, setPrintPhotosMeta] = useState<any[]>([]);
   const [isPreparingPrint, setIsPreparingPrint] = useState(false);
   const { photos: assetPhotos } = useAssetPhotos(asset?.id ?? 0);
+  
+  // Состояния для подготовки фотографий к печати
+  const [printPhotosFull, setPrintPhotosFull] = useState<{ src: string; meta: any }[]>([]);
+  const [isPreparingPrintFull, setIsPreparingPrintFull] = useState(false);
+  const [shouldPrint, setShouldPrint] = useState(false);
+  
   const [newEvent, setNewEvent] = useState({
     event_type: 'repair',
     event_date: new Date().toISOString().split('T')[0],
@@ -216,26 +222,345 @@ const getStatusColor = (status: string): string => {
     </div>
   );
 
-  const printRow = (label: string, value?: string | number | null) => {
-    if (value === undefined || value === null || String(value).trim() === '') return null;
-    return (
-      <div style={{ display: 'flex', padding: '3px 0', fontSize: '13px' }}>
-        <span style={{ width: '220px', fontWeight: 'bold', color: '#000' }}>{label}</span>
-        <span>{value}</span>
-      </div>
-    );
+  // Карта специфичных полей для типов активов
+  const assetTypeFieldMap: Record<string, string[]> = {
+    // Офисное оборудование
+    'computer': ['serial_number', 'manufacturer_name', 'manufacturer_code', 'model', 'capacity', 'power', 'weight'],
+    'printer': ['serial_number', 'manufacturer_name', 'manufacturer_code', 'model', 'consumable_type'],
+    'multifunction': ['serial_number', 'manufacturer_name', 'manufacturer_code', 'model', 'consumable_type'],
+    'communication': ['serial_number', 'manufacturer_name', 'manufacturer_code', 'model'],
+    'it_network': ['serial_number', 'manufacturer_name', 'manufacturer_code', 'model'],
+    'furniture_server': ['serial_number', 'manufacturer_name', 'manufacturer_code', 'model', 'weight'],
+    
+    // Мебель
+    'furniture': ['serial_number', 'manufacturer_name', 'manufacturer_code', 'model', 'weight'],
+    'furniture_server': ['serial_number', 'manufacturer_name', 'manufacturer_code', 'model', 'weight'],
+    'furniture_storage': ['serial_number', 'manufacturer_name', 'manufacturer_code', 'model', 'weight'],
+    
+    // Инженерные системы
+    'ventilation': ['serial_number', 'manufacturer_name', 'manufacturer_code', 'model', 'power', 'capacity', 'weight'],
+    'electrical': ['serial_number', 'manufacturer_name', 'manufacturer_code', 'model', 'power', 'weight'],
+    'power_supply': ['serial_number', 'manufacturer_name', 'manufacturer_code', 'model', 'power', 'capacity', 'weight'],
+    'security': ['serial_number', 'manufacturer_name', 'manufacturer_code', 'model', 'power'],
+    'plumbing': ['serial_number', 'manufacturer_name', 'manufacturer_code', 'model', 'capacity'],
+    'doors_windows': ['serial_number', 'manufacturer_name', 'manufacturer_code', 'model'],
+    'parking': ['serial_number', 'manufacturer_name', 'manufacturer_code', 'model'],
+    
+    // Прочее
+    'fire_extinguisher': ['serial_number', 'manufacturer_name', 'manufacturer_code', 'model', 'capacity', 'weight'],
+    'crypto_token': ['crypto_wallet_address', 'crypto_token_symbol'],
+    'consumables': ['consumable_type'],
+    'tools': ['serial_number', 'manufacturer_name', 'manufacturer_code', 'model', 'weight'],
+    'appliances': ['serial_number', 'manufacturer_name', 'manufacturer_code', 'model', 'power', 'capacity', 'weight'],
+    'ppe': [], // СИЗ — только базовые поля
+    'other': [], // Прочее — только базовые поля
   };
 
-  const printSection = (title: string, rows: React.ReactNode[]) => {
-    const hasContent = rows.some(r => r !== null && r !== undefined);
-    if (!hasContent) return null;
-    return (
-      <div className="print-section">
-        <h2 style={{ fontSize: '14px', borderBottom: '2px solid #000', paddingBottom: '4px', margin: '0 0 8px' }}>{title}</h2>
-        {rows}
-      </div>
-    );
+  // Получаем разрешённые поля для текущего типа актива
+  const assetTypeCode = asset.asset_type || '';
+  const allowedFields = assetTypeCode ? (assetTypeFieldMap[assetTypeCode] || []) : [];
+
+  // Проверяем, разрешено ли поле для данного типа
+  const isFieldAllowed = (fieldName: string): boolean => {
+    // Базовые поля всегда показываем
+    const baseFields = ['inventory_number', 'name', 'description', 'model', 'manufacturer_name', 'manufacturer_code', 'serial_number', 'rfid_tag', 'quantity', 'depreciation_years'];
+    if (baseFields.includes(fieldName)) return true;
+    // Если для типа заданы поля — показываем только их
+    if (allowedFields.length > 0) return allowedFields.includes(fieldName);
+    // Иначе показываем только если есть значение
+    return true;
   };
+
+  // Собираем данные для печати в структуру
+  const printSections: { title: string; content: React.ReactNode }[] = useMemo(() => {
+    // Вспомогательные функции внутри useMemo для правильного замыкания
+    const printRow = (label: string, value?: string | number | null | undefined) => {
+      if (value === undefined || value === null || value === '') return null;
+      if (typeof value === 'string' && value.trim() === '') return null;
+      if (typeof value === 'number' && isNaN(value)) return null;
+      return (
+        <div style={{ display: 'flex', padding: '3px 0', fontSize: '11px', pageBreakInside: 'avoid' }}>
+          <span style={{ width: '180px', fontWeight: 'bold', color: '#000', flexShrink: 0 }}>{label}</span>
+          <span style={{ color: '#333' }}>{value}</span>
+        </div>
+      );
+    };
+    
+    const printSection = (title: string, rows: React.ReactNode[]) => {
+      const validRows = rows.filter(r => r !== null && r !== undefined);
+      if (validRows.length === 0) return null;
+      return (
+        <div className="print-section" style={{ marginBottom: '16px' }}>
+          <h2 style={{ fontSize: '13px', fontWeight: 'bold', borderBottom: '1px solid #000', paddingBottom: '3px', margin: '0 0 8px', textTransform: 'uppercase' }}>{title}</h2>
+          {validRows}
+        </div>
+      );
+    };
+    
+    const getCategoryLabel = (category: string): string => {
+      const labels: Record<string, string> = {
+        general_view: '📷 Общий вид',
+        placement: '📍 Место размещения',
+        inventory_number: '🔢 Инвентарный номер',
+        current_location: '🗺️ Текущее местоположение',
+        condition: '🔍 Состояние',
+        malfunction: '⚠️ Неисправность',
+        general_condition: '📋 Общее состояние',
+      };
+      return labels[category] || category;
+    };
+    
+    const sections: { title: string; content: React.ReactNode }[] = [];
+    
+    // Основная информация
+    const mainInfoRows: React.ReactNode[] = [
+      printRow('Инвентарный номер', asset.inventory_number),
+      printRow('Название', asset.name),
+      printRow('Описание', asset.description),
+      printRow('Модель', asset.model),
+      printRow('Тип актива', assetTypeInfo ? `${assetTypeInfo.icon} ${assetTypeInfo.label}` : asset.asset_type),
+      printRow('Статус', statusInfo?.label || asset.status),
+      printRow('Производитель', asset.manufacturer_name),
+      printRow('Код производителя', asset.manufacturer_code),
+      printRow('Серийный номер', asset.serial_number),
+      printRow('RFID-метка', asset.rfid_tag),
+      ...(asset.quantity && asset.quantity > 1 ? [printRow('Количество', asset.quantity)] : []),
+      ...(asset.depreciation_years != null ? [printRow('Срок амортизации', `${asset.depreciation_years} лет`)] : []),
+      ...(isFieldAllowed('capacity') && asset.capacity ? [printRow('Объём', `${asset.capacity} л`)] : []),
+      ...(isFieldAllowed('power') && asset.power ? [printRow('Мощность', `${asset.power} Вт`)] : []),
+      ...(isFieldAllowed('weight') && asset.weight ? [printRow('Вес', `${asset.weight}`)] : []),
+      ...(isFieldAllowed('consumable_type') && asset.consumable_type ? [printRow('Тип расходника', asset.consumable_type)] : []),
+      ...(isFieldAllowed('crypto_wallet_address') && asset.crypto_wallet_address ? [printRow('Имя пользователя / Логин', asset.crypto_wallet_address)] : []),
+      ...(isFieldAllowed('crypto_token_symbol') && asset.crypto_token_symbol ? [printRow('Серийный номер / Идентификатор', asset.crypto_token_symbol)] : []),
+    ];
+    if (mainInfoRows.some(r => r != null)) {
+      sections.push({ title: 'Основная информация', content: printSection('Основная информация', mainInfoRows) });
+    }
+    
+    // Финансы
+    const financeRows: React.ReactNode[] = [
+      printRow('Стоимость покупки', asset.purchase_price != null ? formatMoney(asset.purchase_price) : undefined),
+      printRow('Текущая стоимость', asset.current_value != null ? formatMoney(asset.current_value) : undefined),
+    ];
+    if (financeRows.some(r => r != null)) {
+      sections.push({ title: 'Финансы', content: printSection('Финансовые данные', financeRows) });
+    }
+    
+    // Даты
+    const dateRows: React.ReactNode[] = [
+      printRow('Создан', formatDate(asset.created_at)),
+      printRow('Обновлён', formatDate(asset.updated_at)),
+      printRow('Дата покупки', asset.purchase_date ? formatDate(asset.purchase_date) : undefined),
+      printRow('Дата ввода в эксплуатацию', asset.commissioning_date ? formatDate(asset.commissioning_date) : undefined),
+      printRow('Гарантия до', asset.warranty_expiry ? formatDate(asset.warranty_expiry) : undefined),
+      printRow('Следующее обслуживание', asset.next_maintenance_date ? formatDate(asset.next_maintenance_date) : undefined),
+    ];
+    if (dateRows.some(r => r != null)) {
+      sections.push({ title: 'Даты', content: printSection('Даты', dateRows) });
+    }
+    
+    // Местоположение
+    const locationRows: React.ReactNode[] = [
+      printRow('Адрес', asset.location_address),
+      printRow('Подразделение', asset.department_name || asset.department_code),
+      printRow('Ответственное лицо', asset.responsible_person || asset.employee_name),
+    ];
+    if (locationRows.some(r => r != null)) {
+      sections.push({ title: 'Местоположение', content: printSection('Местоположение и ответственность', locationRows) });
+    }
+    
+    // История обслуживания
+    if (maintenanceEvents.length > 0) {
+      sections.push({
+        title: 'История обслуживания',
+        content: (
+          <div className="print-section" style={{ marginBottom: '16px' }}>
+            <h2 style={{ fontSize: '13px', fontWeight: 'bold', borderBottom: '1px solid #000', paddingBottom: '3px', margin: '0 0 8px', textTransform: 'uppercase' }}>История обслуживания (последние 10)</h2>
+            <table className="print-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '80px' }}>Дата</th>
+                  <th style={{ width: '120px' }}>Тип</th>
+                  <th>Описание</th>
+                  <th style={{ width: '80px' }}>Стоимость</th>
+                  <th style={{ width: '120px' }}>Выполнил</th>
+                </tr>
+              </thead>
+              <tbody>
+                {maintenanceEvents.slice(0, 10).map((event) => {
+                  const eventTypeInfo = MaintenanceEventTypes[event.event_type as keyof typeof MaintenanceEventTypes];
+                  return (
+                    <tr key={event.id}>
+                      <td>{formatDate(event.event_date)}</td>
+                      <td>{eventTypeInfo?.icon || '🔧'} {eventTypeInfo?.label || event.event_type}</td>
+                      <td>{event.description || '—'}</td>
+                      <td>{event.cost ? formatMoney(event.cost) : '—'}</td>
+                      <td>{event.performed_by || '—'}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )
+      });
+    }
+    
+    // Заявки на ремонт
+    if (repairHistory.length > 0) {
+      sections.push({
+        title: 'Заявки на ремонт',
+        content: (
+          <div className="print-section" style={{ marginBottom: '16px' }}>
+            <h2 style={{ fontSize: '13px', fontWeight: 'bold', borderBottom: '1px solid #000', paddingBottom: '3px', margin: '0 0 8px', textTransform: 'uppercase' }}>Заявки на ремонт</h2>
+            <table className="print-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '80px' }}>Дата</th>
+                  <th>Название</th>
+                  <th style={{ width: '80px' }}>Статус</th>
+                  <th style={{ width: '80px' }}>Оценка</th>
+                  <th style={{ width: '80px' }}>Факт</th>
+                  <th style={{ width: '100px' }}>Исполнитель</th>
+                </tr>
+              </thead>
+              <tbody>
+                {repairHistory.map((repair: any) => {
+                  const badge = getRepairStatusBadge(repair.status);
+                  return (
+                    <tr key={repair.id}>
+                      <td>{formatDate(repair.created_at)}</td>
+                      <td>{repair.title}</td>
+                      <td>{badge.label}</td>
+                      <td>{repair.estimated_cost ? formatMoney(repair.estimated_cost) : '—'}</td>
+                      <td>{repair.actual_cost ? formatMoney(repair.actual_cost) : '—'}</td>
+                      <td>{repair.assigned_to_name || '—'}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )
+      });
+    }
+    
+    // Проверка наличия
+    const inventoryRows: React.ReactNode[] = [];
+    if (asset.last_inventory_confirmed || asset.last_inventory_date) {
+      inventoryRows.push(printRow('Статус', asset.last_inventory_confirmed ? 'Подтверждён' : 'Ожидает'));
+    }
+    if (asset.last_inventory_date) {
+      inventoryRows.push(printRow('Дата проверки', formatDate(asset.last_inventory_date)));
+    }
+    if (asset.last_inventory_by_id != null) {
+      inventoryRows.push(printRow('Проверял (ID)', String(asset.last_inventory_by_id)));
+    }
+    if (asset.last_inventory_source) {
+      inventoryRows.push(printRow('Источник', asset.last_inventory_source === 'rfid' ? 'RFID-сканер' : 'Ручная проверка'));
+    }
+    if (inventoryRows.length > 0) {
+      sections.push({ title: 'Проверка', content: printSection('Проверка наличия', inventoryRows) });
+    }
+    
+    // Фотографии
+    if (printPhotosFull.length > 0) {
+      sections.push({
+        title: 'Фотографии',
+        content: (
+          <div className="print-section" data-has-content="true" style={{ marginBottom: '16px' }}>
+            <h2 style={{ fontSize: '13px', fontWeight: 'bold', borderBottom: '1px solid #000', paddingBottom: '3px', margin: '0 0 8px', textTransform: 'uppercase' }}>Фотографии ({printPhotosFull.length})</h2>
+            <div className="print-photos">
+              {printPhotosFull.map((photo, i) => (
+                <div key={i} className="print-photo">
+                  <img src={photo.src} alt={`Фото ${i + 1}`} />
+                  <div className="photo-caption">
+                    {photo.meta.category && (
+                      <span className="photo-category">{getCategoryLabel(photo.meta.category)}</span>
+                    )}
+                    {photo.meta.description && <span>{photo.meta.description}</span>}
+                    {photo.meta.taken_at && <span style={{ display: 'block', color: '#999' }}>{formatDate(photo.meta.taken_at)}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      });
+    }
+    
+    return sections;
+  }, [
+    asset,
+    assetTypeInfo,
+    statusInfo,
+    maintenanceEvents,
+    repairHistory,
+    printPhotosFull,
+    isFieldAllowed,
+    formatMoney,
+    formatDate,
+    getRepairStatusBadge,
+  ]);
+
+  // QR-код для актива
+  const assetUrl = `${window.location.origin}/assets/${asset.id}`;
+  const qrCodeData = encodeURIComponent(JSON.stringify({ id: asset.id, inventory: asset.inventory_number, url: assetUrl }));
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${qrCodeData}`;
+
+  const handlePreparePrintFull = async () => {
+    if (!asset) return;
+    setIsPreparingPrintFull(true);
+    try {
+      const photosData: { src: string; meta: any }[] = [];
+      let loadErrors = 0;
+      
+      for (const photo of assetPhotos) {
+        try {
+          const res = await api.get(`/asset-photos/${photo.id}/download`, { 
+            responseType: 'blob',
+          });
+          const dataUrl = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(res.data as Blob);
+          });
+          photosData.push({
+            src: dataUrl as string,
+            meta: {
+              category: photo.photo_category,
+              description: photo.description,
+              stage: photo.stage,
+              taken_at: photo.taken_at,
+            },
+          });
+        } catch (err) {
+          loadErrors++;
+          console.error(`Не удалось загрузить фото ${photo.id} для печати:`, err);
+        }
+      }
+      
+      setPrintPhotosFull(photosData);
+      setShouldPrint(true);
+    } finally {
+      setIsPreparingPrintFull(false);
+    }
+  };
+
+  // Печать после ре-рендера с загруженными фото
+  useEffect(() => {
+    if (shouldPrint) {
+      console.log('🖨️ shouldPrint=true, printSections:', printSections.length);
+      // Даем React отрендерить обновленный DOM и изображениям загрузиться
+      const timer = setTimeout(() => {
+        console.log('🖨️ window.print() triggered');
+        window.print();
+        setShouldPrint(false);
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+  }, [shouldPrint, printSections]);
 
 return (
     <div className="space-y-6">
@@ -269,12 +594,12 @@ return (
             <span className="sm:hidden">📷</span>
           </button>
           <button
-            onClick={handlePreparePrint}
-            disabled={isPreparingPrint}
+            onClick={handlePreparePrintFull}
+            disabled={isPreparingPrintFull}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-700 transition whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Printer className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">{isPreparingPrint ? 'Подготовка...' : 'Печать'}</span>
+            <span className="hidden sm:inline">{isPreparingPrintFull ? 'Подготовка...' : 'Печать карточки'}</span>
             <span className="sm:hidden">🖨️</span>
           </button>
           {asset.is_active ? (
@@ -658,101 +983,67 @@ return (
       <AssetPhotoGallery
         assetId={asset.id}
         assetName={asset.name}
+        assetTypeCode={asset.asset_type}
         isOpen={isGalleryOpen}
         onClose={() => setIsGalleryOpen(false)}
       />
 
-      {/* Печатная версия данных актива */}
+      {/* Печатная версия — полная карточка актива */}
       {createPortal(
-        <div className="print-area">
-          <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif', color: '#000' }}>
-            <h1 style={{ fontSize: '22px', margin: '0 0 4px' }}>{asset.name}</h1>
-            <div style={{ fontSize: '13px', color: '#333', marginBottom: '16px' }}>
-              Инвентарный № {asset.inventory_number}
-              {assetTypeInfo && ` • ${assetTypeInfo.label}`}
-              {' • '}{statusInfo?.label || asset.status}
+        <div className="print-area" data-has-content={printSections.length > 0 || undefined}>
+          {/* Шапка организации */}
+          <div className="print-org-header">
+            <h1>Карточка актива</h1>
+            <p>Формирование: {new Date().toLocaleDateString('ru-RU')} в {new Date().toLocaleTimeString('ru-RU')}</p>
+          </div>
+
+          {/* Заголовок карточки с QR */}
+          <div className="print-card-header">
+            <div className="print-card-title">
+              <h2>{asset.name}</h2>
+              <div className="inventory-number">Инвентарный № {asset.inventory_number}</div>
+              <div style={{ fontSize: '12px', color: '#555', marginTop: '4px' }}>
+                {assetTypeInfo && `${assetTypeInfo.icon} ${assetTypeInfo.label}`}
+                {' • '}{statusInfo?.label || asset.status}
+              </div>
             </div>
+            <div style={{ textAlign: 'right', marginLeft: '16px' }}>
+              <img src={qrCodeUrl} alt="QR-код" className="qr-code-print" />
+              <div style={{ fontSize: '8px', color: '#999', marginTop: '2px' }}>Скан для проверки</div>
+            </div>
+          </div>
 
-            {printSection('Основная информация', [
-              printRow('Инвентарный номер', asset.inventory_number),
-              printRow('Название', asset.name),
-              printRow('Описание', asset.description),
-              printRow('Модель', asset.model),
-              printRow('Тип актива', assetTypeInfo ? `${assetTypeInfo.icon} ${assetTypeInfo.label}` : asset.asset_type),
-              printRow('Статус', statusInfo?.label || asset.status),
-              printRow('Производитель', asset.manufacturer_name),
-              printRow('Код производителя', asset.manufacturer_code),
-              printRow('Серийный номер', asset.serial_number),
-              printRow('RFID-метка', asset.rfid_tag || 'Не присвоена'),
-              printRow('Количество', asset.quantity),
-              printRow('Срок амортизации', asset.depreciation_years != null ? `${asset.depreciation_years} лет` : undefined),
-              printRow('Объём', asset.capacity != null ? `${asset.capacity} л` : undefined),
-              printRow('Мощность', asset.power != null ? `${asset.power} Вт` : undefined),
-              printRow('Вес', asset.weight != null ? `${asset.weight}` : undefined),
-              printRow('Тип расходника', asset.consumable_type),
-              printRow('Имя пользователя / Логин', asset.crypto_wallet_address),
-              printRow('Серийный номер / Идентификатор', asset.crypto_token_symbol),
-            ])}
+          {/* Рендерим только секции с данными */}
+          {printSections.length > 0 && printSections.map((section, idx) => (
+            <div key={idx} className="print-section" data-has-content="true" style={{ marginBottom: '16px' }}>
+              {section.content}
+            </div>
+          ))}
 
-            {printSection('Финансы', [
-              printRow('Стоимость покупки', asset.purchase_price != null ? formatMoney(asset.purchase_price) : undefined),
-              printRow('Текущая стоимость', asset.current_value != null ? formatMoney(asset.current_value) : undefined),
-            ])}
-
-            {printSection('Даты', [
-              printRow('Создан', formatDate(asset.created_at)),
-              printRow('Обновлён', formatDate(asset.updated_at)),
-              printRow('Дата покупки', asset.purchase_date ? formatDate(asset.purchase_date) : undefined),
-              printRow('Дата ввода в эксплуатацию', asset.commissioning_date ? formatDate(asset.commissioning_date) : undefined),
-              printRow('Гарантия до', asset.warranty_expiry ? formatDate(asset.warranty_expiry) : undefined),
-              printRow('Следующее обслуживание', asset.next_maintenance_date ? formatDate(asset.next_maintenance_date) : undefined),
-            ])}
-
-            {printSection('Местоположение и ответственность', [
-              printRow('Адрес', asset.location_address),
-              printRow('Подразделение', asset.department_name || asset.department_code),
-              printRow('Ответственное лицо', asset.responsible_person || asset.employee_name),
-            ])}
-
-            {printSection('Проверка наличия', [
-              printRow('Статус', asset.last_inventory_confirmed ? 'Подтверждён' : asset.last_inventory_date ? 'Ожидает' : 'Не проверен'),
-              printRow('Дата проверки', asset.last_inventory_date ? formatDate(asset.last_inventory_date) : undefined),
-              printRow('Проверял (ID)', asset.last_inventory_by_id != null ? String(asset.last_inventory_by_id) : undefined),
-              printRow('Источник', asset.last_inventory_source === 'rfid' ? 'RFID-сканер' : asset.last_inventory_source === 'manual' ? 'Ручная проверка' : undefined),
-            ])}
-
-            {printPhotos.length > 0 && (
-              <div className="print-section">
-                <h2 style={{ fontSize: '14px', borderBottom: '2px solid #000', paddingBottom: '4px', margin: '0 0 8px' }}>
-                  Фотографии ({printPhotos.length})
-                </h2>
-                <div className="print-photos">
-                  {printPhotos.map((src, i) => (
-                    <div key={i} className="print-photo">
-                      <img src={src} alt={`Фото ${i + 1}`} />
-                      <div style={{ fontSize: '10px', marginTop: '4px', color: '#333' }}>
-                        {printPhotosMeta[i]?.category && (
-                          <span style={{ fontWeight: 'bold', marginRight: '6px' }}>
-                            {printPhotosMeta[i].category === 'general_view' && '📷 Общий вид'}
-                            {printPhotosMeta[i].category === 'placement' && '📍 Место размещения'}
-                            {printPhotosMeta[i].category === 'inventory_number' && '🔢 Инвентарный номер'}
-                            {printPhotosMeta[i].category === 'current_location' && '🗺️ Текущее местоположение'}
-                            {printPhotosMeta[i].category === 'condition' && '🔍 Состояние'}
-                            {printPhotosMeta[i].category === 'malfunction' && '⚠️ Неисправность'}
-                            {printPhotosMeta[i].category === 'general_condition' && '📋 Общее состояние'}
-                            {!['general_view', 'placement', 'inventory_number', 'current_location', 'condition', 'malfunction', 'general_condition'].includes(printPhotosMeta[i].category) && printPhotosMeta[i].category}
-                          </span>
-                        )}
-                        {printPhotosMeta[i]?.description && (
-                          <span style={{ color: '#555' }}>{printPhotosMeta[i].description}</span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+          {/* Блок подписей — показываем только если есть данные */}
+          {printSections.length > 0 && (
+            <>
+              <div className="print-signatures">
+                <div className="print-signature">
+                  <div className="sig-label">Составил</div>
+                  <div className="sig-line">_________________ / _________________</div>
+                </div>
+                <div className="print-signature">
+                  <div className="sig-label">Ответственное лицо</div>
+                  <div className="sig-line">_________________ / {asset.responsible_person || '_____________'}</div>
+                </div>
+                <div className="print-signature">
+                  <div className="sig-label">Утвердил</div>
+                  <div className="sig-line">_________________ / _________________</div>
                 </div>
               </div>
-            )}
-          </div>
+
+              {/* Подвал */}
+              <div style={{ marginTop: '24px', paddingTop: '8px', borderTop: '1px solid #ccc', fontSize: '9px', color: '#999', textAlign: 'center' }}>
+                Документ сформирован автоматически системой PAPI • {assetUrl}
+              </div>
+            </>
+          )}
         </div>,
         document.body
       )}

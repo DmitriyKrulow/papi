@@ -1,7 +1,9 @@
 # backend/src/presentation/http/routers/data_export.py
 """Экспорт всех данных системы в JSON-формат для полного восстановления."""
+import base64
 import json
 import logging
+import os
 from datetime import datetime
 from io import BytesIO
 from typing import List, Dict, Any, Optional
@@ -15,6 +17,8 @@ from src.infrastructure.db.init_db import get_db
 from src.infrastructure.db.models.department import Department, Room
 from src.infrastructure.db.models.employee import Employee
 from src.infrastructure.db.models.asset import Asset
+from src.infrastructure.db.models.document import Document
+from src.infrastructure.db.models.asset_photo import AssetPhoto as AssetPhotoModel
 from src.infrastructure.db.models.user import User
 from src.presentation.http.dependencies.auth import get_current_admin
 
@@ -180,6 +184,77 @@ def export_assets(db: Session) -> List[Dict[str, Any]]:
     return result
 
 
+def export_documents(db: Session) -> List[Dict[str, Any]]:
+    """Экспортирует все документы с содержимым файлов в base64."""
+    documents = db.query(Document).all()
+    result = []
+    for doc in documents:
+        doc_data = {
+            "id": getattr(doc, 'id', None),
+            "filename": _safe_str(getattr(doc, 'filename', None)),
+            "file_path": _safe_str(getattr(doc, 'file_path', None)),
+            "file_size": _safe_int(getattr(doc, 'file_size', None)),
+            "mime_type": _safe_str(getattr(doc, 'mime_type', None)),
+            "document_type": _safe_str(getattr(doc, 'document_type', None)),
+            "category": _safe_str(getattr(doc, 'category', None)),
+            "entity_id": _safe_int(getattr(doc, 'entity_id', None)),
+            "entity_type": _safe_str(getattr(doc, 'entity_type', None)),
+            "title": _safe_str(getattr(doc, 'title', None)),
+            "description": _safe_str(getattr(doc, 'description', None)),
+            "uploaded_by": _safe_int(getattr(doc, 'uploaded_by', None)),
+            "uploaded_at": _safe_isoformat(getattr(doc, 'uploaded_at', None)),
+            "is_primary": getattr(doc, 'is_primary', False),
+            "sort_order": _safe_int(getattr(doc, 'sort_order', None)),
+            "file_hash": _safe_str(getattr(doc, 'file_hash', None)),
+            "file_content": None,  # Заполняется ниже
+        }
+        
+        # Читаем файл и кодируем в base64
+        file_path = str(doc.file_path)
+        if os.path.exists(file_path):
+            try:
+                with open(file_path, "rb") as f:
+                    file_bytes = f.read()
+                # Кодируем в base64 для включения в JSON
+                doc_data["file_content"] = base64.b64encode(file_bytes).decode('utf-8')
+                doc_data["file_size_exported"] = len(file_bytes)
+            except Exception as e:
+                logger.warning(f"[DataExport] Could not read file {file_path}: {e}")
+                doc_data["file_content"] = None
+        else:
+            logger.warning(f"[DataExport] File not found on disk: {file_path}")
+            doc_data["file_content"] = None
+        
+        result.append(doc_data)
+    
+    return result
+
+
+def export_asset_photos(db: Session) -> List[Dict[str, Any]]:
+    """Экспортирует все фотографии активов."""
+    photos = db.query(AssetPhotoModel).all()
+    result = []
+    for photo in photos:
+        result.append({
+            "id": getattr(photo, 'id', None),
+            "asset_id": _safe_int(getattr(photo, 'asset_id', None)),
+            "document_id": _safe_int(getattr(photo, 'document_id', None)),
+            "uploaded_by": _safe_int(getattr(photo, 'uploaded_by', None)),
+            "stage": _safe_str(getattr(photo, 'stage', None)),
+            "photo_category": _safe_str(getattr(photo, 'photo_category', None)),
+            "description": _safe_str(getattr(photo, 'description', None)),
+            "taken_at": _safe_isoformat(getattr(photo, 'taken_at', None)),
+            "taken_by": _safe_int(getattr(photo, 'taken_by', None)),
+            "uploaded_at": _safe_isoformat(getattr(photo, 'uploaded_at', None)),
+            "inventory_check_id": _safe_int(getattr(photo, 'inventory_check_id', None)),
+            "repair_request_id": _safe_int(getattr(photo, 'repair_request_id', None)),
+            "is_before": getattr(photo, 'is_before', False),
+            "is_after": getattr(photo, 'is_after', False),
+            "sort_order": _safe_int(getattr(photo, 'sort_order', None)),
+        })
+    return result
+
+
 @router.get("/export/all")
 async def export_all_data(
     db: Session = Depends(get_db),
@@ -187,16 +262,18 @@ async def export_all_data(
 ):
     """
     Экспортирует все данные системы в JSON-формате.
-    Включает: подразделения, помещения, сотрудников, активы.
+    Включает: подразделения, помещения, сотрудников, активы, документы (с файлами), фотографии.
     
     Формат файла:
     {
       "exported_at": "2026-08-12T20:00:00",
-      "version": "1.0",
+      "version": "2.0",
       "departments": [...],
       "rooms": [...],
       "employees": [...],
-      "assets": [...]
+      "assets": [...],
+      "documents": [...],  // файлы в base64
+      "asset_photos": [...]  // метаданные фотографий
     }
     """
     try:
@@ -204,16 +281,24 @@ async def export_all_data(
         
         data = {
             "exported_at": datetime.now().isoformat(),
-            "version": "1.0",
+            "version": "2.0",
             "departments": export_departments(db),
             "rooms": export_rooms(db),
             "employees": export_employees(db),
             "assets": export_assets(db),
+            "documents": export_documents(db),
+            "asset_photos": export_asset_photos(db),
         }
+        
+        doc_count = len(data['documents'])
+        photo_count = len(data['asset_photos'])
+        docs_with_content = sum(1 for d in data['documents'] if d.get('file_content'))
         
         logger.info(f"[DataExport] Exported: {len(data['departments'])} depts, "
                     f"{len(data['rooms'])} rooms, {len(data['employees'])} employees, "
-                    f"{len(data['assets'])} assets")
+                    f"{len(data['assets'])} assets, "
+                    f"{doc_count} documents ({docs_with_content} with content), "
+                    f"{photo_count} photos")
         
         # Создаём JSON-файл для скачивания
         json_str = json.dumps(data, ensure_ascii=False, indent=2)
@@ -237,6 +322,123 @@ async def export_all_data(
 # Импорт/восстановление данных
 # ============================================================================
 
+# ============================================================================
+# Импорт/восстановление данных
+# ============================================================================
+
+def import_documents(db: Session, documents_data: List[Dict[str, Any]], uploads_base_dir: str = "uploads") -> Dict[str, int]:
+    """Импортирует документы и восстанавливает файлы на диске."""
+    imported = 0
+    skipped = 0
+    errors = []
+    files_created = 0
+    files_failed = 0
+    
+    for doc_data in documents_data:
+        try:
+            # Проверяем, есть ли содержимое файла
+            file_content_b64 = doc_data.get("file_content")
+            file_path = doc_data.get("file_path", "")
+            filename = doc_data.get("filename", "")
+            
+            if file_content_b64:
+                # Декодируем base64 и сохраняем файл
+                try:
+                    file_bytes = base64.b64decode(file_content_b64)
+                    
+                    # Создаём директорию если нужно
+                    doc_dir = os.path.dirname(file_path)
+                    if doc_dir and not os.path.exists(doc_dir):
+                        os.makedirs(doc_dir, exist_ok=True)
+                    
+                    # Сохраняем файл
+                    with open(file_path, "wb") as f:
+                        f.write(file_bytes)
+                    files_created += 1
+                    
+                except Exception as e:
+                    logger.warning(f"[DataImport] Could not save file {file_path}: {e}")
+                    skipped += 1
+                    errors.append(f"Document '{filename}': Failed to save file - {str(e)}")
+                    continue
+            
+            # Создаём запись в БД
+            document = Document(
+                filename=filename,
+                file_path=file_path,
+                file_size=doc_data.get("file_size", 0),
+                mime_type=doc_data.get("mime_type", "application/octet-stream"),
+                document_type=doc_data.get("document_type", "other"),
+                category=doc_data.get("category", "asset"),
+                entity_id=doc_data.get("entity_id"),
+                entity_type=doc_data.get("entity_type"),
+                title=doc_data.get("title"),
+                description=doc_data.get("description"),
+                uploaded_by=doc_data.get("uploaded_by", 0),
+                uploaded_at=datetime.fromisoformat(doc_data["uploaded_at"]) if doc_data.get("uploaded_at") else datetime.now(),
+                is_primary=doc_data.get("is_primary", False),
+                sort_order=doc_data.get("sort_order", 0),
+                file_hash=doc_data.get("file_hash"),
+            )
+            db.add(document)
+            imported += 1
+            
+        except Exception as e:
+            skipped += 1
+            errors.append(f"Document '{doc_data.get('filename', '?')}': {str(e)}")
+    
+    return {
+        "imported": imported,
+        "skipped": skipped,
+        "errors": errors,
+        "files_created": files_created,
+        "files_failed": files_failed,
+    }
+
+
+def import_asset_photos(db: Session, photos_data: List[Dict[str, Any]]) -> Dict[str, int]:
+    """Импортирует фотографии активов."""
+    imported = 0
+    skipped = 0
+    errors = []
+    
+    for photo_data in photos_data:
+        try:
+            photo = AssetPhotoModel(
+                asset_id=photo_data.get("asset_id"),
+                document_id=photo_data.get("document_id"),
+                uploaded_by=photo_data.get("uploaded_by", 0),
+                stage=photo_data.get("stage", "other"),
+                photo_category=photo_data.get("photo_category"),
+                description=photo_data.get("description"),
+                uploaded_at=datetime.fromisoformat(photo_data["uploaded_at"]) if photo_data.get("uploaded_at") else datetime.now(),
+                inventory_check_id=photo_data.get("inventory_check_id"),
+                repair_request_id=photo_data.get("repair_request_id"),
+                is_before=photo_data.get("is_before", False),
+                is_after=photo_data.get("is_after", False),
+                sort_order=photo_data.get("sort_order", 0),
+            )
+            # Парсим taken_at если есть
+            if photo_data.get("taken_at"):
+                try:
+                    photo.taken_at = datetime.fromisoformat(photo_data["taken_at"])
+                except:
+                    pass
+            
+            db.add(photo)
+            imported += 1
+            
+        except Exception as e:
+            skipped += 1
+            errors.append(f"Photo (asset_id={photo_data.get('asset_id')}): {str(e)}")
+    
+    return {
+        "imported": imported,
+        "skipped": skipped,
+        "errors": errors,
+    }
+
+
 @router.post("/import/all")
 async def import_all_data(
     request: Request,
@@ -251,6 +453,8 @@ async def import_all_data(
     2. Помещения (зависят от departments)
     3. Сотрудники (зависят от departments)
     4. Активы (зависят от departments, employees)
+    5. Документы и файлы (зависят от путей на диске)
+    6. Фотографии активов (зависят от assets и documents)
     
     Все существующие данные удаляются перед восстановлением.
     """
@@ -276,12 +480,26 @@ async def import_all_data(
                     f"rooms={len(data['rooms'])}, employees={len(data['employees'])}, "
                     f"assets={len(data['assets'])}")
         
+        # Добавляем секции документов и фотографий если есть
+        has_documents = "documents" in data
+        has_photos = "asset_photos" in data
+        
+        if has_documents:
+            logger.info(f"[DataImport] Documents: {len(data['documents'])}")
+        if has_photos:
+            logger.info(f"[DataImport] Asset photos: {len(data['asset_photos'])}")
+        
         stats = {
             "departments": {"imported": 0, "skipped": 0, "errors": []},
             "rooms": {"imported": 0, "skipped": 0, "errors": []},
             "employees": {"imported": 0, "skipped": 0, "errors": []},
             "assets": {"imported": 0, "skipped": 0, "errors": []},
         }
+        
+        if has_documents:
+            stats["documents"] = {"imported": 0, "skipped": 0, "errors": [], "files_created": 0}
+        if has_photos:
+            stats["asset_photos"] = {"imported": 0, "skipped": 0, "errors": []}
         
         # Маппинг: старый ID -> новый ID для подразделений
         dept_id_map: Dict[int, int] = {}
@@ -293,6 +511,23 @@ async def import_all_data(
         db.query(Employee).delete()
         db.query(Room).delete()
         db.query(Department).delete()
+        
+        # Очищаем документы и фотографии если есть в экспорте
+        if has_photos:
+            db.query(AssetPhotoModel).delete()
+        if has_documents:
+            # Удаляем файлы с диска
+            documents_to_delete = db.query(Document).all()
+            for doc in documents_to_delete:
+                file_path = str(doc.file_path)
+                try:
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
+                        logger.debug(f"[DataImport] Deleted file: {file_path}")
+                except Exception as e:
+                    logger.warning(f"[DataImport] Could not delete file {file_path}: {e}")
+            db.query(Document).delete()
+        
         db.commit()
         
         # 1. Восстанавливаем подразделения
@@ -481,6 +716,36 @@ async def import_all_data(
             except Exception as e:
                 stats["assets"]["skipped"] += 1
                 stats["assets"]["errors"].append(f"Asset '{asset_data.get('inventory_number', '?')}': {str(e)}")
+        
+        db.commit()
+        
+        # 5. Восстанавливаем документы и файлы
+        doc_import_stats = {"imported": 0, "skipped": 0, "errors": [], "files_created": 0}
+        if has_documents:
+            logger.info("[DataImport] Restoring documents and files...")
+            doc_import_stats = import_documents(db, data["documents"])
+            stats["documents"] = {
+                "imported": doc_import_stats["imported"],
+                "skipped": doc_import_stats["skipped"],
+                "errors": doc_import_stats["errors"],
+                "files_created": doc_import_stats["files_created"],
+            }
+            logger.info(f"[DataImport] Documents imported: {doc_import_stats['imported']}, "
+                       f"files created: {doc_import_stats['files_created']}")
+        
+        db.commit()
+        
+        # 6. Восстанавливаем фотографии активов
+        photo_import_stats = {"imported": 0, "skipped": 0, "errors": []}
+        if has_photos:
+            logger.info("[DataImport] Restoring asset photos...")
+            photo_import_stats = import_asset_photos(db, data["asset_photos"])
+            stats["asset_photos"] = {
+                "imported": photo_import_stats["imported"],
+                "skipped": photo_import_stats["skipped"],
+                "errors": photo_import_stats["errors"],
+            }
+            logger.info(f"[DataImport] Asset photos imported: {photo_import_stats['imported']}")
         
         db.commit()
         

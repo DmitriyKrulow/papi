@@ -50,7 +50,7 @@ if '@' in DATABASE_URL_RAW:
 else:
     DATABASE_URL = DATABASE_URL_RAW
 
-print(f"🔗 Connected to PostgreSQL: {DATABASE_URL.split('@')[-1]}")
+print(f"[DB] Connected to PostgreSQL: {DATABASE_URL.split('@')[-1]}")
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

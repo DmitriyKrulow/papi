@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 interface AssetPhotoGalleryProps {
   assetId: number;
   assetName?: string;
+  assetTypeCode?: string;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -36,14 +37,28 @@ const CATEGORY_ORDER = [
 const AssetPhotoGallery: React.FC<AssetPhotoGalleryProps> = ({
   assetId,
   assetName,
+  assetTypeCode,
   isOpen,
   onClose,
 }) => {
-  const { photos, loading, fetchPhotos, uploadPhoto, deletePhoto } = useAssetPhotos(assetId);
+  const { photos, loading, fetchPhotos, uploadPhoto, deletePhoto, photoCategories, categoriesLoading } = useAssetPhotos(assetId, assetTypeCode);
   const [selectedPhoto, setSelectedPhoto] = useState<any>(null);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number>(-1);
   const [uploadingCategory, setUploadingCategory] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  // Динамические категории из API или fallback
+  const configuredCategories = photoCategories?.configured || CATEGORY_ORDER;
+  const categoryMap: Record<string, { label: string; stage: string }> = {};
+  photoCategories?.available.forEach(cat => {
+    categoryMap[cat.key] = { label: cat.label, stage: 'receiving' };
+  });
+  
+  // Fallback если нет данных из API
+  const activeCategories = Object.keys(categoryMap).length > 0 ? categoryMap : PHOTO_CATEGORIES;
+  const activeCategoryOrder = Object.keys(categoryMap).length > 0 
+    ? configuredCategories 
+    : CATEGORY_ORDER;
 
   useEffect(() => {
     if (isOpen) {
@@ -52,10 +67,10 @@ const AssetPhotoGallery: React.FC<AssetPhotoGalleryProps> = ({
   }, [isOpen, fetchPhotos]);
 
   // Группируем фотографии по категориям
-  const photoGroups: PhotoGroup[] = CATEGORY_ORDER
-    .filter(cat => PHOTO_CATEGORIES[cat])
+  const photoGroups: PhotoGroup[] = activeCategoryOrder
+    .filter(cat => activeCategories[cat])
     .map(cat => ({
-      label: PHOTO_CATEGORIES[cat].label,
+      label: activeCategories[cat]?.label || cat,
       category: cat,
       photos: photos.filter(p => p.photo_category === cat),
     }))
@@ -94,7 +109,7 @@ const AssetPhotoGallery: React.FC<AssetPhotoGalleryProps> = ({
       await uploadPhoto(file, {
         stage,
         photo_category: category,
-        description: PHOTO_CATEGORIES[category]?.label || category,
+        description: activeCategories[category]?.label || category,
         taken_at: new Date().toISOString(),
       });
       toast.success('Фото загружено');
@@ -179,8 +194,8 @@ const AssetPhotoGallery: React.FC<AssetPhotoGalleryProps> = ({
           ) : (
             <div className="space-y-8">
               {/* Категории фото */}
-              {CATEGORY_ORDER.map((cat) => {
-                const catInfo = PHOTO_CATEGORIES[cat];
+              {activeCategoryOrder.map((cat) => {
+                const catInfo = activeCategories[cat];
                 if (!catInfo) return null;
                 const groupPhotos = photos.filter(p => p.photo_category === cat);
                 return (
@@ -362,8 +377,8 @@ const AssetPhotoGallery: React.FC<AssetPhotoGalleryProps> = ({
             <div className="absolute -bottom-10 left-0 right-0 flex items-center justify-between text-white/70 text-sm">
               <div className="flex items-center gap-3">
                 <span>
-                  {selectedPhoto.photo_category && PHOTO_CATEGORIES[selectedPhoto.photo_category]
-                    ? PHOTO_CATEGORIES[selectedPhoto.photo_category].label
+                  {selectedPhoto.photo_category && activeCategories[selectedPhoto.photo_category]
+                    ? activeCategories[selectedPhoto.photo_category].label
                     : selectedPhoto.stage}
                 </span>
                 {selectedPhoto.description && (

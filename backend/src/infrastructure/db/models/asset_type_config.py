@@ -12,6 +12,65 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 from . import Base
 
+# Стандартные категории фотографий
+DEFAULT_PHOTO_CATEGORIES = [
+    "general_view",           # Общий вид
+    "placement",              # Место размещения
+    "inventory_number",       # Инвентарный номер
+    "current_location",       # Текущее место расположения
+    "condition",              # Состояние
+    "malfunction",            # Неисправность
+    "general_condition",      # Общее состояние
+]
+
+# Категории фотографий по типам активов (умолчания)
+DEFAULT_PHOTO_CATEGORIES_BY_TYPE = {
+    # Мебель
+    "furniture": ["general_view", "inventory_number", "condition", "placement"],
+    # Огнетушители
+    "fire_extinguisher": ["general_view", "inventory_number", "condition", "malfunction"],
+    # Криптотокены
+    "crypto_token": ["general_view", "inventory_number"],
+    # Принтеры
+    "printer": ["general_view", "inventory_number", "condition", "malfunction", "placement"],
+    # Компьютеры
+    "computer": ["general_view", "inventory_number", "condition", "malfunction", "placement"],
+    # Расходники
+    "consumables": ["general_view", "inventory_number"],
+    # Вентиляция и кондиционирование
+    "ventilation": ["general_view", "inventory_number", "condition", "malfunction", "placement"],
+    # Электрооборудование
+    "electrical": ["general_view", "inventory_number", "condition", "malfunction", "placement"],
+    # Сетевое и серверное оборудование
+    "it_network": ["general_view", "inventory_number", "condition", "malfunction", "placement"],
+    # Источники питания
+    "power_supply": ["general_view", "inventory_number", "condition", "malfunction", "placement"],
+    # Системы безопасности
+    "security": ["general_view", "inventory_number", "condition", "malfunction", "placement"],
+    # Сантехника
+    "plumbing": ["general_view", "inventory_number", "condition", "malfunction", "placement"],
+    # Окна и двери
+    "doors_windows": ["general_view", "inventory_number", "condition", "malfunction", "placement"],
+    # Инструмент
+    "tools": ["general_view", "inventory_number", "condition", "malfunction"],
+    # Электроприборы
+    "appliances": ["general_view", "inventory_number", "condition", "malfunction", "placement"],
+    # МФУ
+    "multifunction": ["general_view", "inventory_number", "condition", "malfunction", "placement"],
+    # Серверные стойки
+    "furniture_server": ["general_view", "inventory_number", "condition", "placement"],
+    # Стеллажи
+    "furniture_storage": ["general_view", "inventory_number", "placement"],
+    # Парковка
+    "parking": ["general_view", "inventory_number", "condition", "malfunction"],
+    # Связь
+    "communication": ["general_view", "inventory_number", "condition", "malfunction", "placement"],
+    # СИЗ
+    "ppe": ["general_view", "inventory_number"],
+    # Прочее
+    "other": ["general_view", "inventory_number", "condition"],
+}
+
 
 class AssetTypeConfig(Base):
     """Конфигурация типа актива с полями и настройками"""
@@ -30,6 +89,10 @@ class AssetTypeConfig(Base):
     default_maintenance_type = Column(String(100), nullable=True)
     maintenance_interval_months = Column(Integer, nullable=True)
 
+    # JSONB поле: список разрешённых категорий фотографий для этого типа актива
+    # Пример: ["general_view", "inventory_number", "condition"]
+    photo_categories = Column(Text, nullable=True)
+
     is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime, nullable=False, default=datetime.now)
     updated_at = Column(
@@ -38,6 +101,35 @@ class AssetTypeConfig(Base):
 
     def __repr__(self) -> str:
         return f"<AssetTypeConfig(code='{self.code}', name='{self.name}')>"
+
+    def get_photo_categories(self) -> list[str]:
+        """Возвращает список разрешённых категорий фотографий."""
+        if self.photo_categories:
+            try:
+                import json
+                return json.loads(self.photo_categories)
+            except (json.JSONDecodeError, TypeError):
+                return []
+        return []
+
+    def set_photo_categories(self, categories: list[str]) -> None:
+        """Устанавливает список разрешённых категорий фотографий."""
+        import json
+        self.photo_categories = json.dumps(categories, ensure_ascii=False)
+
+    def add_photo_category(self, category: str) -> None:
+        """Добавляет категорию фотографий (если ещё нет)."""
+        cats = self.get_photo_categories()
+        if category not in cats:
+            cats.append(category)
+            self.set_photo_categories(cats)
+
+    def remove_photo_category(self, category: str) -> None:
+        """Удаляет категорию фотографий (если есть)."""
+        cats = self.get_photo_categories()
+        if category in cats:
+            cats.remove(category)
+            self.set_photo_categories(cats)
 
 
 def seed_asset_types(db):
@@ -270,7 +362,17 @@ def seed_asset_types(db):
         if existing:
             for key, value in type_data.items():
                 setattr(existing, key, value)
+            # Устанавливаем категории фотографий по умолчанию для типа
+            if not existing.get_photo_categories():
+                code = type_data["code"]
+                default_cats = DEFAULT_PHOTO_CATEGORIES_BY_TYPE.get(code, DEFAULT_PHOTO_CATEGORIES)
+                existing.set_photo_categories(default_cats)
         else:
-            db.add(AssetTypeConfig(**type_data))
+            # Создаём новый тип с категориями фотографий
+            type_obj = AssetTypeConfig(**type_data)
+            code = type_data["code"]
+            default_cats = DEFAULT_PHOTO_CATEGORIES_BY_TYPE.get(code, DEFAULT_PHOTO_CATEGORIES)
+            type_obj.set_photo_categories(default_cats)
+            db.add(type_obj)
     db.commit()
 

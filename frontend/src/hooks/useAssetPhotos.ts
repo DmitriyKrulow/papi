@@ -24,11 +24,25 @@ export interface AssetPhotoListResponse {
   items: AssetPhoto[];
 }
 
-export const useAssetPhotos = (assetId: number) => {
+export interface PhotoCategoryInfo {
+  key: string;
+  label: string;
+}
+
+export interface AssetTypePhotoCategories {
+  type_code: string;
+  type_name: string;
+  configured: string[];
+  available: PhotoCategoryInfo[];
+}
+
+export const useAssetPhotos = (assetId: number, assetTypeCode?: string) => {
   const [photos, setPhotos] = useState<AssetPhoto[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [total, setTotal] = useState<number>(0);
+  const [photoCategories, setPhotoCategories] = useState<AssetTypePhotoCategories | null>(null);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
 
   const fetchPhotos = useCallback(async () => {
     setLoading(true);
@@ -58,7 +72,23 @@ export const useAssetPhotos = (assetId: number) => {
     }
   }, []);
 
-const uploadPhoto = useCallback(async (file: File, data?: any) => {
+  const fetchPhotoCategories = useCallback(async () => {
+    if (!assetTypeCode) return;
+    
+    setCategoriesLoading(true);
+    try {
+      const response = await api.get<AssetTypePhotoCategories>(
+        `/asset-types/${assetTypeCode}/photo-categories`
+      );
+      setPhotoCategories(response.data);
+    } catch (err) {
+      console.error('Failed to fetch photo categories:', err);
+    } finally {
+      setCategoriesLoading(false);
+    }
+  }, [assetTypeCode]);
+
+  const uploadPhoto = useCallback(async (file: File, data?: any) => {
     setLoading(true);
     setError(null);
     try {
@@ -119,6 +149,10 @@ const uploadPhoto = useCallback(async (file: File, data?: any) => {
     fetchPhotos();
   }, [fetchPhotos]);
 
+  useEffect(() => {
+    fetchPhotoCategories();
+  }, [fetchPhotoCategories]);
+
   return {
     photos,
     loading,
@@ -128,5 +162,7 @@ const uploadPhoto = useCallback(async (file: File, data?: any) => {
     fetchPhotoById,
     uploadPhoto,
     deletePhoto,
+    photoCategories,
+    categoriesLoading,
   };
 };

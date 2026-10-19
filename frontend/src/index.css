@@ -253,43 +253,278 @@
   text-align: right;
 }
 
-/* ==================== Печать актива ==================== */
+/* ==================== Печать актива — Карточка актива ==================== */
+
+/* Скрываем print-area на экране */
 @media screen {
   .print-area {
     display: none;
   }
 }
 
+/* QR-код для печати */
+.qr-code-print {
+  width: 80px;
+  height: 80px;
+  border: 1px solid #ccc;
+  page-break-inside: avoid;
+}
+
+/* Шапка организации */
+.print-org-header {
+  text-align: center;
+  border-bottom: 2px solid #000;
+  padding-bottom: 8px;
+  margin-bottom: 16px;
+}
+
+.print-org-header h1 {
+  font-size: 16px;
+  font-weight: bold;
+  margin: 0 0 4px;
+  text-transform: uppercase;
+}
+
+.print-org-header p {
+  font-size: 11px;
+  color: #333;
+  margin: 2px 0;
+}
+
+/* Заголовок карточки */
+.print-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  page-break-inside: avoid;
+}
+
+.print-card-title {
+  flex: 1;
+}
+
+.print-card-title h2 {
+  font-size: 18px;
+  margin: 0 0 4px;
+  color: #000;
+}
+
+.print-card-title .inventory-number {
+  font-size: 14px;
+  font-weight: bold;
+  color: #333;
+  font-family: 'Courier New', monospace;
+}
+
+.print-card-meta {
+  text-align: right;
+  font-size: 10px;
+  color: #555;
+}
+
+/* Секции */
+.print-section {
+  page-break-inside: avoid;
+  margin-bottom: 16px;
+}
+
+.print-section h2 {
+  font-size: 13px;
+  font-weight: bold;
+  border-bottom: 1px solid #000;
+  padding-bottom: 3px;
+  margin: 0 0 8px;
+  text-transform: uppercase;
+  color: #000;
+}
+
+/* Строки данных */
+.print-row {
+  display: flex;
+  padding: 3px 0;
+  font-size: 11px;
+  page-break-inside: avoid;
+}
+
+.print-row .label {
+  width: 200px;
+  font-weight: bold;
+  color: #000;
+  flex-shrink: 0;
+}
+
+.print-row .value {
+  flex: 1;
+  color: #333;
+}
+
+/* Таблица истории обслуживания */
+.print-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10px;
+  margin-top: 8px;
+}
+
+.print-table th,
+.print-table td {
+  border: 1px solid #ccc;
+  padding: 4px 6px;
+  text-align: left;
+}
+
+.print-table th {
+  background: #f0f0f0;
+  font-weight: bold;
+  color: #000;
+}
+
+.print-table tr:nth-child(even) {
+  background: #fafafa;
+}
+
+/* Фотографии */
+.print-photos {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  page-break-inside: avoid;
+  margin-top: 8px;
+}
+
+.print-photo {
+  page-break-inside: avoid;
+  text-align: center;
+}
+
+.print-photo img {
+  max-width: 100%;
+  height: auto;
+  max-height: 180px;
+  object-fit: contain;
+  border: 1px solid #ccc;
+  display: block;
+  margin: 0 auto;
+}
+
+.print-photo .photo-caption {
+  font-size: 9px;
+  line-height: 1.3;
+  color: #333;
+  margin-top: 4px;
+}
+
+.print-photo .photo-category {
+  font-weight: bold;
+  color: #000;
+  margin-right: 4px;
+}
+
+/* Блок подписей */
+.print-signatures {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  margin-top: 24px;
+  page-break-inside: avoid;
+}
+
+.print-signature {
+  text-align: center;
+}
+
+.print-signature .sig-label {
+  font-size: 10px;
+  color: #555;
+  margin-bottom: 30px;
+}
+
+.print-signature .sig-line {
+  border-top: 1px solid #000;
+  padding-top: 4px;
+  font-size: 9px;
+  color: #333;
+}
+
+/* Колонтитулы */
+@page {
+  margin: 1.5cm;
+  size: A4;
+}
+
+@page :first {
+  margin-top: 2cm;
+}
+
 @media print {
-  body * {
-    visibility: hidden !important;
+  /* Показываем только область печати. Портал .print-area является прямым
+     потомком body, поэтому скрываем через display:none все остальные
+     элементы (#root и сторонние порталы). display, в отличие от visibility,
+     убирает элемент из потока — скрытый контент больше не занимает место
+     и не создаёт пустые страницы после карточки. */
+  body > *:not(.print-area) {
+    display: none !important;
   }
-  .print-area,
-  .print-area * {
-    visibility: visible !important;
+
+  html,
+  body {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
   }
+
+  /* .print-area в потоке документа — иначе position:absolute обрезает
+     содержимое на первой странице и ломает перенос на следующие */
   .print-area {
     display: block !important;
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    background: #fff;
-    color: #000;
+    position: static !important;
+    width: 100% !important;
+    background: #fff !important;
+    color: #000 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    font-size: 10px !important;
+    line-height: 1.2 !important;
   }
-  .print-area .print-section {
-    page-break-inside: avoid;
-    margin-bottom: 16px;
+
+  /* Скрываем пустые секции и элементы, чтобы они не давали лишних разрывов */
+  .print-area .print-section:empty,
+  .print-area > div:empty {
+    display: none !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
   }
+
+  /* Контролируем вдов/сирот, чтобы не возникало пустых полос на страницах */
+  .print-area * {
+    orphans: 2;
+    widows: 2;
+  }
+
+  /* Разрывы страниц - только явные */
+  .page-break-before {
+    page-break-before: always;
+  }
+  
+  .page-break-after {
+    page-break-after: always;
+  }
+  
+  /* Оптимизация фотографий */
   .print-area .print-photos {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 10px;
     page-break-inside: avoid;
   }
+  
   .print-area .print-photo {
     page-break-inside: avoid;
   }
+  
   .print-area .print-photo img {
     max-width: 100%;
     height: auto;
@@ -298,14 +533,29 @@
     border: 1px solid #ccc;
     display: block;
   }
+  
   .print-area .print-photo > div {
     font-size: 9px;
     line-height: 1.2;
     color: #333;
     margin-top: 4px;
   }
-  @page {
-    margin: 1.5cm;
-    size: A4;
+  
+  /* Таблицы */
+  .print-area .print-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9px;
+  }
+  
+  .print-area .print-table th,
+  .print-area .print-table td {
+    border: 1px solid #999;
+    padding: 3px 5px;
+  }
+  
+  .print-area .print-table th {
+    background: #eee;
+    font-weight: bold;
   }
 }

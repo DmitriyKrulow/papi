@@ -35,8 +35,8 @@ services:
     # Порт 5432 на хосте занят локальным PostgreSQL — он нужен до переноса данных.
     # Как вернуть доступ к контейнерной БД с хоста: раскомментировать блок ports
     # и поставить в .env POSTGRES_PORT=5433 (чтобы не спорить с локальным postgres).
-    # ports:
-    #   - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
