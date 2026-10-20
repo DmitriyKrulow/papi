@@ -12,7 +12,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse
 
-from src.infrastructure.db.init_db import init_db, get_or_create_admin
+from src.infrastructure.db.init_db import init_db, get_or_create_admin, run_migrations
 from src.infrastructure.db.session import SessionLocal
 from src.infrastructure.db.models.asset_type_config import seed_asset_types
 from src.core.services.notification_scheduler import NotificationScheduler
@@ -265,6 +265,10 @@ def startup_event():
     """Запуск при старте приложения."""
     global notification_scheduler
     
+    # 1. Применяем миграции БД (защитный механизм — авто-применение alembic)
+    run_migrations()
+    
+    # 2. Инициализируем таблицы и админа
     init_db()
     get_or_create_admin()
     try:

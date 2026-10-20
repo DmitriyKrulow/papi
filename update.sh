@@ -196,6 +196,15 @@ fi
 log "🐳 Перезапускаем контейнеры..."
 docker compose -f "$PROJECT_DIR/docker-compose.yml" up -d || { log "❌ Ошибка запуска контейнеров"; exit 1; }
 
+# --- 7. Применяем миграции БД ---
+log "🗄️ Применяем миграции Alembic..."
+docker compose -f "$PROJECT_DIR/docker-compose.yml" run --rm --no-deps backend alembic upgrade head 2>&1 | tee -a "$LOG_FILE"
+if [ ${PIPESTATUS[0]} -ne 0 ]; then
+    log "⚠️ Миграции Alembic завершились с предупреждением (возможно, уже применены или требуется ручная проверка)"
+else
+    log "✅ Миграции Alembic применены успешно"
+fi
+
 # --- 6. Проверка работы (с ожиданием) ---
 log "🔍 Проверяем работу сервисов..."
 

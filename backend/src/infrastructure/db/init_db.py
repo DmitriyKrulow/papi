@@ -17,6 +17,7 @@ Usage:
 from datetime import datetime
 from typing import Generator, Optional
 import os
+import sys
 import logging
 
 from sqlalchemy.orm import Session
@@ -36,6 +37,41 @@ def get_db() -> Generator[Session, None, None]:
         yield db
     finally:
         db.close()
+
+
+def run_migrations():
+    """
+    Применяет все доступные миграции Alembic до последнего коммита.
+    Запускается при старте приложения как защитный механизм:
+    если на сервере не был выполнен `alembic upgrade head`,
+    колонки не будут найдены и запросы упадут с 500.
+
+    Ошибки не выбрасываются — только логируются, чтобы не ломать старт приложения.
+    """
+    try:
+        from alembic.config import Config
+        from alembic import command
+
+        # Определяем путь к alembic.ini относительно корня проекта (backend/)
+        # В контейнере WORKDIR=/app, alembic.ini лежит в /app/alembic.ini
+        # На хосте: backend/alembic.ini
+        backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        alembic_cfg_path = os.path.join(backend_dir, "alembic.ini")
+
+        if not os.path.exists(alembic_cfg_path):
+            logger.warning("Alembic config not found at %s — пропускаем миграции", alembic_cfg_path)
+            return
+
+        alembic_cfg = Config(alembic_cfg_path)
+        # env.py уже переопределяет sqlalchemy.url из DATABASE_URL,
+        # но убедимся что это работает и здесь:
+        alembic_cfg.set_main_option("sqlalchemy.url", str(engine.url))
+
+        logger.info("Running alembic migrations...")
+        command.upgrade(alembic_cfg, "head")
+        logger.info("Alembic migrations applied successfully")
+    except Exception as e:
+        logger.error("Failed to run alembic migrations: %s", e, exc_info=True)
 
 
 def init_db():
