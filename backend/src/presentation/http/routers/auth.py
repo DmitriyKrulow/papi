@@ -154,7 +154,7 @@ def login(
 
 
 @router.post("/refresh", response_model=UserToken)
-def refresh_token(
+async def refresh_token(
     request: Request,
     db: Session = Depends(get_db),
 ):
