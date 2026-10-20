@@ -5,13 +5,10 @@ import uuid
 import base64
 import io
 import qrcode
-from PIL import Image
-from datetime import date
-from typing import Optional, List
+from typing import Optional
 from fastapi import APIRouter, Depends, Query, HTTPException, UploadFile, File, Form
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import distinct
 
 from src.infrastructure.db.init_db import get_db
 from src.infrastructure.db.models.asset import Asset
@@ -292,159 +289,136 @@ async def serve_logo(filename: str):
     return FileResponse(filepath, media_type='image/*')
 
 
+# ---------------------------------------------------------------------------
+# Общие помощники для генерации бирок
+# ---------------------------------------------------------------------------
+
+
+def _make_qr_data_url(qr_url: str) -> str:
+    """Генерирует QR-код (base64 PNG) по ссылке на актив."""
+    qr = qrcode.QRCode(
+        version=None,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=10,
+        border=1,
+    )
+    qr.add_data(qr_url)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
+
+
+def _render_label_html(
+    *,
+    name: str,
+    inventory_number: str,
+    responsible: str,
+    purchase_date: str,
+    company_name: str,
+    company_short: str,
+    logo_url: Optional[str],
+    qr_data_url: str,
+    label_width: float,
+    label_height: float,
+) -> str:
+    """Собирает HTML одной бирки.
+
+    Все размеры — в миллиметрах, поэтому экранное отображение и печать
+    совпадают (WYSIWYG). Стили только inline, цвет текста задан явно,
+    поэтому snippet можно безопасно вставлять куда угодно.
+    """
+    w = float(label_width)
+    h = float(label_height)
+
+    border = 0.25
+    pad = round(max(0.8, min(2.0, h * 0.05)), 2)
+    inner_h = h - 2 * pad - 2 * border
+
+    # QR — квадрат, по высоте левой части, но не шире 42 % бирки
+    qr_side = round(max(6.0, min(inner_h, w * 0.42)), 2)
+    right_w = round(qr_side + 2 * pad, 2)
+
+    # Масштаб шрифтов под размер бирки
+    scale = max(0.5, min(h / 37.0, w / 105.0))
+    f_company = round(7.2 * scale, 1)
+    f_name = round(8.5 * scale, 1)
+    f_small = round(5.4 * scale, 1)
+    f_micro = round(4.6 * scale, 1)
+    f_inv = round(6.2 * scale, 1)
+
+    # Вспомогательные отступы
+    m_logo = round(pad * 0.5, 2)
+    m_company = round(pad * 0.4, 2)
+    m_name = round(pad * 0.3, 2)
+    m_inv_top = round(pad * 0.4, 2)
+    m_inv_pad = round(pad * 0.35, 2)
+    m_short = round(pad * 0.3, 2)
+    logo_max_h = round(inner_h * 0.22, 2)
+
+    # Логотип
+    logo_html = ""
+    if logo_url:
+        logo_html = (
+            f'<div style="text-align:center;overflow:hidden;margin:0 0 {m_logo}mm 0;">'
+            f'<img src="{logo_url}" style="max-height:{logo_max_h}mm;max-width:96%;'
+            'object-fit:contain;display:inline-block;" />'
+            '</div>'
+        )
+
+    return f"""<div class="papi-label" style="width:{w}mm;height:{h}mm;box-sizing:border-box;background:#fff;color:#000;font-family:Arial,Helvetica,sans-serif;border:{border}mm solid #000;padding:{pad}mm;display:flex;flex-direction:row;overflow:hidden;page-break-inside:avoid;-webkit-print-color-adjust:exact;print-color-adjust:exact;"><div style="flex:1 1 auto;min-width:0;display:flex;flex-direction:column;border-right:{border}mm solid #000;padding-right:{pad}mm;overflow:hidden;">{logo_html}<div style="text-align:center;font-weight:bold;font-size:{f_company}pt;line-height:1.15;margin:0 0 {m_company}mm 0;word-break:break-word;">{company_name}</div><div style="font-weight:bold;font-size:{f_name}pt;line-height:1.12;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin:0 0 {m_name}mm 0;">{name}</div><div style="flex:1 1 auto;min-height:0;"></div><div style="display:flex;justify-content:space-between;align-items:flex-end;gap:1mm;font-size:{f_small}pt;line-height:1.15;"><div style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Отв: {responsible}</div><div style="text-align:right;flex:0 0 auto;">Пост.:<b>{purchase_date}</b></div></div><div style="margin-top:{m_inv_top}mm;padding-top:{m_inv_pad}mm;border-top:0.2mm solid #999;font-size:{f_micro}pt;line-height:1.15;">Инв. №<span style="font-weight:bold;font-size:{f_inv}pt;word-break:break-all;">{inventory_number}</span></div><div style="font-size:{f_micro}pt;color:#555;text-align:right;margin-top:{m_short}mm;">{company_short}</div></div><div style="flex:0 0 {right_w}mm;display:flex;align-items:center;justify-content:center;padding-left:{pad}mm;"><div style="width:{qr_side}mm;height:{qr_side}mm;flex:0 0 auto;display:flex;align-items:center;justify-content:center;"><img src="{qr_data_url}" style="width:{qr_side}mm;height:{qr_side}mm;display:block;" /></div></div></div>"""
+
+
+# ---------------------------------------------------------------------------
+# Эндпоинты
+# ---------------------------------------------------------------------------
+
+
 @router.get("/label-html/{asset_id}")
 async def get_label_html(
     asset_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Получить HTML-шаблон бирки для актива"""
+    """Получить HTML-шаблон одной бирки для актива"""
     asset = db.query(Asset).filter(Asset.id == asset_id).first()
     if not asset:
         raise HTTPException(status_code=404, detail="Актив не найден")
-    
-    # Используем настройки из _marking_settings
+
     company_name = _marking_settings.get("company_name", "ООО «ПАО»")
     company_short = _marking_settings.get("company_short", "ПАО")
-    label_width = _marking_settings.get("label_width", 105)
-    label_height = _marking_settings.get("label_height", 37)
+    label_width = float(_marking_settings.get("label_width", 105))
+    label_height = float(_marking_settings.get("label_height", 37))
     logo_url = _marking_settings.get("logo_url")
-    
-    responsible = safe_str(asset.responsible_person)
-    initials = get_initials(responsible)
-    formatted = format_responsible(responsible)
-    
+
+    responsible = format_responsible(safe_str(asset.responsible_person))
     purchase_date = safe_date(asset.purchase_date) or "—"
-    
-    # Генерируем QR-код
-    
-    # URL для мобильной страницы актива (публичный)
+
     frontend_url = get_frontend_url(db) or "http://localhost:5173"
     qr_url = f"{frontend_url}/inventory/asset/{asset.id}"
-    
-    # Генерируем QR-код в base64 — компактный размер для бирки
-    qr = qrcode.QRCode(version=1, box_size=4, border=1)
-    qr.add_data(qr_url)
-    qr.make(fit=True)
-    
-    img = qr.make_image(fill_color="black", back_color="white")
-    # Увеличиваем разрешение для качественной печати
-    img = img.resize((300, 300), Image.LANCZOS)
-    buf = io.BytesIO()
-    img.save(buf, format='PNG')
-    buf.seek(0)
-    qr_base64 = base64.b64encode(buf.read()).decode('utf-8')
-    
-    px_per_mm = 3  # коэффициент для экранного отображения
-    label_w = int(label_width * px_per_mm)
-    label_h = int(label_height * px_per_mm)
-    pad = int(2 * px_per_mm)
-    qr_size = int(14 * px_per_mm)  # 14mm в px
-    font_company = int(7 * px_per_mm)
-    font_name = int(9 * px_per_mm)
-    font_small = int(6 * px_per_mm)
-    font_qr_text = int(5 * px_per_mm)
-    font_footer = int(5 * px_per_mm)
-    
-    # QR-код баз64
-    # QR-код — 65% от высоты бирки (динамический размер)
-    qr_size_mm = int(label_height * 0.65)
-    qr_img_html = f'<img src="data:image/png;base64,{qr_base64}" width="{int(qr_size_mm*px_per_mm)}" height="{int(qr_size_mm*px_per_mm)}" style="display:block" />'
-    
-    # Logo
-    logo_img_html = ""
-    if logo_url:
-        logo_img_html = f'<div style="text-align: center; margin: 0 0 1px 0;"><img src="{logo_url}" style="max-height: {int(5*px_per_mm)}px; max-width: 90%; display: inline-block;" /></div>'
-    
-    # Генерируем HTML-бирку — ЛЕВАЯ ПОЛОВИНА: лого+фирма+информация, ПРАВАЯ: QR
-    html = f"""<div class="label-wrapper" style="
-        display: inline-block;
-        position: relative;
-        max-width: 100%;
-    ">
-    <style>
-        .label-wrapper .label {{
-            image-rendering: pixelated;
-            image-rendering: high-quality;
-        }}
-        @media screen {{
-            .label-wrapper {{
-                transform: scale({px_per_mm * 0.6});
-                transform-origin: 0 0;
-            }}
-        }}
-        @media print {{
-            @page {{ size: auto; margin: 2mm; }}
-            .label-wrapper {{
-                max-width: 100% !important;
-                zoom: 1 !important;
-            }}
-            .label {{
-                width: {label_width}mm !important;
-                height: {label_height}mm !important;
-                padding: {int(1.5*px_per_mm)}mm !important;
-            }}
-        }}
-    </style>
-    <div class="label" style="
-        width: {label_w}px;
-        height: {label_h}px;
-        border: 1px solid #000;
-        padding: 0;
-        box-sizing: border-box;
-        font-family: Arial, sans-serif;
-        background: #fff;
-        display: flex;
-        flex-direction: row;
-        overflow: hidden;
-    ">
-        <!-- ЛЕВАЯ ПОЛОВИНКА: логотип, название фирмы, информация -->
-        <div style="width: 50%; height: 100%; padding: {pad}px; display: flex; flex-direction: column; border-right: 2px solid #000; overflow: hidden;">
-            <!-- Логотип сверху -->
-            {logo_img_html}
-            <!-- Название фирмы -->
-            <div style="text-align: center; margin: 0 0 {pad}px 0;">
-                <div style="font-size: {font_company}px; font-weight: bold; line-height: 1.2;">
-                    {company_name}
-                </div>
-            </div>
-            <!-- Остальные элементы -->
-            <div style="flex: 1; display: flex; flex-direction: column; justify-content: flex-start; min-height: 0; overflow: hidden;">
-                <div style="font-size: {font_name}px; font-weight: bold; line-height: 1.15; margin: 0 0 {pad}px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                    {safe_str(asset.name)}
-                </div>
-                <div style="display: flex; justify-content: space-between; align-items: flex-end; font-size: {font_small}px; margin: 0;">
-                    <div style="color: #333; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Отв: {formatted}</div>
-                    <div style="text-align: right; white-space: nowrap;">
-                        <div>Пост.:</div>
-                        <div style="font-weight: bold;">{purchase_date}</div>
-                    </div>
-                </div>
-            </div>
-            <!-- Инв. номер внизу левой части -->
-            <div style="font-size: {font_qr_text}px; margin-top: auto; padding-top: {pad}px; border-top: 1px solid #ccc;">
-                <div>Инв. №:</div>
-                <div style="font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{safe_str(asset.inventory_number)}</div>
-            </div>
-            <!-- Сокращение компании -->
-            <div style="font-size: {font_footer}px; color: #666; text-align: right; margin: 1px 0 0 0;">
-                {company_short}
-            </div>
-        </div>
-        <!-- ПРАВАЯ ПОЛОВИНКА: QR-код -->
-        <div style="width: 50%; height: 100%; padding: {pad}px; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden;">
-            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; width: 100%;">
-                <div style="display: flex; align-items: center; justify-content: center; width: 100%;">
-                    <div style="flex-shrink: 0; width: {int(qr_size_mm*px_per_mm)}px; height: {int(qr_size_mm*px_per_mm)}px;">
-                        {qr_img_html}
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    </div>"""
-    
-    return {"html": html, "inventory_number": safe_str(asset.inventory_number), "qr_url": qr_url}
+    qr_data_url = _make_qr_data_url(qr_url)
+
+    label_html = _render_label_html(
+        name=safe_str(asset.name),
+        inventory_number=safe_str(asset.inventory_number),
+        responsible=responsible,
+        purchase_date=purchase_date,
+        company_name=company_name,
+        company_short=company_short,
+        logo_url=logo_url,
+        qr_data_url=qr_data_url,
+        label_width=label_width,
+        label_height=label_height,
+    )
+
+    return {
+        "html": label_html,
+        "label_width": label_width,
+        "label_height": label_height,
+        "inventory_number": safe_str(asset.inventory_number),
+        "qr_url": qr_url,
+    }
 
 
 @router.get("/label-batch")
@@ -453,122 +427,60 @@ async def get_batch_labels(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Получить HTML для пакетной печати бирок"""
+    """Получить список HTML-бирок для пакетной печати"""
     ids = [int(x.strip()) for x in asset_ids.split(",") if x.strip()]
     assets = db.query(Asset).filter(Asset.id.in_(ids)).all()
-    
+
     if not assets:
         raise HTTPException(status_code=404, detail="Активы не найдены")
-    
-    # Используем настройки
+
     company_name = _marking_settings.get("company_name", "ООО «ПАО»")
     company_short = _marking_settings.get("company_short", "ПАО")
-    label_width = _marking_settings.get("label_width", 105)
-    label_height = _marking_settings.get("label_height", 37)
+    label_width = float(_marking_settings.get("label_width", 105))
+    label_height = float(_marking_settings.get("label_height", 37))
     logo_url = _marking_settings.get("logo_url")
-    
-    # Logo HTML if exists
-    logo_html = ""
-    if logo_url:
-        logo_html = f'''<div style="text-align: center; margin-bottom: 1mm;">
-            <img src="{logo_url}" style="max-height: 10mm; max-width: 50mm; object-fit: contain;" />
-        </div>'''
-    
-    labels_html = []
+    per_row = int(_marking_settings.get("labels_per_row", 3))
+    per_page = int(_marking_settings.get("labels_per_page", 21))
+
+    labels_html: list[str] = []
     for asset in assets:
-        responsible = safe_str(asset.responsible_person)
-        formatted = format_responsible(responsible)
+        responsible = format_responsible(safe_str(asset.responsible_person))
         purchase_date = safe_date(asset.purchase_date) or "—"
-        
-        # Генерируем QR-код — компактный размер для бирки
+
         frontend_url = get_frontend_url(db) or "http://localhost:5173"
         qr_url = f"{frontend_url}/inventory/asset/{asset.id}"
-        
-        qr = qrcode.QRCode(version=1, box_size=3, border=1)
-        qr.add_data(qr_url)
-        qr.make(fit=True)
-        
-        img = qr.make_image(fill_color="black", back_color="white")
-        # Увеличиваем разрешение для качественной печати
-        img = img.resize((250, 250), Image.LANCZOS)
-        buf = io.BytesIO()
-        img.save(buf, format='PNG')
-        buf.seek(0)
-        qr_base64 = base64.b64encode(buf.read()).decode('utf-8')
-        
-        qr_html = f'''<div style="flex-shrink: 0; width: {int(label_height * 0.65)}mm; height: {int(label_height * 0.65)}mm; display: flex; align-items: center; justify-content: center;">
-            <img src="data:image/png;base64,{qr_base64}" style="width: {int(label_height * 0.65)}mm; height: {int(label_height * 0.65)}mm; object-fit: contain;" />
-        </div>'''
-        
-        label = f"""
-        <div class="label" style="
-            width: {label_width}mm; height: {label_height}mm; border: 1px solid #000; padding: 0;
-            box-sizing: border-box; font-family: Arial, sans-serif;
-            page-break-inside: avoid; display: inline-block;
-            vertical-align: top; margin: 0;
-            display: flex;
-            flex-direction: row;
-        ">
-            <!-- ЛЕВАЯ ПОЛОВИНКА: лого+фирма+информация -->
-            <div style="width: 50%; height: 100%; padding: 1.5mm; display: flex; flex-direction: column; border-right: 1px solid #000;">
-                <!-- Логотип сверху -->
-                {logo_html}
-                <!-- Название фирмы -->
-                <div style="text-align: center; margin: 0 0 0.5mm 0;">
-                    <div style="font-size: 7.5pt; font-weight: bold; line-height: 1.2;">
-                        {company_name}
-                    </div>
-                </div>
-                <!-- Остальные элементы -->
-                <div style="flex: 1; display: flex; flex-direction: column; justify-content: flex-start; min-height: 0; overflow: hidden;">
-                    <div style="font-size: 9pt; font-weight: bold; margin: 0 0 0.5mm 0; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                        {safe_str(asset.name)}
-                    </div>
-                    <div style="display: flex; justify-content: space-between; align-items: flex-end; font-size: 5.5pt; margin: 0;">
-                        <div style="color: #333; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Отв: {formatted}</div>
-                        <div style="text-align: right; white-space: nowrap;">
-                            <div>Пост.:</div>
-                            <div style="font-weight: bold; font-size: 7pt;">{purchase_date}</div>
-                        </div>
-                    </div>
-                </div>
-                <!-- Инв. номер внизу -->
-                <div style="font-size: 4.5pt; margin-top: auto; padding-top: 0.5mm; border-top: 0.5px solid #ccc;">
-                    <div>Инв. №:</div>
-                    <div style="font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{safe_str(asset.inventory_number)}</div>
-                </div>
-                <div style="font-size: 4.5pt; color: #666; text-align: right; margin: 0.3mm 0 0 0;">
-                    {company_short}
-                </div>
-            </div>
-            <!-- ПРАВАЯ ПОЛОВИНКА: QR-код -->
-            <div style="width: 50%; height: 100%; padding: 1.5mm; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; width: 100%;">
-                    {qr_html}
-                </div>
-            </div>
-        </div>
-        """
-        labels_html.append(label)
-    
-    full_html = f"""
-    <html>
-    <head>
-        <title>Бирки для печати</title>
-        <style>
-            @page {{ size: A4; margin: 5mm; }}
-            body {{ margin: 0; padding: 0; }}
-            .page-break {{ page-break-after: always; }}
-            @media print {{
-                body {{ margin: 0; padding: 0; }}
-                .label {{ page-break-inside: avoid; }}
-            }}
-        </style>
-    </head>
-    <body>
-        {''.join(labels_html)}
-    </body>
-    </html>
-    """
-    
-    return {"html": full_html, "count": len(assets)}
+        qr_data_url = _make_qr_data_url(qr_url)
+
+        label_html = _render_label_html(
+            name=safe_str(asset.name),
+            inventory_number=safe_str(asset.inventory_number),
+            responsible=responsible,
+            purchase_date=purchase_date,
+            company_name=company_name,
+            company_short=company_short,
+            logo_url=logo_url,
+            qr_data_url=qr_data_url,
+            label_width=label_width,
+            label_height=label_height,
+        )
+        labels_html.append(label_html)
+
+    # Вычисляем реальную раскладку (чтобы превью совпадало с печатью)
+    page_w, page_h = 200.0, 287.0  # A4 − поля 5 мм
+    max_per_row = max(1, int(page_w // label_width))
+    eff_per_row = max(1, min(per_row, max_per_row))
+    rows = max(1, int(page_h // label_height))
+    max_per_page = eff_per_row * rows
+    eff_per_page = max(1, min(per_page, max_per_page))
+
+    return {
+        "labels": labels_html,
+        "count": len(labels_html),
+        "label_width": label_width,
+        "label_height": label_height,
+        "labels_per_row": eff_per_row,
+        "labels_per_page": eff_per_page,
+    }
+
+
+

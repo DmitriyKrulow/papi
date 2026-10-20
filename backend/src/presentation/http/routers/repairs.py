@@ -542,25 +542,69 @@ def simple_print_repair(repair_id: int, db: Session = Depends(get_db), current_u
 
 @router.get("/stats/")
 def get_repair_stats(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Статистика по ремонтам: статусы, топ-5 типов активов, финансы."""
     query = db.query(RepairRequest)
-    
+
     if current_user.role not in ("admin", "responsible"):
         query = query.filter(RepairRequest.created_by == current_user.id)
-    
+
     total = query.count()
-    
     results = query.all()
-    
+
     counts = {}
     for status in RepairStatus:
         counts[status.value] = 0
-    
     for repair in results:
         status_key = repair.status.value if repair.status else "draft"
         counts[status_key] = counts.get(status_key, 0) + 1
-    
+
     templates_count = db.query(RepairTemplate).count()
-    
+
+    # ── Топ-5 типов активов по количеству ремонтов ──
+    top_types = (
+        db.query(
+            Asset.asset_type,
+            RepairRequest.id,
+        )
+        .join(RepairRequest.asset, isouter=False)
+        .filter(
+            RepairRequest.status != "draft",
+            Asset.is_active == True,
+            Asset.asset_type.isnot(None),
+            Asset.asset_type != "",
+        )
+        .group_by(Asset.asset_type)
+        .order_by(RepairRequest.id.desc())
+        .all()
+    )
+    from collections import Counter
+    type_counts = Counter(row.asset_type for row in top_types)
+    top_five = [{"type": t, "count": c} for t, c in type_counts.most_common(5)]
+
+    # ── Финансы ──
+    total_estimated = db.query(RepairRequest.estimated_cost).with_entities(
+        RepairRequest.estimated_cost
+    ).filter(
+        RepairRequest.status == RepairStatus.COMPLETED,
+        RepairRequest.estimated_cost.isnot(None),
+    ).all()
+    total_actual = db.query(RepairRequest.actual_cost).with_entities(
+        RepairRequest.actual_cost
+    ).filter(
+        RepairRequest.status == RepairStatus.COMPLETED,
+        RepairRequest.actual_cost.isnot(None),
+    ).all()
+
+    from decimal import Decimal as D
+    est_sum = sum(float(r[0] or 0) for r in total_estimated)
+    act_sum = sum(float(r[0] or 0) for r in total_actual)
+
+    # ── Активы в процессе ремонта ──
+    active_repair_ids = db.query(RepairRequest.asset_id).filter(
+        RepairRequest.status.in_(["in_progress", "approved"]),
+    ).distinct().all()
+    active_repair_assets = len(active_repair_ids)
+
     return {
         "total_repairs": total,
         "pending": counts.get("draft", 0) + counts.get("submitted", 0) + counts.get("approved", 0),
@@ -569,6 +613,10 @@ def get_repair_stats(db: Session = Depends(get_db), current_user: User = Depends
         "rejected": counts.get("rejected", 0),
         "cancelled": counts.get("cancelled", 0),
         "total_templates": templates_count,
+        "active_repair_assets": active_repair_assets,
+        "total_estimated_cost": round(est_sum, 2),
+        "total_actual_cost": round(act_sum, 2),
+        "top_asset_types": top_five,
     }
 
 

@@ -1,9 +1,10 @@
 // frontend/src/pages/Marking.tsx
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import {
-  Printer, Settings, CheckSquare, Square, Download,
-  Tag, Search, Eye, Printer as PrinterIcon, CheckCircle2, XCircle, Upload, Image as ImageIcon, X
+  Printer, Settings, CheckSquare, Square,
+  Tag, Search, Eye, Printer as PrinterIcon, CheckCircle2, XCircle, Upload, Image as ImageIcon, X,
+  ZoomIn, ZoomOut, Maximize,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -30,15 +31,113 @@ interface MarkingSettings {
   logo_url: string | null;
 }
 
+interface BatchResult {
+  labels: string[];
+  count: number;
+  label_width: number;
+  label_height: number;
+  labels_per_row: number;
+  labels_per_page: number;
+}
+
 const LABEL_SIZE_PRESETS = [
-  { name: '105×37 мм', width: 105, height: 37, perRow: 3, perPage: 21 },
-  { name: '100×40 мм', width: 100, height: 40, perRow: 3, perPage: 20 },
-  { name: '99×38 мм', width: 99, height: 38, perRow: 3, perPage: 21 },
-  { name: '90×45 мм', width: 90, height: 45, perRow: 3, perPage: 18 },
-  { name: '100×50 мм', width: 100, height: 50, perRow: 2, perPage: 12 },
-  { name: '65×40 мм', width: 65, height: 40, perRow: 4, perPage: 24 },
-  { name: 'Custom', width: 0, height: 0, perRow: 0, perPage: 0 },
+  { name: '105×37 мм', width: 105, height: 37 },
+  { name: '100×40 мм', width: 100, height: 40 },
+  { name: '99×38 мм', width: 99, height: 38 },
+  { name: '90×45 мм', width: 90, height: 45 },
+  { name: '100×50 мм', width: 100, height: 50 },
+  { name: '80×40 мм', width: 80, height: 40 },
+  { name: '70×35 мм', width: 70, height: 35 },
+  { name: '65×40 мм', width: 65, height: 40 },
+  { name: '50×25 мм', width: 50, height: 25 },
 ];
+
+// A4 лист и поля печати
+const PAGE_W = 210;
+const PAGE_H = 297;
+const PAGE_MARGIN = 5;
+// Пикселей в одном миллиметре при 96dpi
+const MM = 96 / 25.4;
+
+/** Делает относительные URL абсолютными (для iframe и окна печати). */
+const absolutize = (html: string) =>
+  html.replace(/src="\//g, `src="${window.location.origin}/`);
+
+/** Собирает полный HTML-документ для печати. */
+const buildPrintDoc = (
+  labels: string[],
+  opts: { width: number; height: number; perRow: number; single?: boolean },
+) => {
+  const page = opts.single
+    ? `${opts.width}mm ${opts.height}mm`
+    : 'A4';
+  const margin = opts.single ? 0 : PAGE_MARGIN;
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Бирки</title><style>
+@page { size: ${page}; margin: ${margin}mm; }
+html, body { margin: 0; padding: 0; background: #fff; }
+body { display: grid; grid-template-columns: repeat(${opts.perRow}, ${opts.width}mm); justify-content: center; align-content: start; }
+.papi-label { page-break-inside: avoid; break-inside: avoid; }
+</style></head><body>${absolutize(labels.join(''))}</body></html>`;
+};
+
+/** Хук: масштаб, при котором содержимое размером wmm×hmm целиком влезает в контейнер. */
+const useFitZoom = (wmm: number, hmm: number) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const [zoom, setZoom] = useState(1);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const update = () => {
+      const availW = el.clientWidth - 24;
+      const availH = el.clientHeight - 24;
+      if (availW <= 0 || availH <= 0) return;
+      const z = Math.min(availW / (wmm * MM), availH / (hmm * MM), 2);
+      setZoom(Math.max(0.1, z));
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [wmm, hmm]);
+
+  return { ref, zoom };
+};
+
+/** Рамка, которая рендерит HTML в изолированном iframe и масштабирует его. */
+const ScaledFrame: React.FC<{
+  html: string;
+  wmm: number;
+  hmm: number;
+  zoom: number;
+  title?: string;
+}> = ({ html, wmm, hmm, zoom, title }) => (
+  <div
+    style={{
+      width: wmm * MM * zoom,
+      height: hmm * MM * zoom,
+      flex: '0 0 auto',
+      position: 'relative',
+    }}
+  >
+    <iframe
+      title={title}
+      srcDoc={html}
+      scrolling="no"
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: wmm * MM,
+        height: hmm * MM,
+        border: 0,
+        background: '#fff',
+        transform: `scale(${zoom})`,
+        transformOrigin: '0 0',
+      }}
+    />
+  </div>
+);
 
 const Marking: React.FC = () => {
   const { user } = useAuth();
@@ -62,11 +161,21 @@ const Marking: React.FC = () => {
   const [customHeight, setCustomHeight] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Одиночный предпросмотр
   const [previewAsset, setPreviewAsset] = useState<MarkingAsset | null>(null);
   const [previewHtml, setPreviewHtml] = useState('');
-  const [batchHtml, setBatchHtml] = useState('');
+  const [previewSize, setPreviewSize] = useState({ width: 105, height: 37 });
+  const [previewZoom, setPreviewZoom] = useState(1);
+  const [previewFit, setPreviewFit] = useState(true);
+  const singlePreview = useFitZoom(previewSize.width, previewSize.height);
+
+  // Пакетный предпросмотр
+  const [batch, setBatch] = useState<BatchResult | null>(null);
   const [showBatchPreview, setShowBatchPreview] = useState(false);
-  const printRef = useRef<HTMLDivElement>(null);
+  const [batchZoom, setBatchZoom] = useState(1);
+  const [batchFit, setBatchFit] = useState(true);
+  const batchPreview = useFitZoom(PAGE_W, PAGE_H);
 
   const isAdmin = user?.role === 'admin';
   const isResponsible = user?.role === 'ответственный' || user?.role === 'responsible';
@@ -122,20 +231,95 @@ const Marking: React.FC = () => {
   };
 
   const applyPreset = (preset: typeof LABEL_SIZE_PRESETS[0]) => {
-    if (preset.name === 'Custom') {
-      setActiveSettingsTab('labels');
-      return;
-    }
     setSettings(prev => ({
       ...prev,
       label_width: preset.width,
       label_height: preset.height,
-      labels_per_row: preset.perRow,
-      labels_per_page: preset.perPage,
     }));
     setCustomWidth(String(preset.width));
     setCustomHeight(String(preset.height));
     toast.success(`Применён пресет: ${preset.name}`);
+  };
+
+  /** Вычисляет рекомендаемую раскладку для A4 (поля 5 мм). */
+  const calcLayout = (w: number, h: number) => {
+    const usableW = PAGE_W - 2 * PAGE_MARGIN;
+    const usableH = PAGE_H - 2 * PAGE_MARGIN;
+    const perRow = Math.max(1, Math.floor(usableW / w));
+    const rows = Math.max(1, Math.floor(usableH / h));
+    return { perRow, perPage: perRow * rows };
+  };
+
+  const previewSingle = async (asset: MarkingAsset) => {
+    try {
+      const res = await fetch(`/api/marking/label-html/${asset.id}`, {
+        headers: localStorage.getItem('token') ? { 'Authorization': `Bearer ${localStorage.getItem('token')}` } : {},
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPreviewAsset(asset);
+        setPreviewHtml(data.html);
+        setPreviewSize({ width: data.label_width, height: data.label_height });
+        setPreviewFit(true);
+        setPreviewZoom(1);
+      }
+    } catch {
+      toast.error('Ошибка загрузки бирки');
+    }
+  };
+
+  const previewBatch = async () => {
+    if (selectedIds.size === 0) {
+      toast.error('Выберите активы');
+      return;
+    }
+    try {
+      const ids = Array.from(selectedIds).join(',');
+      const res = await fetch(`/api/marking/label-batch?asset_ids=${ids}`, {
+        headers: localStorage.getItem('token') ? { 'Authorization': `Bearer ${localStorage.getItem('token')}` } : {},
+      });
+      if (res.ok) {
+        const data = await res.json() as BatchResult;
+        setBatch(data);
+        setBatchFit(true);
+        setBatchZoom(1);
+        setShowBatchPreview(true);
+      }
+    } catch {
+      toast.error('Ошибка загрузки пакетной бирки');
+    }
+  };
+
+  const printBatch = () => {
+    if (!batch) return;
+    const { width, height, labels_per_row } = batch;
+    const fullHtml = buildPrintDoc(batch.labels, { width, height, perRow: labels_per_row });
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast.error('Блокировщик всплывающих окон');
+      return;
+    }
+    printWindow.document.write(fullHtml);
+    printWindow.document.close();
+    printWindow.onload = () => {
+      printWindow.print();
+    };
+  };
+
+  const printSingle = () => {
+    if (!previewHtml || !previewAsset) return;
+    const { width, height } = previewSize;
+    const fullHtml = buildPrintDoc([previewHtml], { width, height, perRow: 1, single: true });
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast.error('Блокировщик всплывающих окон');
+      return;
+    }
+    printWindow.document.write(fullHtml);
+    printWindow.document.close();
+    printWindow.onload = () => {
+      printWindow.print();
+    };
   };
 
   const handleLogoUpload = async (file: File) => {
@@ -225,96 +409,6 @@ const Marking: React.FC = () => {
     }
     return true;
   });
-
-  const previewSingle = async (asset: MarkingAsset) => {
-    try {
-      const res = await fetch(`/api/marking/label-html/${asset.id}`, {
-        headers: localStorage.getItem('token') ? { 'Authorization': `Bearer ${localStorage.getItem('token')}` } : {},
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setPreviewAsset(asset);
-        setPreviewHtml(data.html);
-      }
-    } catch {
-      toast.error('Ошибка загрузки бирки');
-    }
-  };
-
-  const previewBatch = async () => {
-    if (selectedIds.size === 0) {
-      toast.error('Выберите активы');
-      return;
-    }
-    try {
-      const ids = Array.from(selectedIds).join(',');
-      const res = await fetch(`/api/marking/label-batch?asset_ids=${ids}`, {
-        headers: localStorage.getItem('token') ? { 'Authorization': `Bearer ${localStorage.getItem('token')}` } : {},
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setBatchHtml(data.html);
-        setShowBatchPreview(true);
-      }
-    } catch {
-      toast.error('Ошибка загрузки пакетной бирки');
-    }
-  };
-
-  const printBatch = () => {
-    const fullHtml = `
-      <html>
-      <head>
-        <title>Бирки для печати</title>
-        <style>
-          @page { size: A4; margin: 5mm; }
-          body { margin: 0; padding: 0; }
-          .label { page-break-inside: avoid; }
-          img { display: block; }
-        </style>
-      </head>
-      <body>${batchHtml}</body>
-      </html>
-    `;
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      toast.error('Блокировщик всплывающих окон');
-      return;
-    }
-    printWindow.document.write(fullHtml);
-    printWindow.document.close();
-    printWindow.onload = () => {
-      printWindow.print();
-    };
-  };
-
-  const printSingle = () => {
-    if (!previewHtml || !previewAsset) return;
-    const fullHtml = `
-      <html>
-      <head>
-        <title>Бирка — ${previewAsset.inventory_number}</title>
-        <style>
-          @page { margin: 0; size: auto; }
-          body { margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-          .label { page-break-inside: avoid; }
-          img { display: block; }
-        </style>
-      </head>
-      <body>${previewHtml}</body>
-      </html>
-    `;
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      toast.error('Блокировщик всплывающих окон');
-      return;
-    }
-    printWindow.document.write(fullHtml);
-    printWindow.document.close();
-    printWindow.onload = () => {
-      printWindow.print();
-    };
-  };
 
   const saveSettings = async () => {
     try {
@@ -773,71 +867,119 @@ const Marking: React.FC = () => {
       </div>
 
       {/* Single Label Preview Modal */}
-      {previewAsset && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setPreviewAsset(null)}>
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-2xl w-full p-6" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 mb-4">
-              Предпросмотр бирки
-            </h3>
-            <div className="flex justify-center mb-4 overflow-auto max-h-[60vh] p-4 bg-gray-50 dark:bg-gray-900 rounded-lg" style={{ minHeight: '200px' }}>
+      {previewAsset && (() => {
+        const { width: lw, height: lh } = previewSize;
+        const effZoom = previewFit ? singlePreview.zoom : previewZoom;
+        const doc = buildPrintDoc([previewHtml], { width: lw, height: lh, perRow: 1, single: true });
+        return (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setPreviewAsset(null)}>
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200">Предпросмотр бирки</h3>
+                <button onClick={() => setPreviewAsset(null)} className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              {/* Preview area */}
               <div
-                dangerouslySetInnerHTML={{ __html: previewHtml }}
-              />
-            </div>
-            <div className="text-center text-sm text-gray-600 dark:text-gray-400 mb-4">
-              {previewAsset.name} | Инв. № {previewAsset.inventory_number}
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={printSingle}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                ref={singlePreview.ref}
+                className="flex-1 overflow-auto flex items-center justify-center p-6"
+                style={{ background: '#e5e7eb', minHeight: '200px' }}
               >
-                <PrinterIcon className="w-4 h-4" />
-                Печать
-              </button>
-              <button
-                onClick={() => setPreviewAsset(null)}
-                className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition"
-              >
-                Закрыть
-              </button>
+                <div style={{ boxShadow: '0 4px 24px rgba(0,0,0,.18)', borderRadius: '2px' }}>
+                  <ScaledFrame html={doc} wmm={lw} hmm={lh} zoom={effZoom} title={`Бирка ${previewAsset.inventory_number}`} />
+                </div>
+              </div>
+              {/* Zoom controls */}
+              <div className="flex items-center gap-2 px-6 py-2 border-t border-gray-200 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-400">
+                <button onClick={() => { setPreviewZoom(z => Math.max(0.2, z - 0.15)); setPreviewFit(false); }} className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700"><ZoomOut className="w-4 h-4" /></button>
+                <span className="w-12 text-center">{Math.round(effZoom * 100)}%</span>
+                <button onClick={() => { setPreviewZoom(z => Math.min(3, z + 0.15)); setPreviewFit(false); }} className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700"><ZoomIn className="w-4 h-4" /></button>
+                <button onClick={() => setPreviewFit(true)} className={`ml-2 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 ${previewFit ? 'text-blue-600' : ''}`} title="По размеру"><Maximize className="w-4 h-4" /></button>
+                <span className="ml-auto text-xs">{lw}×{lh} мм</span>
+              </div>
+              {/* Info + actions */}
+              <div className="px-6 pb-5">
+                <p className="text-center text-sm text-gray-600 dark:text-gray-400 mb-4 truncate">
+                  {previewAsset.name} | Инв. № {previewAsset.inventory_number}
+                </p>
+                <div className="flex gap-2">
+                  <button onClick={printSingle} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium">
+                    <PrinterIcon className="w-4 h-4" /> Печать
+                  </button>
+                  <button onClick={() => setPreviewAsset(null)} className="flex-1 px-4 py-2.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition">
+                    Закрыть
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Batch Preview Modal */}
-      {showBatchPreview && batchHtml && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowBatchPreview(false)}>
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-6xl w-full p-6 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 mb-4 flex items-center gap-2">
-              <PrinterIcon className="w-5 h-5" />
-              Пакетная печать бирок ({selectedIds.size} шт.)
-            </h3>
-            <div ref={printRef} className="mb-4 bg-gray-50 dark:bg-gray-900 rounded-lg p-4" style={{ minHeight: '200px', overflow: 'auto', maxHeight: '70vh' }}>
+      {showBatchPreview && batch && (() => {
+        const { labels, label_width: lw, label_height: lh, labels_per_row: perRow, labels_per_page: perPage } = batch;
+        const effZoom = batchFit ? batchPreview.zoom : batchZoom;
+        const pages: string[][] = [];
+        for (let i = 0; i < labels.length; i += perPage) {
+          pages.push(labels.slice(i, i + perPage));
+        }
+        return (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setShowBatchPreview(false)}>
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-5xl flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                  <PrinterIcon className="w-5 h-5" />
+                  Пакетная печать ({labels.length} шт., {pages.length} лист.)
+                </h3>
+                <button onClick={() => setShowBatchPreview(false)} className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              {/* Pages preview */}
               <div
-                dangerouslySetInnerHTML={{ __html: batchHtml.replace(/<\/?html[^>]*>/g, '').replace(/<\/?head[^>]*>/g, '').replace(/<\/?body[^>]*>/g, '').replace(/<title>[^<]*<\/title>/gi, '') }}
-                style={{ display: 'flex', flexWrap: 'wrap', gap: '1mm', justifyContent: 'center' }}
-              />
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={printBatch}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                ref={batchPreview.ref}
+                className="flex-1 overflow-auto flex flex-col items-center gap-4 p-6"
+                style={{ background: '#e5e7eb' }}
               >
-                <PrinterIcon className="w-4 h-4" />
-                Печать
-              </button>
-              <button
-                onClick={() => setShowBatchPreview(false)}
-                className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition"
-              >
-                Закрыть
-              </button>
+                {pages.map((pageLabels, i) => {
+                  const doc = buildPrintDoc(pageLabels, { width: lw, height: lh, perRow });
+                  return (
+                    <div key={i} className="flex flex-col items-center gap-1">
+                      <div style={{ boxShadow: '0 4px 24px rgba(0,0,0,.18)', borderRadius: '2px' }}>
+                        <ScaledFrame html={doc} wmm={PAGE_W} hmm={PAGE_H} zoom={effZoom} title={`Лист ${i + 1}`} />
+                      </div>
+                      <span className="text-xs text-gray-500">Лист {i + 1} / {pages.length}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Zoom controls */}
+              <div className="flex items-center gap-2 px-6 py-2 border-t border-gray-200 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-400">
+                <button onClick={() => { setBatchZoom(z => Math.max(0.1, z - 0.1)); setBatchFit(false); }} className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700"><ZoomOut className="w-4 h-4" /></button>
+                <span className="w-12 text-center">{Math.round(effZoom * 100)}%</span>
+                <button onClick={() => { setBatchZoom(z => Math.min(2, z + 0.1)); setBatchFit(false); }} className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700"><ZoomIn className="w-4 h-4" /></button>
+                <button onClick={() => setBatchFit(true)} className={`ml-2 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 ${batchFit ? 'text-blue-600' : ''}`} title="По размеру"><Maximize className="w-4 h-4" /></button>
+                <span className="ml-auto text-xs">{lw}×{lh} мм · {perRow}/ряд · {perPage}/лист</span>
+              </div>
+              {/* Actions */}
+              <div className="px-6 pb-5 pt-2">
+                <div className="flex gap-2">
+                  <button onClick={printBatch} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium">
+                    <PrinterIcon className="w-4 h-4" /> Печать
+                  </button>
+                  <button onClick={() => setShowBatchPreview(false)} className="flex-1 px-4 py-2.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition">
+                    Закрыть
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 };

@@ -2,13 +2,31 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { ClipboardCheck, CheckCircle2, Clock, Loader2 } from 'lucide-react';
+import { ClipboardCheck, CheckCircle2, Clock, Loader2, Wrench, TrendingUp } from 'lucide-react';
 
 interface Stats {
   total: number;
   active: number;
   maintenance: number;
   written_off: number;
+}
+
+interface TopAssetType {
+  type: string;
+  count: number;
+}
+
+interface RepairStats {
+  total_repairs: number;
+  pending: number;
+  in_progress: number;
+  completed: number;
+  rejected: number;
+  cancelled: number;
+  active_repair_assets: number;
+  total_estimated_cost: number;
+  total_actual_cost: number;
+  top_asset_types: TopAssetType[];
 }
 
 interface InventoryCheckItem {
@@ -50,6 +68,8 @@ const Dashboard: React.FC = () => {
   });
   const [activeInventory, setActiveInventory] = useState<InventoryCheck | null>(null);
   const [inventoryLoading, setInventoryLoading] = useState(false);
+  const [repairStats, setRepairStats] = useState<RepairStats | null>(null);
+  const [repairStatsLoading, setRepairStatsLoading] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -107,6 +127,24 @@ const Dashboard: React.FC = () => {
         }
         
         setInventoryLoading(false);
+
+        // Загрузка статистики ремонтов
+        setRepairStatsLoading(true);
+        try {
+          const repairResponse = await fetch('/api/repairs/stats/', {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            },
+          });
+          if (repairResponse.ok) {
+            const repairData = await repairResponse.json();
+            setRepairStats(repairData);
+          }
+        } catch {
+          // Статистика ремонтов не загружена
+        } finally {
+          setRepairStatsLoading(false);
+        }
         
         setLoading(false);
       } catch (err: any) {
@@ -389,6 +427,85 @@ const Dashboard: React.FC = () => {
                     Создать инвентаризацию
                   </button>
                 </div>
+              </div>
+            )}
+
+            {/* Статистика ремонтов */}
+            {repairStats && (
+              <div className="mt-6 sm:mt-8 grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+                {/* Карточки */}
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 border border-gray-100 dark:border-gray-700">
+                  <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
+                    <Wrench className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                    🔧 Заявки на ремонт
+                  </h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-3">
+                      <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">{repairStats.total_repairs}</div>
+                      <div className="text-xs text-gray-600 dark:text-gray-400">Всего заявок</div>
+                    </div>
+                    <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3">
+                      <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{repairStats.in_progress}</div>
+                      <div className="text-xs text-gray-600 dark:text-gray-400">В работе</div>
+                    </div>
+                    <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-3">
+                      <div className="text-2xl font-bold text-green-600 dark:text-green-400">{repairStats.completed}</div>
+                      <div className="text-xs text-gray-600 dark:text-gray-400">Завершено</div>
+                    </div>
+                    <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-3">
+                      <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{repairStats.active_repair_assets}</div>
+                      <div className="text-xs text-gray-600 dark:text-gray-400">Активов в ремонте</div>
+                    </div>
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 flex justify-between items-center text-sm">
+                    <span className="text-gray-600 dark:text-gray-400">Смета:</span>
+                    <span className="font-bold text-gray-800 dark:text-gray-200">{repairStats.total_estimated_cost.toLocaleString('ru-RU')} ₽</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-600 dark:text-gray-400">Факт:</span>
+                    <span className="font-bold text-gray-800 dark:text-gray-200">{repairStats.total_actual_cost.toLocaleString('ru-RU')} ₽</span>
+                  </div>
+                </div>
+
+                {/* Топ-5 типов активов */}
+                {repairStats.top_asset_types.length > 0 && (
+                  <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 border border-gray-100 dark:border-gray-700">
+                    <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
+                      <TrendingUp className="w-5 h-5 text-red-600 dark:text-red-400" />
+                      🔥 Топ-5 типов активов по ремонтам
+                    </h3>
+                    <div className="space-y-3">
+                      {repairStats.top_asset_types.map((item, idx) => {
+                        const maxCount = repairStats.top_asset_types[0]?.count || 1;
+                        const pct = Math.round((item.count / maxCount) * 100);
+                        const colors = [
+                          'bg-red-500 dark:bg-red-400',
+                          'bg-orange-500 dark:bg-orange-400',
+                          'bg-yellow-500 dark:bg-yellow-400',
+                          'bg-green-500 dark:bg-green-400',
+                          'bg-blue-500 dark:bg-blue-400',
+                        ];
+                        return (
+                          <div key={idx} className="flex items-center gap-3">
+                            <span className="text-xs font-bold text-gray-500 dark:text-gray-400 w-5 text-right">{idx + 1}</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex justify-between items-center mb-1">
+                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">{item.type}</span>
+                                <span className="text-xs font-bold text-gray-600 dark:text-gray-400 ml-2">{item.count}</span>
+                              </div>
+                              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                <div
+                                  className={`h-2 rounded-full ${colors[idx]}`}
+                                  style={{ width: `${pct}%` }}
+                                ></div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
