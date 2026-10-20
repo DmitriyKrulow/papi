@@ -36,11 +36,14 @@ RUN apk add --no-cache certbot openssl gettext
 # Copy HTTP config (used as fallback when SSL is not available)
 COPY nginx-http.conf /etc/nginx/nginx-http.conf
 
-# Built assets (copy from build stage, ignore errors if build failed)
-COPY --from=build /app/dist /usr/share/nginx/html 2>/dev/null || true
+# Ensure dist exists (for fallback case when build stage fails)
+RUN mkdir -p /usr/share/nginx/html
+
+# Built assets from build stage
+COPY --from=build /app/dist /usr/share/nginx/html
 
 # If build failed, serve a fallback HTML
-RUN echo '<!DOCTYPE html><html><head><meta charset="utf-8"><title>PAPI</title></head><body><h1>PAPI Frontend</h1><p>Please rebuild with network access.</p></body></html>' > /usr/share/nginx/html/index.html 2>/dev/null || true
+RUN test -f /usr/share/nginx/html/index.html || echo '<!DOCTYPE html><html><head><meta charset="utf-8"><title>PAPI</title></head><body><h1>PAPI Frontend</h1><p>Please rebuild with network access.</p></body></html>' > /usr/share/nginx/html/index.html
 
 EXPOSE 80
 EXPOSE 443
