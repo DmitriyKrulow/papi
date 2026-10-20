@@ -18,14 +18,18 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Добавляем колонку photo_categories
-    op.add_column('asset_type_configs', 
-        sa.Column('photo_categories', sa.Text(), nullable=True)
-    )
-    
-    # Устанавливаем категории фотографий по умолчанию для существующих типов
-    # (будет обработано в seed_asset_types при запуске приложения)
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    columns = [c["name"] for c in inspector.get_columns("asset_type_configs")]
+    if "photo_categories" not in columns:
+        op.add_column('asset_type_configs', 
+            sa.Column('photo_categories', sa.Text(), nullable=True)
+        )
 
 
 def downgrade() -> None:
-    op.drop_column('asset_type_configs', 'photo_categories')
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    columns = [c["name"] for c in inspector.get_columns("asset_type_configs")]
+    if "photo_categories" in columns:
+        op.drop_column('asset_type_configs', 'photo_categories')
