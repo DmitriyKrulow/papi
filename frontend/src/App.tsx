@@ -28,6 +28,10 @@ import InventoryAssetMobile from './pages/InventoryAssetMobile';
 import AuditLog from './pages/AuditLog';
 import NotificationsPage from './pages/NotificationsPage';
 import SchedulePage from './pages/SchedulePage';
+import AnalyticsPage from './pages/AnalyticsPage';
+import DisposalPage from './pages/DisposalPage';
+import RegulatoryPage from './pages/RegulatoryPage';
+import ReconciliationPage from './pages/ReconciliationPage';
 import './index.css';
 
 class ErrorBoundary extends React.Component<
@@ -246,6 +250,34 @@ function App() {
                   <PrivateRoute>
                     <SchedulePage />
                   </PrivateRoute>
+                } />
+                
+                {/* Аналитика поломок */}
+                <Route path="/analytics" element={
+                  <PrivateRoute>
+                    <AnalyticsPage />
+                  </PrivateRoute>
+                } />
+                
+                {/* Списание активов (только админ) */}
+                <Route path="/disposal" element={
+                  <AdminRoute>
+                    <DisposalPage />
+                  </AdminRoute>
+                } />
+                
+                {/* Нормативные документы (только админ) */}
+                <Route path="/regulatory" element={
+                  <AdminRoute>
+                    <RegulatoryPage />
+                  </AdminRoute>
+                } />
+                
+                {/* Сверка с бухгалтерией (только админ) */}
+                <Route path="/reconciliation" element={
+                  <AdminRoute>
+                    <ReconciliationPage />
+                  </AdminRoute>
                 } />
                 
                 {/* 404 - перенаправление на главную */}

@@ -1,16 +1,12 @@
 # src/main.py
-import re
-from fastapi import FastAPI, Request
-from fastapi.exceptions import RequestValidationError
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, HTMLResponse
+import os
+import logging
+from datetime import datetime
 
-# src/main.py
-import re
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
 
 from src.infrastructure.db.init_db import init_db, get_or_create_admin, run_migrations
 from src.infrastructure.db.session import SessionLocal
@@ -22,11 +18,11 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Создаем необходимые папки
-import os
-os.makedirs("uploads/documents", exist_ok=True)
-os.makedirs("uploads/reports", exist_ok=True)
-os.makedirs("uploads/inventory", exist_ok=True)
-os.makedirs("uploads/asset_photos", exist_ok=True)
+UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "uploads")
+os.makedirs(os.path.join(UPLOAD_DIR, "documents"), exist_ok=True)
+os.makedirs(os.path.join(UPLOAD_DIR, "reports"), exist_ok=True)
+os.makedirs(os.path.join(UPLOAD_DIR, "inventory"), exist_ok=True)
+os.makedirs(os.path.join(UPLOAD_DIR, "asset_photos"), exist_ok=True)
 
 app = FastAPI(
     title="PAPI Backend",
@@ -93,23 +89,8 @@ app = FastAPI(
 
 @app.get("/", tags=["root"])
 async def root():
-    """
-    Корневой endpoint — редирект на документацию API.
-    """
-    from fastapi.responses import RedirectResponse
+    """Корневой endpoint — редирект на документацию API."""
     return RedirectResponse(url="/docs")
-
-
-# ---------------------------------------------------------------------------
-# Сопоставление маршрутов для корректной обработки trailing slash.
-#
-# Роуты объявлены НЕОДНОРОДНО: часть с trailing slash (напр. POST /),
-# часть без (напр. POST /{department_id}/rooms). При этом фронтенд шлёт пути
-# без завершающего слэша. Чтобы не полагаться на 307-редиректы FastAPI
-# (которые при кросс-ориджин переходе теряют Authorization header и могут
-@app.get("/")
-def root():
-    return {"message": "Welcome to PAPI Backend API"}
 
 
 @app.get("/api/db-check")
@@ -128,6 +109,26 @@ def db_check():
         }
     except Exception as e:
         return {"status": "disconnected", "error": str(e)}
+
+
+@app.get("/health")
+def health_check():
+    """Общий endpoint здоровья приложения (для load balancer и мониторинга)."""
+    try:
+        from sqlalchemy import text
+        from src.infrastructure.db.session import SessionLocal
+        db = SessionLocal()
+        db.execute(text("SELECT 1"))
+        db.close()
+        db_status = "ok"
+    except Exception:
+        db_status = "error"
+    
+    return {
+        "status": "healthy" if db_status == "ok" else "degraded",
+        "database": db_status,
+        "timestamp": datetime.now().isoformat(),
+    }
 
 
 def register_routers():
@@ -338,9 +339,7 @@ async def log_request(request: Request, call_next):
     # Публичные endpoints не требуют авторизации
     public_paths = ("/docs", "/openapi.json", "/redoc", "/health", "/api/db-check")
     if 'authorization' not in headers_dict and not request.url.path.startswith(public_paths):
-        logger.warning(f"[Request] ⚠️ No Authorization header for {request.url.path}")
-    else:
-        logger.info(f"[Request] ✅ Authorization header present: {headers_dict.get('authorization', 'N/A')[:50]}...")
+        logger.warning(f"[Request] No Authorization header for {request.url.path}")
     response = await call_next(request)
     return response
 

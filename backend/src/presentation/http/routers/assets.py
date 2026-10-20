@@ -396,8 +396,8 @@ async def create_asset(
                 asset_to_dict(asset, db),
                 user_id=int(current_user.id) if hasattr(current_user, 'id') and current_user.id else None,  # type: ignore[arg-type]
             )
-        except Exception:
-            pass  # Аудит не должен ломать создание актива
+        except Exception as e:
+            logger.warning(f"Audit logging failed for asset create: {e}")
         
         return asset_to_dict(asset, db)
         
@@ -530,8 +530,8 @@ async def update_asset(
                 asset_to_dict(asset, db),
                 user_id=int(current_user.id) if hasattr(current_user, 'id') and current_user.id else None,  # type: ignore[arg-type]
             )
-        except Exception:
-            pass  # Аудит не должен ломать обновление актива
+        except Exception as e:
+            logger.warning(f"Audit logging failed for asset update: {e}")
         
         return asset_to_dict(asset, db)
         
@@ -576,8 +576,8 @@ async def delete_asset(
                 old_snapshot,
                 user_id=int(current_user.id) if hasattr(current_user, 'id') and current_user.id else None,  # type: ignore[arg-type]
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Audit logging failed for asset hide: {e}")
         
         return {"message": "Asset hidden successfully"}
         
@@ -636,8 +636,8 @@ async def hard_delete_asset(
                 {"name": asset.name, "inventory_number": asset.inventory_number},
                 user_id=int(current_user.id) if hasattr(current_user, 'id') and current_user.id else None,  # type: ignore[arg-type]
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Audit logging failed for asset delete: {e}")
         
         return {"message": "Asset permanently deleted", "deleted_id": asset_id}
         

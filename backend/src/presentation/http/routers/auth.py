@@ -4,6 +4,7 @@ import os
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.security import OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
@@ -11,7 +12,7 @@ from src.infrastructure.db.init_db import get_db
 from src.core.value_objects.password_hash import PasswordHash
 from src.infrastructure.db.models.user import User
 from ..schemas.auth import UserLogin as LoginRequest, UserCreate as RegisterRequest
-from ..schemas.auth import UserToken, UserResponse, ProfileUpdate
+from ..schemas.auth import UserToken, UserResponse, ProfileUpdate, ChangePasswordRequest
 from ..dependencies.auth import get_current_user, SECRET_KEY, ALGORITHM
 from src.use_cases.auth.login_user import (
     LoginUser,
@@ -21,6 +22,7 @@ from src.use_cases.auth.login_user import (
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
+REFRESH_TOKEN_EXPIRE_DAYS = 7
 
 
 def _get_client_ip(request: Request) -> str:
@@ -69,7 +71,19 @@ def register(user: RegisterRequest, db: Session = Depends(get_db)):
         data={"sub": new_user.username, "role": new_user.role},
         expires_delta=access_token_expires,
     )
-    return UserToken(access_token=access_token, token_type="bearer")
+    
+    # Генерируем refresh token
+    refresh_expires = timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    refresh_token = _create_access_token(
+        data={"sub": new_user.username, "type": "refresh"},
+        expires_delta=refresh_expires,
+    )
+    
+    return UserToken(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        token_type="bearer",
+    )
 
 
 @router.post("/login", response_model=UserToken)
@@ -114,7 +128,15 @@ def login(
         data={"sub": user.username, "role": user.role},
         expires_delta=access_token_expires,
     )
-    logger.info(f"[Auth] Login successful for user: {user.username}, token: {access_token[:50]}...")
+    
+    # Генерируем refresh token
+    refresh_expires = timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    refresh_token = _create_access_token(
+        data={"sub": user.username, "type": "refresh"},
+        expires_delta=refresh_expires,
+    )
+    
+    logger.info(f"[Auth] Login successful for user: {user.username}")
     
     # Логирование в аудит
     try:
@@ -124,12 +146,92 @@ def login(
     except Exception:
         pass  # Аудит не должен ломать вход
     
-    return UserToken(access_token=access_token, token_type="bearer")
+    return UserToken(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        token_type="bearer",
+    )
 
 
 @router.post("/refresh", response_model=UserToken)
-def refresh_token(refresh_token: str):
-    pass
+def refresh_token(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Обновляет access token с помощью refresh token из body."""
+    form_data = OAuth2PasswordRequestForm(username="", password="")
+    # Получаем refresh token из body
+    try:
+        body = await request.json()
+        refresh_token_value = body.get("refresh_token")
+        if not refresh_token_value:
+            raise HTTPException(status_code=401, detail="Refresh token is required")
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid request body")
+
+    try:
+        payload = jwt.decode(refresh_token_value, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        token_type: str = payload.get("type")
+        if username is None or token_type != "refresh":
+            raise HTTPException(status_code=401, detail="Invalid refresh token")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
+
+    user = db.query(User).filter(User.username == username).first()
+    if not user or not user.is_active:
+        raise HTTPException(status_code=401, detail="User not found or inactive")
+
+    # Генерируем новый access token
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    new_access_token = _create_access_token(
+        data={"sub": user.username, "role": user.role},
+        expires_delta=access_token_expires,
+    )
+
+    # Генерируем новый refresh token
+    refresh_expires = timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    new_refresh_token = _create_access_token(
+        data={"sub": user.username, "type": "refresh"},
+        expires_delta=refresh_expires,
+    )
+
+    return UserToken(access_token=new_access_token, token_type="bearer")
+
+
+@router.post("/change-password", response_model=UserResponse)
+def change_password(
+    change_request: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Меняет пароль текущего пользователя."""
+    user = db.query(User).filter(User.id == current_user.id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Проверяем старый пароль
+    if not PasswordHash.verify(change_request.old_password, user.password_hash):
+        raise HTTPException(status_code=400, detail="Incorrect old password")
+
+    # Устанавливаем новый пароль
+    new_hash = PasswordHash.from_plain_password(change_request.new_password)
+    user.password_hash = str(new_hash)
+    user.updated_at = datetime.now()
+    db.commit()
+    db.refresh(user)
+
+    return UserResponse(
+        id=user.id,
+        username=user.username,
+        email=user.email,
+        full_name=user.full_name,
+        phone=user.phone,
+        role=user.role,
+        is_active=user.is_active,
+        created_at=user.created_at,
+        updated_at=user.updated_at,
+    )
 
 
 @router.get("/me", response_model=UserResponse)

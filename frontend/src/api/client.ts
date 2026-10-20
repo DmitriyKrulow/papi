@@ -35,14 +35,11 @@ api.interceptors.response.use(
     
     // Если Network Error (сервер не отвечает) - НЕ удаляем токен!
     if (!error.response) {
-      console.warn('[API] Network error (server not responding):', error.message);
-      console.log('[API] Token preserved - server may be down');
       return Promise.reject(error);
     }
     
     // Если 401 - токен истек или невалидный
     if (error.response?.status === 401 && !originalRequest?._retried) {
-      // Не пытаемся перезапросить если уже logout
       if (isLoggingOut) {
         return Promise.reject(error);
       }
@@ -50,12 +47,9 @@ api.interceptors.response.use(
       isLoggingOut = true;
       
       try {
-        // Очищаем данные сессии только при реальном 401
-        console.log('[API] 401 Unauthorized - clearing session');
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         
-        // Если пользователь не на странице логина - редиректим
         if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
           window.location.href = '/login';
         }
@@ -64,19 +58,6 @@ api.interceptors.response.use(
       }
       
       return Promise.reject(error);
-    }
-    
-    // Если 403 - нет прав доступа
-    if (error.response?.status === 403) {
-      // Пытаемся перезапросить с обновленным токеном (если это не первый запрос)
-      if (originalRequest && !originalRequest._retried) {
-        originalRequest._retried = true;
-        const token = localStorage.getItem('token');
-        if (token) {
-          originalRequest.headers.Authorization = `Bearer ${token}`;
-          return api(originalRequest);
-        }
-      }
     }
     
     return Promise.reject(error);
@@ -88,26 +69,15 @@ export const API_BASE = '/api';
 export const apiClient = {
   // Аутентификация
   auth: {
-    login: (data: any) => {
-      console.log('[Auth API] login called');
-      return api.post('/auth/login', data);
-    },
-    register: (data: any) => {
-      console.log('[Auth API] register called');
-      return api.post('/auth/register', data);
-    },
-    me: () => {
-      console.log('[Auth API] me called');
-      return api.get('/auth/me');
-    },
-    profile: (data: any) => {
-      console.log('[Auth API] profile called');
-      return api.put('/auth/profile', data);
-    },
-    changePassword: (data: any) => {
-      console.log('[Auth API] changePassword called');
-      return api.post('/auth/change-password', data);
-    },
+    login: (data: { username: string; password: string }) => 
+      api.post('/auth/login', data),
+    register: (data: { username: string; password: string; email: string; full_name?: string; phone?: string }) => 
+      api.post('/auth/register', data),
+    me: () => api.get('/auth/me'),
+    profile: (data: { username?: string; email?: string; full_name?: string; phone?: string }) => 
+      api.put('/auth/profile', data),
+    changePassword: (data: { old_password: string; new_password: string }) => 
+      api.post('/auth/change-password', data),
   },
   
   // База данных
@@ -117,8 +87,8 @@ export const apiClient = {
   assets: {
     list: () => api.get('/assets/'),
     get: (id: number) => api.get(`/assets/${id}/`),
-    create: (data: any) => api.post('/assets/', data),
-    update: (id: number, data: any) => api.put(`/assets/${id}/`, data),
+    create: (data: Record<string, unknown>) => api.post('/assets/', data),
+    update: (id: number, data: Record<string, unknown>) => api.put(`/assets/${id}/`, data),
     hide: (id: number) => api.put(`/assets/${id}/hide/`),
     delete: (id: number) => api.delete(`/assets/${id}/`),
   },
@@ -127,7 +97,7 @@ export const apiClient = {
   documents: {
     list: () => api.get('/documents'),
     get: (id: number) => api.get(`/documents/${id}`),
-    upload: (file: File, data?: any) => {
+    upload: (file: File, data?: Record<string, unknown>) => {
       const formData = new FormData();
       formData.append('file', file);
       if (data) {
@@ -136,9 +106,7 @@ export const apiClient = {
         });
       }
       return api.post('/documents/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
     },
     delete: (id: number) => api.delete(`/documents/${id}`),
@@ -146,7 +114,7 @@ export const apiClient = {
   
   // Фотографии активов
   assetPhotos: {
-    upload: (assetId: number, file: File, data?: any) => {
+    upload: (assetId: number, file: File, data?: Record<string, unknown>) => {
       const formData = new FormData();
       formData.append('file', file);
       if (data) {
@@ -155,9 +123,7 @@ export const apiClient = {
         });
       }
       return api.post(`/asset-photos/${assetId}/upload`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
     },
     list: (assetId: number) => api.get(`/assets/${assetId}/photos`),
@@ -167,93 +133,67 @@ export const apiClient = {
   
   // Размещения (подразделения)
   placements: {
-    list: (params?: Record<string, any>) => {
-      const query = new URLSearchParams(params as any).toString();
+    list: (params?: Record<string, unknown>) => {
+      const query = new URLSearchParams(params as unknown as string[]).toString();
       return api.get(`/admin/placements/?${query}`);
     },
     get: (id: number) => api.get(`/admin/placements/${id}/`),
-    create: (data: any) => api.post('/admin/placements/', data),
-    update: (id: number, data: any) => api.put(`/admin/placements/${id}/`, data),
+    create: (data: Record<string, unknown>) => api.post('/admin/placements/', data),
+    update: (id: number, data: Record<string, unknown>) => api.put(`/admin/placements/${id}/`, data),
     delete: (id: number) => api.delete(`/admin/placements/${id}/`),
     options: () => api.get('/admin/placements/options'),
     getEmployees: (id: number) => api.get(`/admin/placements/${id}/employees`),
     getTree: () => api.get('/admin/placements/tree'),
     getRooms: (departmentId: number) => api.get(`/admin/placements/${departmentId}/rooms`),
-    createRoom: (departmentId: number, data: any) => api.post(`/admin/placements/${departmentId}/rooms`, data),
-    updateRoom: (roomId: number, data: any) => api.put(`/admin/placements/rooms/${roomId}`, data),
+    createRoom: (departmentId: number, data: Record<string, unknown>) => api.post(`/admin/placements/${departmentId}/rooms`, data),
+    updateRoom: (roomId: number, data: Record<string, unknown>) => api.put(`/admin/placements/rooms/${roomId}`, data),
     deleteRoom: (roomId: number) => api.delete(`/admin/placements/rooms/${roomId}`),
-    moveRoom: (roomId: number, data: any) => api.put(`/admin/placements/rooms/${roomId}/move`, data),
+    moveRoom: (roomId: number, data: Record<string, unknown>) => api.put(`/admin/placements/rooms/${roomId}/move`, data),
   },
   
   // Сотрудники
   employees: {
-    list: (params?: Record<string, any>) => {
-      const query = new URLSearchParams(params as any).toString();
+    list: (params?: Record<string, unknown>) => {
+      const query = new URLSearchParams(params as unknown as string[]).toString();
       return api.get(`/admin/employees/?${query}`);
     },
     get: (id: number) => api.get(`/admin/employees/${id}/`),
-    create: (data: any) => api.post('/admin/employees/', data),
-    update: (id: number, data: any) => api.put(`/admin/employees/${id}/`, data),
+    create: (data: Record<string, unknown>) => api.post('/admin/employees/', data),
+    update: (id: number, data: Record<string, unknown>) => api.put(`/admin/employees/${id}/`, data),
     delete: (id: number) => api.delete(`/admin/employees/${id}/`),
     options: () => api.get('/admin/employees/options'),
   },
   
   // Размещение активов
   placementAssignments: {
-    list: (params?: Record<string, any>) => {
-      const query = new URLSearchParams(params as any).toString();
+    list: (params?: Record<string, unknown>) => {
+      const query = new URLSearchParams(params as unknown as string[]).toString();
       return api.get(`/admin/placement-assignments/?${query}`);
     },
-    create: (data: any) => api.post('/admin/placement-assignments/', data),
-    update: (id: number, data: any) => api.put(`/admin/placement-assignments/${id}/`, data),
+    create: (data: Record<string, unknown>) => api.post('/admin/placement-assignments/', data),
+    update: (id: number, data: Record<string, unknown>) => api.put(`/admin/placement-assignments/${id}/`, data),
     delete: (id: number) => api.delete(`/admin/placement-assignments/${id}/`),
-    departments: (params?: Record<string, any>) => {
-      const query = new URLSearchParams(params as any).toString();
+    departments: (params?: Record<string, unknown>) => {
+      const query = new URLSearchParams(params as unknown as string[]).toString();
       return api.get(`/admin/placement-assignments/departments?${query}`);
     },
-    employees: (params?: Record<string, any>) => {
-      const query = new URLSearchParams(params as any).toString();
+    employees: (params?: Record<string, unknown>) => {
+      const query = new URLSearchParams(params as unknown as string[]).toString();
       return api.get(`/admin/placement-assignments/employees?${query}`);
     },
   },
   
   // Ремонты
   repairs: {
-    list: () => {
-      console.log('[API Client] repairs.list called');
-      return api.get('/repairs/');
-    },
-    get: (id: number) => {
-      console.log('[API Client] repairs.get called with id:', id);
-      return api.get(`/repairs/${id}/`);
-    },
-    create: (data: any) => {
-      console.log('[API Client] repairs.create called');
-      return api.post('/repairs/', data);
-    },
-    update: (id: number, data: any) => {
-      console.log('[API Client] repairs.update called with id:', id);
-      return api.put(`/repairs/${id}/`, data);
-    },
-    updateStatus: (id: number, status: string) => {
-      console.log('[API Client] repairs.updateStatus called with id:', id, 'status:', status);
-      const token = localStorage.getItem('token');
-      console.log('[API Client] Token from localStorage:', token ? token.substring(0, 30) + '...' : 'NONE');
-      console.log('[API Client] Token type:', typeof token);
-      console.log('[API Client] Token length:', token?.length);
-      console.log('[API Client] Token first 100 chars:', token?.substring(0, 100));
-      const result = api.patch(`/repairs/${id}/status/`, { status_update: { status } });
-      console.log('[API Client] PATCH result:', result);
-      return result;
-    },
-    updatePriority: (id: number, priority: string) => {
-      console.log('[API Client] repairs.updatePriority called with id:', id, 'priority:', priority);
-      return api.patch(`/repairs/${id}/priority/`, { priority });
-    },
-    delete: (id: number) => {
-      console.log('[API Client] repairs.delete called with id:', id);
-      return api.delete(`/repairs/${id}/`);
-    },
+    list: () => api.get('/repairs/'),
+    get: (id: number) => api.get(`/repairs/${id}/`),
+    create: (data: Record<string, unknown>) => api.post('/repairs/', data),
+    update: (id: number, data: Record<string, unknown>) => api.put(`/repairs/${id}/`, data),
+    updateStatus: (id: number, status: string) => 
+      api.patch(`/repairs/${id}/status/`, { status_update: { status } }),
+    updatePriority: (id: number, priority: string) => 
+      api.patch(`/repairs/${id}/priority/`, { priority }),
+    delete: (id: number) => api.delete(`/repairs/${id}/`),
   },
 };
 
