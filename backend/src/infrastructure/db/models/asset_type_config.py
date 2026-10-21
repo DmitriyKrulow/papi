@@ -21,6 +21,7 @@ DEFAULT_PHOTO_CATEGORIES = [
     "condition",              # Состояние
     "malfunction",            # Неисправность
     "general_condition",      # Общее состояние
+    "scan_receipt",           # Скан-копии расписок о передаче имущества
 ]
 
 # Категории фотографий по типам активов (умолчания)

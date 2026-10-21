@@ -1,8 +1,12 @@
 # backend/src/presentation/http/routers/placements.py
 from fastapi import APIRouter, Depends, HTTPException, Query, Body
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.background import BackgroundTasks
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import func, or_
 from typing import Optional, Any
 from datetime import datetime
+import os
 
 from src.infrastructure.db.init_db import get_db
 from src.infrastructure.db.models.department import Department, Room
@@ -10,6 +14,47 @@ from src.infrastructure.db.models.employee import Employee
 from src.presentation.http.dependencies.auth import get_current_admin
 
 router = APIRouter(prefix="/admin/placements", tags=["placements"])
+
+
+def _save_print_record(
+    room_id: int,
+    room_name: str,
+    department_id: Optional[int],
+    department_name: str,
+    employee_id: Optional[int],
+    employee_name: str,
+    employee_position: str,
+    asset_count: int,
+    file_path: str,
+    user_id: int,
+):
+    """Background task для сохранения записи о распечатанной описи"""
+    from src.infrastructure.db.session import SessionLocal
+    from src.infrastructure.db.models.room_inventory_print import RoomInventoryPrint
+    
+    db = SessionLocal()
+    try:
+        print_record = RoomInventoryPrint(
+            room_id=room_id,
+            room_name=room_name,
+            department_id=department_id,
+            department_name=department_name,
+            employee_id=employee_id,
+            employee_name=employee_name,
+            employee_position=employee_position,
+            asset_count=asset_count,
+            file_path=file_path,
+            signed=False,
+            created_by_user_id=user_id,
+            created_at=datetime.now(),
+        )
+        db.add(print_record)
+        db.commit()
+    except Exception as e:
+        print(f"❌ Error saving print record: {e}")
+        db.rollback()
+    finally:
+        db.close()
 
 
 def safe_isoformat(value: Optional[Any]) -> Optional[str]:
@@ -142,7 +187,7 @@ async def get_placement_tree(
     return result
 
 
-@router.get("/{department_id}")
+@router.get("/{department_id:int}")
 async def get_department(
     department_id: int,
     db: Session = Depends(get_db),
@@ -192,7 +237,7 @@ async def create_department(
     return department_to_dict(dept)
 
 
-@router.put("/{department_id}")
+@router.put("/{department_id:int}")
 async def update_department(
     department_id: int,
     data: dict = Body(...),
@@ -233,7 +278,7 @@ async def update_department(
     return department_to_dict(dept)
 
 
-@router.delete("/{department_id}")
+@router.delete("/{department_id:int}")
 async def delete_department(
     department_id: int,
     db: Session = Depends(get_db),
@@ -446,8 +491,8 @@ async def move_room(
         Asset.room_id == room_id
     ).all()
     
-    # Формируем новый location_address: "ИмяКабинета (КодПодразделения)"
-    new_location = f"{room.name} ({new_dept.code})"
+    # Формируем новый location_address: "ИмяКабинета (НазваниеПодразделения)"
+    new_location = f"{room.name} ({new_dept.name})"
     
     updated_assets = 0
     for asset in assets_in_room:
@@ -465,3 +510,440 @@ async def move_room(
         "assets_moved": updated_assets,
         "new_location": new_location,
     }
+
+
+# ======================================================================
+# ОПИСЬ ПОМЕЩЕНИЯ
+# ======================================================================
+
+REPORTS_DIR = "uploads/reports"
+os.makedirs(REPORTS_DIR, exist_ok=True)
+
+
+@router.get("/{department_id}/rooms-with-assets")
+async def get_rooms_with_assets(
+    department_id: int,
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(get_current_admin),
+):
+    """
+    Получить список кабинетов подразделения с количеством активов.
+    """
+    from src.infrastructure.db.models.asset import Asset
+
+    dept = db.query(Department).filter(Department.id == department_id).first()
+    if not dept:
+        raise HTTPException(status_code=404, detail="Подразделение не найдено")
+
+    rooms = db.query(Room).filter(
+        Room.department_id == department_id,
+        Room.is_active == True
+    ).order_by(Room.name).all()
+
+    result = []
+    for room in rooms:
+        dept = db.query(Department).filter(Department.id == room.department_id).first()
+        dept_code = dept.code if dept else ""
+        location_pattern = f"{room.name} ({dept_code})" if dept_code else room.name
+
+        # Считаем по room_id ИЛИ по location_address
+        assets_direct = db.query(Asset).filter(
+            Asset.room_id == room.id,
+            Asset.is_active == True
+        ).all()
+
+        assets_location = db.query(Asset).filter(
+            Asset.location_address.like(f"%{room.name}%"),
+            Asset.is_active == True
+        ).all()
+
+        # Объединяем, убираем дубликаты
+        seen_ids = set()
+        for a in assets_direct + assets_location:
+            seen_ids.add(a.id)
+
+        result.append({
+            "id": room.id,
+            "name": room.name,
+            "floor": room.floor or "",
+            "building": room.building or "",
+            "asset_count": len(seen_ids),
+        })
+
+    return result
+
+
+@router.get("/{room_id}/assets")
+async def get_room_assets(
+    room_id: int,
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(get_current_admin),
+):
+    """Получить активы кабинета (для формирования актов передачи).
+    Используется та же логика отбора, что и при печати описи:
+    прямая привязка room_id ИЛИ строковая привязка location_address."""
+    from src.infrastructure.db.models.asset import Asset
+
+    room = db.query(Room).filter(Room.id == room_id).first()
+    if not room:
+        raise HTTPException(status_code=404, detail="Кабинет не найден")
+
+    assets_direct = db.query(Asset).filter(
+        Asset.room_id == room_id,
+        Asset.is_active == True
+    ).order_by(Asset.inventory_number).all()
+
+    assets_location = db.query(Asset).filter(
+        Asset.location_address.like(f"%{room.name}%"),
+        Asset.is_active == True
+    ).order_by(Asset.inventory_number).all()
+
+    seen_ids = set()
+    assets = []
+    for a in assets_direct + assets_location:
+        if a.id not in seen_ids:
+            seen_ids.add(a.id)
+            assets.append(a)
+
+    from src.infrastructure.db.models.employee import Employee as EmpModel
+
+    result = []
+    for asset in assets:
+        emp_name = None
+        if asset.employee_id:
+            emp = db.query(EmpModel).filter(EmpModel.id == asset.employee_id).first()
+            if emp:
+                emp_name = f"{emp.last_name} {emp.first_name} {emp.middle_name or ''}".strip()
+        result.append({
+            "id": asset.id,
+            "name": asset.name or "Без названия",
+            "inventory_number": asset.inventory_number or "",
+            "quantity": asset.quantity or 1,
+            "model": asset.model or "",
+            "serial_number": asset.serial_number or "",
+            "asset_type": asset.asset_type or "",
+            "status": asset.status or "",
+            "employee_id": asset.employee_id,
+            "employee_name": emp_name,
+            "responsible_person": asset.responsible_person or "",
+            "location_address": asset.location_address or "",
+            "room_id": asset.room_id,
+        })
+
+    return JSONResponse(content=result)
+
+
+@router.post("/{room_id}/print/inventory")
+async def print_room_inventory(
+    room_id: int,
+    data: dict = Body(default={"employee_id": None}),
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(get_current_admin),
+):
+    """
+    Сгенерировать опись имущества для указанного кабинета.
+    Возвращает Excel-файл для скачивания.
+    
+    Body: {"employee_id": int | null} — сотрудник, подписывающий опись
+    """
+    from src.infrastructure.db.models.asset import Asset
+    from src.infrastructure.db.models.department import Department
+    from src.infrastructure.db.models.employee import Employee
+    from src.infrastructure.db.models.room_inventory_print import RoomInventoryPrint
+    from src.infrastructure.reports.room_inventory_report import RoomInventoryReportGenerator
+
+    room = db.query(Room).filter(Room.id == room_id).first()
+    if not room:
+        raise HTTPException(status_code=404, detail="Кабинет не найден")
+
+    dept = db.query(Department).filter(Department.id == room.department_id).first()
+    department_name = dept.name if dept else ""
+
+    # Формируем location_address как в move_room: "ИмяКабинета (НазваниеПодразделения)"
+    location_pattern = f"{room.name} ({dept.name})" if dept else room.name
+
+    # Ищем по room_id (прямая привязка) ИЛИ по location_address (строковая привязка)
+    assets_direct = db.query(Asset).filter(
+        Asset.room_id == room_id,
+        Asset.is_active == True
+    ).order_by(Asset.inventory_number).all()
+
+    assets_location = db.query(Asset).filter(
+        Asset.location_address.like(f"%{room.name}%"),
+        Asset.is_active == True
+    ).order_by(Asset.inventory_number).all()
+
+    # Объединяем, убираем дубликаты по id
+    seen_ids = set()
+    assets = []
+    for a in assets_direct + assets_location:
+        if a.id not in seen_ids:
+            seen_ids.add(a.id)
+            assets.append(a)
+
+    assets_data = []
+    for asset in assets:
+        assets_data.append({
+            "name": asset.name or "Без названия",
+            "inventory_number": asset.inventory_number or "",
+            "quantity": asset.quantity or 1,
+            "model": asset.model or "",
+            "serial_number": asset.serial_number or "",
+        })
+
+    # Данные сотрудника (подписанта)
+    employee_id = data.get("employee_id")
+    senior_inspector = ''
+    position = ''
+    if employee_id:
+        emp = db.query(Employee).filter(
+            Employee.id == employee_id,
+            Employee.is_active == True
+        ).first()
+        if emp:
+            position = emp.position or ''
+            # Формируем "Фамилия И.О."
+            initials = ''
+            if emp.first_name:
+                initials += emp.first_name[0].upper() + '.'
+            if emp.middle_name:
+                initials += emp.middle_name[0].upper() + '.'
+            senior_inspector = f"{emp.last_name} {initials}".strip()
+
+    generator = RoomInventoryReportGenerator()
+    excel_bytes = generator.generate(
+        room_name=room.name,
+        department_name=department_name,
+        assets=assets_data,
+        senior_inspector=senior_inspector,
+        position=position,
+    )
+
+    filename = f"опись_{room.name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    filepath = os.path.join(REPORTS_DIR, filename)
+    with open(filepath, 'wb') as f:
+        f.write(excel_bytes)
+
+    # Сохраняем запись в БД ДО отправки файла
+    print_record = RoomInventoryPrint(
+        room_id=room.id,
+        room_name=room.name,
+        department_id=room.department_id,
+        department_name=department_name,
+        employee_id=employee_id,
+        employee_name=senior_inspector,
+        employee_position=position,
+        asset_count=len(assets_data),
+        file_path=filepath,
+        signed=False,
+        created_by_user_id=current_user.id,
+        created_at=datetime.now(),
+    )
+    db.add(print_record)
+    db.commit()
+    db.refresh(print_record)
+
+    return FileResponse(
+        path=filepath,
+        filename=filename,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
+@router.get("/inventory-prints")
+async def list_room_inventory_prints(
+    room_id: Optional[int] = Query(None, description="Фильтр по кабинету"),
+    signed: Optional[bool] = Query(None, description="Фильтр по статусу подписания"),
+    archived: Optional[bool] = Query(None, description="Фильтр по статусу архивации (по умолчанию — только неархивированные)"),
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(get_current_admin),
+):
+    """Получить список распечатанных описей"""
+    from src.infrastructure.db.models.room_inventory_print import RoomInventoryPrint
+    from src.infrastructure.db.models.employee import Employee
+    
+    query = db.query(RoomInventoryPrint).options(
+        joinedload(RoomInventoryPrint.employee),
+    )
+    
+    if room_id:
+        query = query.filter(RoomInventoryPrint.room_id == room_id)
+    if signed is not None:
+        query = query.filter(RoomInventoryPrint.signed == signed)
+    # По умолчанию скрываем архивированные описи
+    if archived is None:
+        query = query.filter(RoomInventoryPrint.is_archived == False)
+    else:
+        query = query.filter(RoomInventoryPrint.is_archived == archived)
+    
+    prints = query.order_by(RoomInventoryPrint.created_at.desc()).all()
+    
+    result = []
+    for p in prints:
+        employee_data = None
+        if p.employee_id:
+            emp = db.query(Employee).filter(Employee.id == p.employee_id).first()
+            if emp:
+                employee_data = {
+                    "id": emp.id,
+                    "name": f"{emp.last_name} {emp.first_name[0].upper()}.{''.join([emp.middle_name[0].upper() + '.' if emp.middle_name else ''])}".strip(),
+                    "position": emp.position or '',
+                }
+        
+        result.append({
+            "id": p.id,
+            "room_id": p.room_id,
+            "room_name": p.room_name,
+            "department_name": p.department_name,
+            "employee_id": p.employee_id,
+            "employee_name": p.employee_name,
+            "employee_position": p.employee_position,
+            "employee": employee_data,
+            "asset_count": p.asset_count,
+            "file_path": p.file_path,
+            "signed": p.signed,
+            "signed_at": p.signed_at.isoformat() if p.signed_at else None,
+            "signed_by": p.signed_by_user.full_name if p.signed_by_user else None,
+            "created_by": p.created_by_user.full_name if p.created_by_user else None,
+            "created_at": p.created_at.isoformat() if p.created_at else None,
+            "is_archived": p.is_archived,
+            "archived_at": p.archived_at.isoformat() if p.archived_at else None,
+        })
+    
+    return JSONResponse(content=result)
+
+
+@router.post("/inventory-prints/{print_id}/confirm")
+async def confirm_inventory_print(
+    print_id: int,
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(get_current_admin),
+):
+    """
+    Подтвердить подписание описи.
+    При подтверждении активам в кабинете проставляется employee_id подписанта.
+    """
+    from src.infrastructure.db.models.room_inventory_print import RoomInventoryPrint
+    from src.infrastructure.db.models.asset import Asset
+    from src.infrastructure.db.models.employee import Employee
+    
+    print_record = db.query(RoomInventoryPrint).filter(
+        RoomInventoryPrint.id == print_id
+    ).first()
+    
+    if not print_record:
+        raise HTTPException(status_code=404, detail="Запись описи не найдена")
+    
+    if print_record.signed:
+        raise HTTPException(status_code=400, detail="Опись уже подписана")
+    
+    if print_record.is_archived:
+        raise HTTPException(status_code=400, detail="Нельзя подтвердить архивированную опись")
+    
+    # Получаем сотрудника-подписанта
+    employee = None
+    if print_record.employee_id:
+        employee = db.query(Employee).filter(Employee.id == print_record.employee_id).first()
+    
+    # Проставляем employee_id для всех активов в кабинете.
+    # Та же логика отбора, что и при генерации описи: активы, привязанные
+    # напрямую (room_id), ИЛИ строковой привязкой (location_address).
+    if employee:
+        from src.infrastructure.db.models.asset_transfer_history import AssetTransferHistory
+
+        assets = db.query(Asset).filter(
+            or_(
+                Asset.room_id == print_record.room_id,
+                Asset.location_address.like(f"%{print_record.room_name}%"),
+            ),
+            Asset.is_active == True
+        ).all()
+        
+        full_name = f"{employee.last_name} {employee.first_name} {employee.middle_name or ''}".strip()
+        source_ref = f"Опись кабинета {print_record.room_name or ''}".strip()
+        
+        for asset in assets:
+            prev_emp_id = asset.employee_id
+            prev_emp_name = None
+            if prev_emp_id:
+                prev = db.query(Employee).filter(Employee.id == prev_emp_id).first()
+                if prev:
+                    prev_emp_name = f"{prev.last_name} {prev.first_name} {prev.middle_name or ''}".strip()
+
+            asset.employee_id = employee.id
+            asset.responsible_person = full_name
+
+            # История передачи актива
+            history = AssetTransferHistory(
+                asset_id=asset.id,
+                prev_employee_id=prev_emp_id,
+                prev_employee_name=prev_emp_name,
+                new_employee_id=employee.id,
+                new_employee_name=full_name,
+                source="inventory_print",
+                source_id=print_record.id,
+                source_ref=source_ref,
+                transfer_date=datetime.now(),
+                created_by_user_id=current_user.id,
+                created_at=datetime.now(),
+            )
+            db.add(history)
+    
+    # Отмечаем опись как подписанную
+    print_record.signed = True
+    print_record.signed_at = datetime.now()
+    print_record.signed_by_user_id = current_user.id
+    
+    db.commit()
+    
+    assets_updated = len(db.query(Asset).filter(
+        or_(
+            Asset.room_id == print_record.room_id,
+            Asset.location_address.like(f"%{print_record.room_name}%"),
+        ),
+        Asset.is_active == True
+    ).all()) if employee else 0
+    
+    return JSONResponse(content={
+        "message": "Опись подтверждена, активам проставлен сотрудник",
+        "print_id": print_record.id,
+        "assets_updated": assets_updated,
+    })
+
+
+@router.post("/inventory-prints/{print_id}/archive")
+async def archive_inventory_print(
+    print_id: int,
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(get_current_admin),
+):
+    """
+    Архивировать опись (отметить как не подписанную).
+    Активам ничего не присваивается.
+    """
+    from src.infrastructure.db.models.room_inventory_print import RoomInventoryPrint
+    
+    print_record = db.query(RoomInventoryPrint).filter(
+        RoomInventoryPrint.id == print_id
+    ).first()
+    
+    if not print_record:
+        raise HTTPException(status_code=404, detail="Запись описи не найдена")
+    
+    if print_record.signed:
+        raise HTTPException(status_code=400, detail="Нельзя архивировать подписанную опись")
+    
+    if print_record.is_archived:
+        raise HTTPException(status_code=400, detail="Опись уже архивирована")
+    
+    # Отмечаем опись как архивированную — она больше не появится в списке
+    print_record.is_archived = True
+    print_record.archived_at = datetime.now()
+    print_record.signed = False
+    db.commit()
+    
+    return JSONResponse(content={
+        "message": "Опись архивирована",
+        "print_id": print_record.id,
+    })
+

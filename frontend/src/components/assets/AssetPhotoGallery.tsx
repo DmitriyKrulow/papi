@@ -154,6 +154,7 @@ const AssetPhotoGallery: React.FC<AssetPhotoGalleryProps> = ({
       condition: '🔍',
       malfunction: '⚠️',
       general_condition: '📋',
+      scan_receipt: '📄',
     };
     return icons[category] || '📸';
   };

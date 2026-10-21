@@ -43,6 +43,9 @@ interface InventoryCheck {
   status: 'draft' | 'in_progress' | 'completed' | 'cancelled';
   responsible_name: string | null;
   creator_name: string | null;
+  employee_id: number | null;
+  employee_name: string | null;
+  employee_position: string | null;
   created_at: string;
   started_at: string | null;
   completed_at: string | null;
@@ -780,6 +783,10 @@ const CreateCheckModal: React.FC<CreateCheckModalProps> = ({ onClose, onCreated 
   const [loadingScope, setLoadingScope] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [scopeError, setScopeError] = useState<string | null>(null);
+  const [selectedEmployeeInfo, setSelectedEmployeeInfo] = useState<{
+    position?: string;
+    room?: string;
+  } | null>(null);
 
   useEffect(() => {
     if (checkType !== 'full') {
@@ -842,6 +849,15 @@ const CreateCheckModal: React.FC<CreateCheckModalProps> = ({ onClose, onCreated 
         params.append('scope_id', String(scopeId));
         const opt = scopeOptions.find(o => o.id === scopeId);
         if (opt) params.append('scope_name', opt.name);
+      }
+      // Добавляем сотрудника-подписанта
+      if (selectedEmployeeInfo && scopeId) {
+        const opt = scopeOptions.find(o => o.id === scopeId);
+        if (opt && (opt as any).type === 'employee') {
+          params.append('employee_id', String(scopeId));
+          params.append('employee_name', opt.name);
+          params.append('employee_position', selectedEmployeeInfo.position || '');
+        }
       }
 
       const res = await fetch(`/api/inventory-checks?${params.toString()}`, {
@@ -917,7 +933,7 @@ const CreateCheckModal: React.FC<CreateCheckModalProps> = ({ onClose, onCreated 
           {checkType !== 'full' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                {checkType === 'by_room' ? 'Помещение' : checkType === 'by_employee' ? 'Сотрудник' : 'Ответственный'}
+                {checkType === 'by_room' ? 'Помещение' : checkType === 'by_employee' ? 'Сотрудник (подписант)' : 'Ответственный'}
               </label>
               {loadingScope ? (
                 <p className="text-sm text-gray-400">Загрузка...</p>
@@ -934,27 +950,60 @@ const CreateCheckModal: React.FC<CreateCheckModalProps> = ({ onClose, onCreated 
               ) : scopeOptions.length === 0 ? (
                 <p className="text-sm text-gray-400">Нет доступных объектов для выбора</p>
               ) : (
-                <select
-                  value={scopeId || ''}
-                  onChange={(e) => setScopeId(Number(e.target.value) || null)}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">— Выберите —</option>
-                  {scopeOptions.map(opt => {
-                    const isUser = (opt as any).type === 'user';
-                    const isEmployee = (opt as any).type === 'employee';
-                    const role = (opt as any).role;
-                    return (
-                      <option key={opt.id} value={opt.id}>
-                        {opt.name}
-                        {isUser ? (role === 'admin' ? ' 👑 (админ)' : ' 👤 (пользователь)') : ''}
-                        {isEmployee && opt.position ? ` — ${opt.position}` : ''}
-                        {opt.building ? ` (${opt.building})` : ''}
-                        {opt.floor ? `, этаж ${opt.floor}` : ''}
-                      </option>
-                    );
-                  })}
-                </select>
+                <>
+                  <select
+                    value={scopeId || ''}
+                    onChange={(e) => {
+                      const val = Number(e.target.value) || null;
+                      setScopeId(val);
+                      // Получаем информацию о выбранном сотруднике
+                      if (val) {
+                        const opt = scopeOptions.find(o => o.id === val);
+                        if (opt && (opt as any).type === 'employee') {
+                          setSelectedEmployeeInfo({
+                            position: (opt as any).position,
+                            room: (opt as any).room,
+                          });
+                        } else {
+                          setSelectedEmployeeInfo(null);
+                        }
+                      } else {
+                        setSelectedEmployeeInfo(null);
+                      }
+                    }}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">— Выберите —</option>
+                    {scopeOptions.map(opt => {
+                      const isUser = (opt as any).type === 'user';
+                      const isEmployee = (opt as any).type === 'employee';
+                      const role = (opt as any).role;
+                      return (
+                        <option key={opt.id} value={opt.id}>
+                          {opt.name}
+                          {isUser ? (role === 'admin' ? ' 👑 (админ)' : ' 👤 (пользователь)') : ''}
+                          {isEmployee && opt.position ? ` — ${opt.position}` : ''}
+                          {opt.building ? ` (${opt.building})` : ''}
+                          {opt.floor ? `, этаж ${opt.floor}` : ''}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  {/* Отображение информации о выбранном сотруднике */}
+                  {selectedEmployeeInfo && scopeId && (
+                    <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                      <p className="text-xs font-medium text-blue-800 dark:text-blue-200 mb-1">Информация о подписанте:</p>
+                      <div className="text-xs text-blue-700 dark:text-blue-300 space-y-0.5">
+                        {selectedEmployeeInfo.position && (
+                          <p>Должность: {selectedEmployeeInfo.position}</p>
+                        )}
+                        {selectedEmployeeInfo.room && (
+                          <p>Кабинет: {selectedEmployeeInfo.room}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}

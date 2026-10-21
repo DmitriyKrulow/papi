@@ -41,6 +41,11 @@ class InventoryCheck(Base):
     responsible_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     commission_members = Column(Text, nullable=True)
 
+    # Сотрудник-подписант описи
+    employee_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
+    employee_name = Column(String(255), nullable=True)  # ФИО подписанта для печати
+    employee_position = Column(String(255), nullable=True)  # Должность подписанта
+
     created_at = Column(DateTime, nullable=False, default=datetime.now)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     started_at = Column(DateTime, nullable=True)
@@ -56,6 +61,7 @@ class InventoryCheck(Base):
     department = relationship("Department", back_populates="inventory_checks")
     responsible = relationship("User", foreign_keys=[responsible_id], back_populates="inventory_checks")
     creator = relationship("User", foreign_keys=[created_by], back_populates="created_inventory_checks")
+    assigned_employee = relationship("Employee", foreign_keys=[employee_id], back_populates="inventory_checks")
     asset_photos = relationship("AssetPhoto", back_populates="inventory_check")
     items = relationship("InventoryCheckItem", back_populates="inventory_check", cascade="all, delete-orphan")
 

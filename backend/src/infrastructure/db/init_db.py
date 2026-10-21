@@ -52,14 +52,22 @@ def run_migrations():
         from alembic.config import Config
         from alembic import command
 
-        # Определяем путь к alembic.ini относительно корня проекта (backend/)
-        # В контейнере WORKDIR=/app, alembic.ini лежит в /app/alembic.ini
-        # На хосте: backend/alembic.ini
-        backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        alembic_cfg_path = os.path.join(backend_dir, "alembic.ini")
+        # Определяем путь к alembic.ini относительно корня проекта (backend/).
+        # Файл init_db.py лежит в src/infrastructure/db/, поэтому поднимаемся на 4 уровня:
+        #   хост:      f:/Code/papi/backend/src/infrastructure/db/...  -> backend/
+        #   контейнер: /app/src/infrastructure/db/...                  -> /app/
+        this_file = os.path.abspath(__file__)
+        candidates = [
+            # backend/ (4 уровня вверх от src/infrastructure/db/init_db.py)
+            os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(this_file)))), "alembic.ini"),
+            # запасной вариант на случай иной структуры каталогов
+            os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(this_file))), "alembic.ini"),
+            "/app/alembic.ini",
+        ]
+        alembic_cfg_path = next((p for p in candidates if os.path.exists(p)), None)
 
-        if not os.path.exists(alembic_cfg_path):
-            logger.warning("Alembic config not found at %s — пропускаем миграции", alembic_cfg_path)
+        if not alembic_cfg_path:
+            logger.warning("Alembic config not found (tried %s) — пропускаем миграции", candidates)
             return
 
         alembic_cfg = Config(alembic_cfg_path)

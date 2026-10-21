@@ -38,6 +38,9 @@ from .rfid_api_key import RfidApiKey
 from .storage_address import StorageAddress
 from .inventory_schedule import InventorySchedule, ReconciliationRecord
 from .regulatory_document import RegulatoryDocument, EquipmentStandard, ResponsibilityRecord
+from .room_inventory_print import RoomInventoryPrint
+from .transfer_act import TransferAct
+from .asset_transfer_history import AssetTransferHistory
 
 __all__ = [
     "Base",
@@ -69,4 +72,7 @@ __all__ = [
     "NotificationSettings",
     "SystemSettings",
     "AuditLog",
+    "RoomInventoryPrint",
+    "TransferAct",
+    "AssetTransferHistory",
 ]

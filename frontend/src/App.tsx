@@ -32,6 +32,8 @@ import AnalyticsPage from './pages/AnalyticsPage';
 import DisposalPage from './pages/DisposalPage';
 import RegulatoryPage from './pages/RegulatoryPage';
 import ReconciliationPage from './pages/ReconciliationPage';
+import RoomInventoryPrint from './pages/RoomInventoryPrint';
+import { Toaster } from 'react-hot-toast';
 import './index.css';
 
 class ErrorBoundary extends React.Component<
@@ -280,11 +282,36 @@ function App() {
                   </AdminRoute>
                 } />
                 
+                {/* Распечатка описи помещения (только админ) */}
+                <Route path="/room-inventory-print" element={
+                  <AdminRoute>
+                    <RoomInventoryPrint />
+                  </AdminRoute>
+                } />
+                
                 {/* 404 - перенаправление на главную */}
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </main>
             <Footer />
+            <Toaster
+              position="top-right"
+              toastOptions={{
+                duration: 4000,
+                style: {
+                  borderRadius: '8px',
+                  background: '#1f2937',
+                  color: '#f9fafb',
+                  fontSize: '14px',
+                },
+                success: {
+                  iconTheme: { primary: '#22c55e', secondary: '#ffffff' },
+                },
+                error: {
+                  iconTheme: { primary: '#ef4444', secondary: '#ffffff' },
+                },
+              }}
+            />
           </div>
         </ThemeProvider>
       </AuthProvider>

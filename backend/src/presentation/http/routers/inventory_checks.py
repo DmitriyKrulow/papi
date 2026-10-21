@@ -133,6 +133,9 @@ async def list_inventory_checks(
             "status": c.status,
             "responsible_name": c.responsible.full_name if c.responsible else None,
             "creator_name": c.creator.full_name if c.creator else c.creator.username if c.creator else None,
+            "employee_id": c.employee_id,
+            "employee_name": c.employee_name,
+            "employee_position": c.employee_position,
             "created_at": c.created_at.isoformat() if c.created_at else None,
             "started_at": c.started_at.isoformat() if c.started_at else None,
             "completed_at": c.completed_at.isoformat() if c.completed_at else None,
@@ -150,6 +153,9 @@ async def create_inventory_check(
     scope_name: Optional[str] = Query(None, description="Название объекта проверки"),
     department_id: Optional[int] = Query(None, description="ID подразделения"),
     commission_members: Optional[str] = Query(None, description="Члены комиссии"),
+    employee_id: Optional[int] = Query(None, description="ID сотрудника-подписанта"),
+    employee_name: Optional[str] = Query(None, description="ФИО сотрудника-подписанта"),
+    employee_position: Optional[str] = Query(None, description="Должность сотрудника-подписанта"),
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin),
 ):
@@ -170,6 +176,9 @@ async def create_inventory_check(
         responsible_id=admin.id,
         commission_members=commission_members,
         created_by=admin.id,
+        employee_id=employee_id,
+        employee_name=employee_name,
+        employee_position=employee_position,
         created_at=datetime.now(),
     )
     db.add(inv_check)
@@ -181,6 +190,8 @@ async def create_inventory_check(
         "name": inv_check.name,
         "check_type": inv_check.check_type,
         "status": inv_check.status,
+        "employee_id": inv_check.employee_id,
+        "employee_name": inv_check.employee_name,
         "message": "Инвентаризация создана",
     })
 
@@ -277,16 +288,26 @@ async def get_scope_options(
             ]
         elif check_type == "by_employee":
             employees = db.query(Employee).filter(Employee.is_active == True).order_by(Employee.last_name).all()
-            return [
-                {
+            result = []
+            for e in employees:
+                # Получаем кабинет из первого актива сотрудника
+                room_name = None
+                room = db.query(Room).join(Asset, Asset.room_id == Room.id).filter(
+                    Asset.employee_id == e.id,
+                    Asset.is_active == True
+                ).first()
+                if room:
+                    room_name = room.name
+                
+                result.append({
                     "id": e.id,
                     "name": f"{e.last_name} {e.first_name} {e.middle_name or ''}".strip(),
                     "department_id": e.department_id,
                     "position": e.position,
+                    "room": room_name,
                     "type": "employee",
-                }
-                for e in employees
-            ]
+                })
+            return result
         elif check_type == "by_responsible":
             users = db.query(User).filter(User.is_active == True).order_by(User.username).all()
             return [
@@ -378,6 +399,9 @@ async def get_inventory_check(
         "responsible_name": inv_check.responsible.full_name if inv_check.responsible else None,
         "creator_name": inv_check.creator.full_name if inv_check.creator else None,
         "commission_members": inv_check.commission_members,
+        "employee_id": inv_check.employee_id,
+        "employee_name": inv_check.employee_name,
+        "employee_position": inv_check.employee_position,
         "created_at": inv_check.created_at.isoformat() if inv_check.created_at else None,
         "started_at": inv_check.started_at.isoformat() if inv_check.started_at else None,
         "completed_at": inv_check.completed_at.isoformat() if inv_check.completed_at else None,
@@ -407,11 +431,20 @@ async def start_inventory_check(
         InventoryCheckItem.inventory_check_id == check_id
     ).delete()
 
-    # Сбрасываем статус подтверждения у всех активов
+    # Сбрасываем статус подтверждения у всех активов и устанавливаем сотрудника
+    employee = None
+    if inv_check.employee_id:
+        employee = db.query(Employee).filter(Employee.id == inv_check.employee_id).first()
+    
     for a in assets:
         a.last_inventory_confirmed = False
         a.last_inventory_date = None
         a.last_inventory_by_id = None
+        # Устанавливаем сотрудника-подписанта для актива
+        if employee:
+            a.employee_id = employee.id
+            full_name = f"{employee.last_name} {employee.first_name} {employee.middle_name or ''}".strip()
+            a.responsible_person = full_name
 
     # Создаём элементы проверки
     for a in assets:

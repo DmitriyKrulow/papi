@@ -51,6 +51,7 @@ class Department(Base):
     incoming_movements = relationship("MovementRecord", foreign_keys="[MovementRecord.to_department_id]", back_populates="to_department")
     inventory_checks = relationship("InventoryCheck", back_populates="department")
     rooms = relationship("Room", back_populates="department", cascade="all, delete-orphan")
+    room_inventory_prints = relationship("RoomInventoryPrint", back_populates="department")
 
     def __repr__(self) -> str:
         return f"<Department(id={self.id}, name='{self.name}', code='{self.code}')>"
@@ -73,6 +74,7 @@ class Room(Base):
     )
 
     department = relationship("Department", back_populates="rooms")
+    inventory_prints = relationship("RoomInventoryPrint", back_populates="room")
 
     def __repr__(self) -> str:
         return f"<Room(id={self.id}, name='{self.name}', department_id={self.department_id})>"

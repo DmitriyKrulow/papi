@@ -24,6 +24,7 @@ PHOTO_CATEGORY_LABELS = {
     "condition": "Состояние",
     "malfunction": "Неисправность",
     "general_condition": "Общее состояние",
+    "scan_receipt": "Скан-копии расписок (акты передачи)",
 }
 
 
@@ -94,7 +95,10 @@ def get_asset_type_photo_categories(type_code: str, db: Session = Depends(get_db
     if not asset_type:
         raise HTTPException(status_code=404, detail="Asset type not found")
     
-    configured = asset_type.get_photo_categories()
+    configured = list(asset_type.get_photo_categories())
+    # Скан-копии расписок доступны для всех типов активов
+    if "scan_receipt" not in configured:
+        configured.append("scan_receipt")
     available = [
         {"key": cat, "label": PHOTO_CATEGORY_LABELS.get(cat, cat)}
         for cat in DEFAULT_PHOTO_CATEGORIES

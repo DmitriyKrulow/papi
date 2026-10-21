@@ -31,6 +31,7 @@ const Navbar: React.FC = () => {
   const adminItems = [
     { path: '/admin', label: 'Панель управления', icon: '⚙️' },
     { path: '/audit', label: 'Журнал аудита', icon: '📜' },
+    { path: '/room-inventory-print', label: 'Распечатка описи', icon: '🖨️' },
   ];
 
   const handleLogout = () => {

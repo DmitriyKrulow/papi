@@ -5,3 +5,4 @@ from .asset_report import AssetReportGenerator
 from .depreciation_report import DepreciationReportGenerator
 from .inventory_report import InventoryReportGenerator
 from .repair_report import RepairReportGenerator
+from .room_inventory_report import RoomInventoryReportGenerator

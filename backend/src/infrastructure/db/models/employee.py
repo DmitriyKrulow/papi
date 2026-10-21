@@ -53,6 +53,8 @@ class Employee(Base):
 
     department = relationship("Department", back_populates="employees")
     user = relationship("User", back_populates="employees")
+    inventory_checks = relationship("InventoryCheck", foreign_keys="[InventoryCheck.employee_id]", back_populates="assigned_employee")
+    room_inventory_prints = relationship("RoomInventoryPrint", back_populates="employee")
 
     def __repr__(self) -> str:
         return f"<Employee(id={self.id}, name='{self.last_name} {self.first_name}', position='{self.position}')>"
