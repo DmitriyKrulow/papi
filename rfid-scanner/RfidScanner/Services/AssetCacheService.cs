@@ -46,6 +46,9 @@ public class AssetCacheService
 
     public (bool Found, string AssetName, string InventoryNumber) CheckLocalCache(string rfidTag)
     {
+        // Нормализация: приводим к верхнему регистру для нечувствительного сравнения
+        var normalized = rfidTag.ToUpperInvariant().Trim();
+        
         lock (_lock)
         {
             foreach (var file in Directory.GetFiles(_dataDir, "cache_room_*.json"))
@@ -54,7 +57,9 @@ public class AssetCacheService
                 var d = JsonConvert.DeserializeObject<RoomCacheJson>(json);
                 if (d != null)
                 {
-                    var asset = d.Assets?.FirstOrDefault(a => a.RfidTag == rfidTag);
+                    var asset = d.Assets?.FirstOrDefault(a => 
+                        !string.IsNullOrEmpty(a.RfidTag) && 
+                        a.RfidTag.ToUpperInvariant().Trim() == normalized);
                     if (asset != null)
                         return (Found: true, asset.Name, asset.InventoryNumber);
                 }

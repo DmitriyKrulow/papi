@@ -1,11 +1,14 @@
 # backend/src/presentation/http/routers/assets.py
 import os
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import text
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional, Any
+
+logger = logging.getLogger(__name__)
 
 from src.infrastructure.db.init_db import get_db
 from src.infrastructure.db.models.asset import Asset
@@ -129,6 +132,7 @@ def asset_to_dict(asset, db: Optional[Session] = None):
         "last_inventory_by_name": safe_str(assigned_inventory_checker_name) if assigned_inventory_checker_name else None,
         "last_inventory_confirmed": getattr(asset, 'last_inventory_confirmed', False),
         "last_inventory_source": getattr(asset, 'last_inventory_source', None),
+        "rfid_tag": safe_str(getattr(asset, 'rfid_tag', None)),
     }
 
 
@@ -501,6 +505,13 @@ async def update_asset(
             asset.depreciation_years = asset_data["depreciation_years"] if asset_data["depreciation_years"] is not None else None  # type: ignore[assignment]
         if "employee_id" in asset_data:
             asset.employee_id = asset_data["employee_id"] if asset_data["employee_id"] is not None else None  # type: ignore[assignment]
+        if "rfid_tag" in asset_data:
+            # Нормализация: убираем пробелы и приводим к верхнему регистру
+            raw_tag = asset_data["rfid_tag"]
+            if raw_tag is not None:
+                raw_tag = str(raw_tag).strip().upper() or None
+            logger.info(f"[Asset Update] Setting rfid_tag for asset {asset_id}: {raw_tag!r}")
+            asset.rfid_tag = raw_tag  # type: ignore[assignment]
         
         asset.updated_at = datetime.now()  # type: ignore[assignment]
         

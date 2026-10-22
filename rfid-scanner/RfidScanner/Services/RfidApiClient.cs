@@ -239,6 +239,76 @@ public class RfidApiClient
     }
 
     /// <summary>
+    /// Подтвердить актив как найденный
+    /// </summary>
+    public async Task<Dictionary<string, object>> ConfirmAssetAsync(int inventoryId, int assetId)
+    {
+        try
+        {
+            var url = $"/api/inventory-checks/{inventoryId}/confirm/{assetId}?found=true";
+            System.Diagnostics.Debug.WriteLine($"[API] POST {url}");
+            var response = await SendAsync(HttpMethod.Post, url);
+            var json = await response.Content.ReadAsStringAsync();
+            System.Diagnostics.Debug.WriteLine($"[API] ConfirmAsset response: {(int)response.StatusCode} {json}");
+
+            if (!response.IsSuccessStatusCode)
+            {
+                string detail = json;
+                try
+                {
+                    var errObj = Newtonsoft.Json.Linq.JObject.Parse(json);
+                    detail = errObj["detail"]?.ToString() ?? json;
+                }
+                catch { }
+                System.Diagnostics.Debug.WriteLine($"[API] ConfirmAsset ERROR: {(int)response.StatusCode} {detail}");
+                return new Dictionary<string, object> { { "success", false }, { "message", $"HTTP {(int)response.StatusCode}: {detail}" } };
+            }
+
+            return JsonConvert.DeserializeObject<Dictionary<string, object>>(json) ?? new();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[API] ConfirmAssetAsync ERROR: {ex.Message}");
+            return new Dictionary<string, object> { { "success", false }, { "message", $"Ошибка соединения: {ex.Message}" } };
+        }
+    }
+
+    /// <summary>
+    /// Завершить инвентаризацию с сохранением результатов
+    /// </summary>
+    public async Task<Dictionary<string, object>> CompleteInventoryAsync(int inventoryId)
+    {
+        try
+        {
+            var url = $"/api/inventory-checks/{inventoryId}/complete-and-save";
+            System.Diagnostics.Debug.WriteLine($"[API] POST {url}");
+            var response = await SendAsync(HttpMethod.Post, url);
+            var json = await response.Content.ReadAsStringAsync();
+            System.Diagnostics.Debug.WriteLine($"[API] CompleteInventory response: {(int)response.StatusCode} {json}");
+
+            if (!response.IsSuccessStatusCode)
+            {
+                string detail = json;
+                try
+                {
+                    var errObj = Newtonsoft.Json.Linq.JObject.Parse(json);
+                    detail = errObj["detail"]?.ToString() ?? json;
+                }
+                catch { }
+                System.Diagnostics.Debug.WriteLine($"[API] CompleteInventory ERROR: {(int)response.StatusCode} {detail}");
+                return new Dictionary<string, object> { { "success", false }, { "message", $"HTTP {(int)response.StatusCode}: {detail}" } };
+            }
+
+            return JsonConvert.DeserializeObject<Dictionary<string, object>>(json) ?? new();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[API] CompleteInventoryAsync ERROR: {ex.Message}");
+            return new Dictionary<string, object> { { "success", false }, { "message", $"Ошибка соединения: {ex.Message}" } };
+        }
+    }
+
+    /// <summary>
     /// Пакетная отправка результатов сканирования на сервер
     /// </summary>
     public async Task<Dictionary<string, object>> SyncResultsAsync(int inventoryId, List<Dictionary<string, string>> results)

@@ -10,9 +10,21 @@ public class AssetDisplayItem : INotifyPropertyChanged
 {
     private string _statusText = "⏳ Ожидание";
     private string _statusColor = "#FF9800"; // Orange
+    private bool _isConfirmed = false;
     
     public Asset Asset { get; set; } = new();
     public bool IsChecked { get; set; }
+    public int AssetId { get; set; } // ID актива для отправки на сервер
+    public bool IsConfirmed
+    {
+        get => _isConfirmed;
+        set
+        {
+            if (_isConfirmed == value) return;
+            _isConfirmed = value;
+            OnPropertyChanged();
+        }
+    }
     
     public string AssetName => Asset.Name ?? Asset.InventoryNumber ?? "Без названия";
     public string InventoryNumber => Asset.InventoryNumber ?? "—";
@@ -46,6 +58,13 @@ public class AssetDisplayItem : INotifyPropertyChanged
         IsChecked = true;
         StatusText = "✅ Найдено";
         StatusColor = "#4CAF50"; // Green
+    }
+
+    public void MarkAsPending()
+    {
+        IsChecked = false;
+        StatusText = "⏳ Ожидает";
+        StatusColor = "#FF9800"; // Orange
     }
 
     public void MarkAsNotChecked()

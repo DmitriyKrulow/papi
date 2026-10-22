@@ -325,6 +325,31 @@ const Inventory: React.FC = () => {
     }
   };
 
+  const handleMarkAllFound = async (checkId: number) => {
+    if (!checkAuth()) return;
+    if (!confirm('Подтвердить все найденные активы? Это действие отметит все ожидающие активы как найденные.')) return;
+    try {
+      const token = localStorage.getItem('token')!;
+      const res = await fetch(
+        `/api/inventory-checks/${checkId}/mark-all-found`,
+        { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        toast.success(`Все активы отмечены как найденные (${data.marked} шт.)`);
+        fetchCheckDetails(checkId);
+      } else if (res.status === 401) {
+        clearAuth();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.detail || 'Ошибка');
+      }
+    } catch (err) {
+      console.error('handleMarkAllFound error:', err);
+      toast.error('Ошибка соединения');
+    }
+  };
+
   // ====================== РЕНДЕР ======================
 
   if (loading) {
@@ -454,6 +479,7 @@ const Inventory: React.FC = () => {
           onConfirm={handleConfirm}
           onSkip={handleSkip}
           onResetAsset={handleResetAsset}
+          onMarkAllFound={handleMarkAllFound}
           onRefresh={() => fetchCheckDetails(selectedCheck.id)}
           onShowQr={() => setShowQrModal(selectedCheck)}
         />
@@ -487,15 +513,17 @@ interface CheckDetailViewProps {
   onConfirm: (checkId: number, assetId: number, found: boolean) => void;
   onSkip: (checkId: number, assetId: number) => void;
   onResetAsset: (checkId: number, assetId: number) => void;
+  onMarkAllFound: (checkId: number) => void;
   onRefresh: () => void;
   onShowQr: () => void;
 }
 
 const CheckDetailView: React.FC<CheckDetailViewProps> = ({
-  check, isAdmin, onBack, onStart, onComplete, onDelete, onConfirm, onSkip, onResetAsset, onRefresh, onShowQr
+  check, isAdmin, onBack, onStart, onComplete, onDelete, onConfirm, onSkip, onResetAsset, onMarkAllFound, onRefresh, onShowQr
 }) => {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'pending' | 'found' | 'missing'>('all');
+  const [autoRefresh, setAutoRefresh] = useState(true);
 
   const items = check.items || [];
   const filtered = items.filter(item => {
@@ -513,6 +541,17 @@ const CheckDetailView: React.FC<CheckDetailViewProps> = ({
   const foundCount = items.filter(i => i.result === 'found').length;
   const missingCount = items.filter(i => i.result === 'missing').length;
   const progress = items.length > 0 ? ((foundCount + missingCount) / items.length * 100).toFixed(0) : '0';
+
+  // Автообновление при сканировании RFID
+  useEffect(() => {
+    if (check.status !== 'in_progress' || !autoRefresh) return;
+    
+    const interval = setInterval(() => {
+      onRefresh();
+    }, 5000); // Обновление каждые 5 секунд
+    
+    return () => clearInterval(interval);
+  }, [check.status, autoRefresh, onRefresh]);
 
   return (
     <div className="space-y-4">
@@ -603,9 +642,17 @@ const CheckDetailView: React.FC<CheckDetailViewProps> = ({
         {/* Progress bar */}
         {check.status === 'in_progress' && (
           <div className="mb-2">
-            <div className="flex justify-between text-xs text-gray-500 mb-1">
+            <div className="flex justify-between items-center text-xs text-gray-500 mb-1">
               <span>Прогресс проверки</span>
-              <span>{progress}%</span>
+              <div className="flex items-center gap-2">
+                <span>{progress}%</span>
+                {autoRefresh && (
+                  <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
+                    <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                    Автообновление
+                  </span>
+                )}
+              </div>
             </div>
             <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
               <div
@@ -628,6 +675,29 @@ const CheckDetailView: React.FC<CheckDetailViewProps> = ({
       {/* Items */}
       {check.status === 'in_progress' || check.status === 'completed' ? (
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+          {/* Auto-scan notice */}
+          {check.status === 'in_progress' && (
+            <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                  <p className="text-sm text-blue-800 dark:text-blue-200">
+                    При сканировании RFID-метки активы автоматически отмечаются в списке
+                  </p>
+                </div>
+                <button
+                  onClick={() => setAutoRefresh(!autoRefresh)}
+                  className={`px-2 py-1 text-xs rounded transition ${
+                    autoRefresh
+                      ? 'bg-blue-600 text-white hover:bg-blue-700'
+                      : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  {autoRefresh ? 'Вкл' : 'Выкл'}
+                </button>
+              </div>
+            </div>
+          )}
           {/* Filters */}
           <div className="flex flex-wrap gap-3 mb-4">
             <div className="flex-1 min-w-[200px] relative">
@@ -655,6 +725,15 @@ const CheckDetailView: React.FC<CheckDetailViewProps> = ({
                 </button>
               ))}
             </div>
+            {pendingCount > 0 && check.status === 'in_progress' && (
+              <button
+                onClick={() => onMarkAllFound(check.id)}
+                className="px-3 py-1.5 text-xs bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center gap-1"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                Подтвердить все найденные ({pendingCount})
+              </button>
+            )}
           </div>
 
           {/* Items list */}
@@ -665,34 +744,52 @@ const CheckDetailView: React.FC<CheckDetailViewProps> = ({
               {filtered.map(item => (
                 <div
                   key={item.id}
-                  className={`flex items-center gap-3 p-3 rounded-lg border transition ${
+                  className={`flex items-center gap-3 p-3 rounded-lg border transition-all duration-300 ${
                     item.result === 'found'
-                      ? 'border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/10'
+                      ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20 shadow-sm'
                       : item.result === 'missing'
-                      ? 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/10'
-                      : 'border-gray-200 dark:border-gray-700'
+                      ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20 shadow-sm'
+                      : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700'
                   }`}
                 >
+                  {/* Status indicator */}
                   <div className="flex-shrink-0">
                     {item.result === 'found' ? (
-                      <CheckCircle2 className="w-5 h-5 text-green-500" />
+                      <div className="w-7 h-7 rounded-full bg-green-100 dark:bg-green-900/40 flex items-center justify-center">
+                        <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+                      </div>
                     ) : item.result === 'missing' ? (
-                      <XCircle className="w-5 h-5 text-red-500" />
+                      <div className="w-7 h-7 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center">
+                        <XCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                      </div>
                     ) : (
-                      <Clock className="w-5 h-5 text-gray-400" />
+                      <div className="w-7 h-7 rounded-full bg-yellow-100 dark:bg-yellow-900/40 flex items-center justify-center">
+                        <Clock className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+                      </div>
                     )}
                   </div>
 
+                  {/* Asset info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs text-gray-500">{item.inventory_number}</span>
+                      <span className="font-mono text-xs text-gray-500 dark:text-gray-400">{item.inventory_number}</span>
                       <span className="font-medium text-gray-900 dark:text-gray-100 truncate">{item.asset_name}</span>
+                      {/* Status badge */}
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                        item.result === 'found'
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300'
+                          : item.result === 'missing'
+                          ? 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300'
+                          : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300'
+                      }`}>
+                        {item.result === 'found' ? 'Найден' : item.result === 'missing' ? 'Отсутствует' : 'Ожидает'}
+                      </span>
                     </div>
                     <div className="text-xs text-gray-400 dark:text-gray-500 flex flex-wrap gap-2 mt-0.5">
                       {item.model && <span>{item.model}</span>}
                       {item.location && <span>📍 {item.location}</span>}
                       {item.responsible && <span>👤 {item.responsible}</span>}
-                      {item.confirmed_by && <span>✓ {item.confirmed_by}</span>}
+                      {item.confirmed_by && <span className="text-green-600 dark:text-green-400">✓ {item.confirmed_by}</span>}
                     </div>
                   </div>
 
@@ -700,32 +797,35 @@ const CheckDetailView: React.FC<CheckDetailViewProps> = ({
                   <div className="flex-shrink-0 flex gap-1 flex-wrap justify-end">
                     {check.status === 'in_progress' && (
                       <>
-                        {item.result !== 'found' && (
-                          <button
-                            onClick={() => onConfirm(check.id, item.asset_id, true)}
-                            className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition flex items-center gap-1"
-                            title="Найден"
-                          >
-                            <Check className="w-3.5 h-3.5" /> Найден
-                          </button>
-                        )}
-                        {item.result !== 'missing' && (
-                          <button
-                            onClick={() => onConfirm(check.id, item.asset_id, false)}
-                            className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition flex items-center gap-1"
-                            title="Отсутствует"
-                          >
-                            <X className="w-3.5 h-3.5" /> Нет
-                          </button>
-                        )}
                         {item.result === 'pending' && (
-                          <button
-                            onClick={() => onSkip(check.id, item.asset_id)}
-                            className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 rounded hover:bg-gray-50 dark:hover:bg-gray-700 transition flex items-center gap-1"
-                            title="Пропустить"
-                          >
-                            <ArrowRight className="w-3.5 h-3.5" /> Пропуск
-                          </button>
+                          <>
+                            <button
+                              onClick={() => onConfirm(check.id, item.asset_id, true)}
+                              className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition flex items-center gap-1"
+                              title="Найден"
+                            >
+                              <Check className="w-3.5 h-3.5" /> Найден
+                            </button>
+                            <button
+                              onClick={() => onConfirm(check.id, item.asset_id, false)}
+                              className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition flex items-center gap-1"
+                              title="Отсутствует"
+                            >
+                              <X className="w-3.5 h-3.5" /> Нет
+                            </button>
+                            <button
+                              onClick={() => onSkip(check.id, item.asset_id)}
+                              className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 rounded hover:bg-gray-50 dark:hover:bg-gray-700 transition flex items-center gap-1"
+                              title="Пропустить"
+                            >
+                              <ArrowRight className="w-3.5 h-3.5" /> Пропуск
+                            </button>
+                          </>
+                        )}
+                        {item.result !== 'pending' && (
+                          <span className="px-2 py-1 text-xs text-gray-500 dark:text-gray-400">
+                            {item.result === 'found' ? '✓ Подтверждён' : '✗ Отмечен'}
+                          </span>
                         )}
                         {isAdmin && item.result !== 'pending' && (
                           <button

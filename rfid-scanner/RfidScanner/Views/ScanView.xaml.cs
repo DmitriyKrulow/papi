@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using RfidScanner.Models;
 using RfidScanner.ViewModels;
 
 namespace RfidScanner.Views;
@@ -32,6 +33,12 @@ public partial class ScanView : UserControl
         // Подписываемся на событие обновления результатов
         _viewModel.ResultsUpdated += UpdateResultsList;
         
+        // Подписываемся на событие завершения инвентаризации
+        _viewModel.InventoryCompleted += () =>
+        {
+            InventoryCompleted?.Invoke();
+        };
+        
         // Подписываемся на события изменения свойств для обновления UI
         _viewModel.PropertyChanged += (s, e) =>
         {
@@ -43,6 +50,9 @@ public partial class ScanView : UserControl
                 MissingCountText.Text = _viewModel.MissingCount.ToString();
             else if (e.PropertyName == nameof(ScanViewModel.TotalCount))
                 TotalCountText.Text = _viewModel.TotalCount.ToString();
+            else if (e.PropertyName == nameof(ScanViewModel.ConfirmedCount))
+                // Обновляем прогресс при изменении подтверждённых
+                UpdateProgress();
             else if (e.PropertyName == nameof(ScanViewModel.SessionRoomName))
                 RoomNameText.Text = $"🏢 Помещение: {_viewModel.SessionRoomName}";
             else if (e.PropertyName == nameof(ScanViewModel.StatusText))
@@ -51,7 +61,7 @@ public partial class ScanView : UserControl
                 LastTagText.Text = string.IsNullOrEmpty(_viewModel.LastTag) ? "—" : _viewModel.LastTag;
             else if (e.PropertyName == nameof(ScanViewModel.HasResults))
                 UpdateResultsList();
-            else if (e.PropertyName is nameof(ScanViewModel.MatchedCount) or nameof(ScanViewModel.TotalCount))
+            else if (e.PropertyName is nameof(ScanViewModel.ConfirmedCount) or nameof(ScanViewModel.TotalCount))
                 UpdateProgress();
         };
         
@@ -88,7 +98,13 @@ public partial class ScanView : UserControl
     {
         if (_viewModel != null)
         {
-            ProgressText.Text = $"{_viewModel.MatchedCount} / {_viewModel.TotalCount}";
+            ProgressText.Text = $"{_viewModel.ConfirmedCount} / {_viewModel.TotalCount}";
+            ProgressPercentText.Text = $"{_viewModel.ProgressPercent}%";
+            // Обновляем ProgressBar вручную (так как ProgressPercent — вычисляемое свойство)
+            if (ProgressPercentBar != null)
+            {
+                ProgressPercentBar.Value = _viewModel.ProgressPercent;
+            }
         }
     }
     
@@ -184,7 +200,28 @@ public partial class ScanView : UserControl
         Exit?.Invoke();
     }
 
+    private void ConfirmAllButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_viewModel == null) return;
+        
+        // Подтверждаем все найденные активы
+        _viewModel.ConfirmAllFoundCommand.Execute(null);
+    }
+
+    private void ConfirmAssetButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_viewModel == null) return;
+        
+        var button = sender as Button;
+        if (button?.DataContext is AssetDisplayItem item)
+        {
+            // Подтверждаем конкретный актив через команду
+            _viewModel.ConfirmAssetCommand.Execute(item.AssetName);
+        }
+    }
+
     public event Action? Finished;
     public event Action? Reset;
     public event Action? Exit;
+    public event Action? InventoryCompleted;
 }

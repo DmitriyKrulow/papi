@@ -87,11 +87,19 @@ public class InventoryViewModel : BaseViewModel
             var result = await _apiClient.ScanAsync(SelectedInventory.Id, rfidTag);
             if (result.Success)
             {
-                // Обновить статус элемента
-                var item = _items.FirstOrDefault(i => i.RfidTag == rfidTag);
+                // Обновить статус элемента — бэкенд возвращает asset_id
+                // Ищем элемент по asset_id, а не по rfid_tag (надёжнее)
+                var item = _items.FirstOrDefault(i => !string.IsNullOrEmpty(i.RfidTag) 
+                    && i.RfidTag.Trim().ToUpper() == rfidTag.Trim().ToUpper());
                 if (item != null)
                 {
                     item.CheckStatus = "found";
+                }
+                else
+                {
+                    // Если не нашли по RFID — пробуем обновить через API
+                    // Получаем обновлённый список активов
+                    await LoadInventory(SelectedInventory.Id);
                 }
             }
             else

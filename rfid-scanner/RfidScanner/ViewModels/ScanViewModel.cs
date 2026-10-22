@@ -35,6 +35,7 @@ public class ScanViewModel : INotifyPropertyChanged
     private int _extraCount;
     private int _missingCount;
     private int _totalCount;
+    private int _confirmedCount;
     private string _statusText = "Ожидание сканирования...";
     private string _lastTag = "";
     private bool _isPaused;
@@ -106,7 +107,7 @@ public class ScanViewModel : INotifyPropertyChanged
                 assets = pendingAssets;
                 
                 // Сохраняем в кэш для локальной проверки RFID
-                var cacheStatus = await _assetCache.LoadRoomAssetsAsync(_sessionManager.CurrentSession.RoomId, assets);
+            var cacheStatus = await _assetCache.LoadRoomAssetsAsync(_sessionManager.CurrentSession.RoomId, assets);
                 System.Diagnostics.Debug.WriteLine($"[LoadSessionAssetsAsync] Cache saved from pending: {cacheStatus}");
                 
                 System.Diagnostics.Debug.WriteLine($"[LoadSessionAssetsAsync] BEFORE TotalCount={TotalCount}, setting to {pendingAssets.Count}");
@@ -121,6 +122,7 @@ public class ScanViewModel : INotifyPropertyChanged
                 
                 StatusText = $"✅ Загружено {pendingAssets.Count} активов. Готово к сканированию";
                 HintText = "💡 Поднесите RFID-сканер на 1-3 см к метке и дождитесь сигнала";
+                ReportTagsCoverage(pendingAssets.Count, pendingAssets.Count(a => !string.IsNullOrWhiteSpace(a.RfidTag)));
                 return;
             }
             
@@ -164,6 +166,7 @@ public class ScanViewModel : INotifyPropertyChanged
             
             StatusText = $"✅ Загружено {assets.Count} активов. Готово к сканированию";
             HintText = "💡 Поднесите RFID-сканер на 1-3 см к метке и дождитесь сигнала";
+            ReportTagsCoverage(assets.Count, assets.Count(a => !string.IsNullOrWhiteSpace(a.RfidTag)));
         }
         catch (Exception ex)
         {
@@ -203,18 +206,26 @@ public class ScanViewModel : INotifyPropertyChanged
                 Location = item.Location,
                 Responsible = item.Responsible,
             };
-            var displayItem = new AssetDisplayItem { Asset = asset };
+            var displayItem = new AssetDisplayItem { Asset = asset, AssetId = item.AssetId };
             
             // Восстанавливаем статус из сервера
             if (item.CheckStatus == "found")
             {
                 displayItem.MarkAsChecked();
+                displayItem.IsConfirmed = true;
             }
-            // pending/missing → оставляем "Ожидание"
+            else if (item.CheckStatus == "missing")
+            {
+                displayItem.MarkAsSkipped();
+                displayItem.IsConfirmed = true;
+            }
+            // pending → оставляем "Ожидает"
             
             RoomAssets.Add(displayItem);
         }
-        System.Diagnostics.Debug.WriteLine($"[PopulateRoomAssetsWithStatus] Added {RoomAssets.Count} assets to UI list");
+        // Пересчитываем подтверждённые
+        UpdateConfirmedCount();
+        System.Diagnostics.Debug.WriteLine($"[PopulateRoomAssetsWithStatus] Added {RoomAssets.Count} assets to UI list, Confirmed={ConfirmedCount}");
     }
 
     /// <summary>
@@ -223,14 +234,35 @@ public class ScanViewModel : INotifyPropertyChanged
     private void UpdateAssetStatusFromResults(List<ScanResultItem> results)
     {
         var matchedTags = results.Where(r => r.Status == ScanAssetStatus.Matched)
-            .Select(r => r.RfidTag)
+            .Select(r => r.RfidTag.ToUpperInvariant().Trim())
             .ToHashSet();
+        
+        System.Diagnostics.Debug.WriteLine($"[UpdateAssetStatusFromResults] Checking {RoomAssets.Count} assets against {matchedTags.Count} matched tags");
         
         foreach (var item in RoomAssets)
         {
-            if (matchedTags.Contains(item.Asset.RfidTag ?? string.Empty))
+            var assetRfid = (item.Asset.RfidTag ?? string.Empty).ToUpperInvariant().Trim();
+            var assetInvNum = (item.Asset.InventoryNumber ?? string.Empty).ToUpperInvariant().Trim();
+            
+            // Проверяем по RFID тегу
+            if (!string.IsNullOrEmpty(assetRfid) && matchedTags.Contains(assetRfid))
             {
+                System.Diagnostics.Debug.WriteLine($"[UpdateAssetStatusFromResults] Found match by RFID: {assetRfid} -> {item.AssetName}");
                 item.MarkAsChecked();
+            }
+            // Fallback: ищем по инвентарному номеру (если RFID не заполнен)
+            else if (string.IsNullOrEmpty(assetRfid) && !string.IsNullOrEmpty(assetInvNum))
+            {
+                var matchedByInvNum = matchedTags.Any(mt => mt.Contains(assetInvNum) || assetInvNum.Contains(mt));
+                if (matchedByInvNum)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[UpdateAssetStatusFromResults] Found match by InventoryNumber: {assetInvNum} -> {item.AssetName}");
+                    item.MarkAsChecked();
+                }
+                else
+                {
+                    item.MarkAsNotChecked();
+                }
             }
             else
             {
@@ -265,8 +297,16 @@ public class ScanViewModel : INotifyPropertyChanged
         private set => SetProperty(ref _totalCount, value);
     }
 
+    public int ConfirmedCount
+    {
+        get => _confirmedCount;
+        private set => SetProperty(ref _confirmedCount, value);
+    }
+
+    public int PendingCount => _totalCount - _confirmedCount;
+
     public int ProgressPercent => _totalCount > 0 
-        ? (int)((double)_matchedCount / Math.Max(_totalCount, 1) * 100) 
+        ? (int)((double)_confirmedCount / Math.Max(_totalCount, 1) * 100) 
         : 0;
 
     public string SessionRoomName
@@ -467,7 +507,11 @@ public class ScanViewModel : INotifyPropertyChanged
             return;
         }
         
-        System.Diagnostics.Debug.WriteLine($"[ProcessTagCommand] Tag: '{tag}', Session: {_sessionManager.CurrentSession.Id}");
+        // Нормализация: RFID-метки приводим к верхнему регистру и убираем пробелы
+        tag = tag.ToUpperInvariant().Trim();
+        if (tag.Length == 0) return;
+        
+        System.Diagnostics.Debug.WriteLine($"[ProcessTagCommand] Tag (normalized): '{tag}', Session: {_sessionManager.CurrentSession.Id}");
         LastTag = tag;
         
         // Мгновенная визуальная реакция
@@ -480,8 +524,18 @@ public class ScanViewModel : INotifyPropertyChanged
         
         if (cached.Found)
         {
-            // ПОКАЗЫВАЕМ ДИАЛОГ ПОДТВЕРЖДЕНИЯ перед отметкой "проверен"
-            ShowConfirmationDialog(tag, cached.AssetName, cached.InventoryNumber);
+            // Помечаем как "Ожидает подтверждения" — не сразу Matched
+            _sessionManager.AddTag(tag, ScanAssetStatus.Matched, cached.AssetName, cached.InventoryNumber);
+            _silentMode.PlayMatch();
+            StatusText = $"⏳ {cached.AssetName} — ожидает подтверждения";
+            HintText = "Нажмите 'Подтвердить' или 'Подтвердить все найденные'";
+            ReadErrorCount = 0;
+            
+            // Обновляем статус в списке как "Ожидает"
+            UpdateAssetStatusByName(tag, cached.AssetName, cached.InventoryNumber, false);
+            
+            // Отправляем на сервер асинхронно
+            _ = SendToServerAsync(tag, "found", cached.AssetName, cached.InventoryNumber);
         }
         else
         {
@@ -498,72 +552,214 @@ public class ScanViewModel : INotifyPropertyChanged
     });
 
     /// <summary>
-    /// Показать диалог подтверждения (для Matched активов)
-    /// Если включено AutoConfirm — пропускает диалог
-    /// Debounce: не показывать чаще 2 секунд
+    /// Подтвердить конкретный актив (по названию или инвентарному номеру)
     /// </summary>
-    private void ShowConfirmationDialog(string rfidTag, string assetName, string inventoryNumber)
+    public ICommand ConfirmAssetCommand => new AsyncRelayCommand<string>(async (assetName) =>
     {
-        if (_autoConfirm)
+        if (string.IsNullOrEmpty(assetName) || _sessionManager.CurrentSession == null) return;
+        
+        // Ищем актив в списке и подтверждаем
+        var normalizedName = assetName.Trim().ToLowerInvariant();
+        foreach (var item in RoomAssets)
         {
-            // Автоподтверждение — сразу отмечаем без диалога
-            _sessionManager.AddTag(rfidTag, ScanAssetStatus.Matched, assetName, inventoryNumber);
-            _silentMode.PlayMatch();
-            StatusText = $"✅ {assetName} — подтверждено";
-            HintText = "✅ Актив найден! Следующая метка...";
-            ReadErrorCount = 0;
-            _ = SendToServerAsync(rfidTag, "found", assetName, inventoryNumber);
-            return;
-        }
-
-        // Debounce: не показывать диалог чаще 2 секунд
-        var now = DateTime.Now;
-        if ((now - _lastDialogTime).TotalSeconds < 2)
-        {
-            StatusText = $"⏳ Обработка... (повторное сканирование)";
-            return;
-        }
-
-        if (_isDialogShowing)
-        {
-            StatusText = $"⏳ Диалог уже открыт...";
-            return;
-        }
-
-        System.Windows.Application.Current.Dispatcher.Invoke(() =>
-        {
-            _isDialogShowing = true;
-            IsDialogShowing = true;
-            
-            try
+            var itemName = (item.AssetName ?? string.Empty).Trim().ToLowerInvariant();
+            if (itemName == normalizedName || itemName.Contains(normalizedName) || normalizedName.Contains(itemName))
             {
-                var dialog = new ConfirmationDialog(_localStore, _currentUser, rfidTag, assetName, inventoryNumber);
-                
-                if (dialog.ShowDialog() == true)
+                // Отправляем подтверждение на сервер
+                if (item.AssetId > 0)
                 {
-                    // Подтверждено — отмечаем локально
-                    _sessionManager.AddTag(rfidTag, ScanAssetStatus.Matched, assetName, inventoryNumber);
-                    _silentMode.PlayMatch();
-                    StatusText = $"✅ {assetName} — подтверждено";
-                    HintText = "✅ Актив найден! Следующая метка...";
-                    ReadErrorCount = 0;
-
-                    // Отправляем на сервер асинхронно
-                    _ = SendToServerAsync(rfidTag, "found", assetName, inventoryNumber);
+                    System.Diagnostics.Debug.WriteLine($"[ConfirmAsset] Confirming asset_id={item.AssetId}, name={item.AssetName}");
+                    var result = await _apiClient.ConfirmAssetAsync(_sessionManager.CurrentSession.InventoryId, item.AssetId);
+                    
+                    if (result.ContainsKey("success") && result["success"] is bool success && success)
+                    {
+                        item.MarkAsChecked();
+                        item.IsConfirmed = true;
+                        StatusText = $"✅ {item.AssetName} — подтверждено на сервере";
+                        HintText = "✅ Актив подтверждён! Следующая метка...";
+                    }
+                    else
+                    {
+                        // Если сервер вернул ошибку, всё равно помечаем локально
+                        item.MarkAsChecked();
+                        item.IsConfirmed = true;
+                        StatusText = $"⚠ {item.AssetName} — подтверждено локально";
+                        HintText = "Сервер недоступен, но актив отмечен";
+                    }
                 }
                 else
                 {
-                    // Отменено пользователем — отдельный тип ошибки
-                    HandleReadError(rfidTag, ScanErrorType.UserCancelled);
+                    // Нет asset_id — просто помечаем локально
+                    item.MarkAsChecked();
+                    item.IsConfirmed = true;
+                    StatusText = $"✅ {item.AssetName} — подтверждено";
+                    HintText = "✅ Актив подтверждён! Следующая метка...";
+                }
+                UpdateConfirmedCount();
+                return;
+            }
+        }
+    });
+
+    /// <summary>
+    /// Пересчитывает количество подтверждённых активов из RoomAssets
+    /// </summary>
+    private async void UpdateConfirmedCount()
+    {
+        ConfirmedCount = RoomAssets.Count(i => i.IsConfirmed);
+        System.Diagnostics.Debug.WriteLine($"[UpdateConfirmedCount] Confirmed={ConfirmedCount}, Total={TotalCount}, Pending={PendingCount}");
+        
+        // Если все активы подтверждены — автоматически завершаем инвентаризацию
+        if (ConfirmedCount > 0 && ConfirmedCount == TotalCount)
+        {
+            System.Diagnostics.Debug.WriteLine($"[UpdateConfirmedCount] All assets confirmed! Completing inventory...");
+            await CompleteInventoryIfAllConfirmed();
+        }
+    }
+
+    /// <summary>
+    /// Завершает инвентаризацию, если все активы подтверждены
+    /// </summary>
+    private async Task CompleteInventoryIfAllConfirmed()
+    {
+        if (_sessionManager.CurrentSession == null) return;
+        
+        // Проверяем ещё раз — вдруг кто-то уже завершил
+        if (ConfirmedCount != TotalCount) return;
+        
+        StatusText = "🔄 Все активы подтверждены! Сохранение результатов...";
+        HintText = "Инвентаризация завершается автоматически";
+        
+        try
+        {
+            var result = await _apiClient.CompleteInventoryAsync(_sessionManager.CurrentSession.InventoryId);
+            
+            if (result.TryGetValue("success", out var s) && 
+                (s is bool b && b || string.Equals(s?.ToString(), "True", StringComparison.OrdinalIgnoreCase)))
+            {
+                StatusText = "✅ Инвентаризация завершена! Результаты сохранены";
+                HintText = $"Найдено: {result.GetValueOrDefault("found")}, Отсутствует: {result.GetValueOrDefault("missing")}";
+                
+                // Вызываем событие завершения инвентаризации
+                InventoryCompleted?.Invoke();
+                
+                // Показываем сообщение
+                System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                {
+                    MessageBox.Show(
+                        $"Инвентаризация завершена!\n\n" +
+                        $"Всего активов: {result.GetValueOrDefault("total")}\n" +
+                        $"Найдено: {result.GetValueOrDefault("found")}\n" +
+                        $"Отсутствует: {result.GetValueOrDefault("missing")}\n" +
+                        $"Точность: {result.GetValueOrDefault("accuracy")}",
+                        "Инвентаризация завершена",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                });
+            }
+            else
+            {
+                StatusText = "⚠ Ошибка при сохранении";
+                HintText = result.GetValueOrDefault("message")?.ToString() ?? "Неизвестная ошибка";
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[CompleteInventory] ERROR: {ex.Message}");
+            StatusText = "⚠ Ошибка соединения";
+            HintText = "Не удалось завершить инвентаризацию. Попробуйте ещё раз.";
+        }
+    }
+
+    /// <summary>
+    /// Подтвердить все найденные активы (массовое подтверждение)
+    /// </summary>
+    public ICommand ConfirmAllFoundCommand => new AsyncRelayCommand(async () =>
+    {
+        if (_sessionManager.CurrentSession == null) return;
+        
+        int confirmedCount = 0;
+        
+        // Подтверждаем все активы в списке, которые ещё не подтверждены
+        foreach (var item in RoomAssets.ToList())
+        {
+            if (!item.IsConfirmed)
+            {
+                if (item.AssetId > 0)
+                {
+                    var result = await _apiClient.ConfirmAssetAsync(_sessionManager.CurrentSession.InventoryId, item.AssetId);
+                    var ok = result.TryGetValue("success", out var s)
+                             && (s is bool b ? b : string.Equals(s?.ToString(), "True", StringComparison.OrdinalIgnoreCase));
+                    if (ok)
+                    {
+                        item.MarkAsChecked();
+                        item.IsConfirmed = true;
+                        confirmedCount++;
+                    }
+                }
+                else
+                {
+                    item.MarkAsChecked();
+                    item.IsConfirmed = true;
+                    confirmedCount++;
                 }
             }
-            finally
+        }
+        
+        UpdateConfirmedCount();
+        
+        if (confirmedCount > 0)
+        {
+            StatusText = $"✅ Подтверждено {confirmedCount} активов";
+            HintText = "✅ Все найденные активы подтверждены!";
+        }
+        else
+        {
+            StatusText = "⚠ Нет активов для подтверждения";
+            HintText = "Сначала отсканируйте RFID-метки";
+        }
+    });
+
+    /// <summary>
+    /// Обновляет статус актива в списке ПО НАЗВАНИЮ или ИНВЕНТАРНОМУ НОМЕРУ
+    /// Это работает надёжнее, чем поиск по RFID тегу
+    /// </summary>
+    private void UpdateAssetStatusByName(string rfidTag, string assetName, string inventoryNumber, bool markAsChecked)
+    {
+        System.Diagnostics.Debug.WriteLine($"[UpdateAssetStatusByName] Looking for: Name='{assetName}', InvNum='{inventoryNumber}', Tag='{rfidTag}'");
+        
+        var normalizedName = assetName.Trim().ToLowerInvariant();
+        var normalizedInvNum = inventoryNumber.Trim().ToLowerInvariant();
+        
+        foreach (var item in RoomAssets)
+        {
+            var itemName = (item.AssetName ?? string.Empty).Trim().ToLowerInvariant();
+            var itemInvNum = (item.InventoryNumber ?? string.Empty).Trim().ToLowerInvariant();
+            
+            // Ищем по названию (полное или частичное совпадение)
+            bool nameMatch = !string.IsNullOrEmpty(normalizedName) && 
+                            (itemName == normalizedName || itemName.Contains(normalizedName) || normalizedName.Contains(itemName));
+            
+            // Или по инвентарному номеру (точное совпадение)
+            bool invNumMatch = !string.IsNullOrEmpty(normalizedInvNum) && itemInvNum == normalizedInvNum;
+            
+            if (nameMatch || invNumMatch)
             {
-                _lastDialogTime = DateTime.Now;
-                _isDialogShowing = false;
-                IsDialogShowing = false;
+                System.Diagnostics.Debug.WriteLine($"[UpdateAssetStatusByName] Found match! Asset: '{item.AssetName}', InvNum: '{item.InventoryNumber}'");
+                if (markAsChecked)
+                {
+                    item.MarkAsChecked();
+                }
+                else
+                {
+                    // Помечаем как "Ожидает подтверждения"
+                    item.MarkAsPending();
+                }
+                return; // Нашли только один актив
             }
-        });
+        }
+        
+        System.Diagnostics.Debug.WriteLine($"[UpdateAssetStatusByName] No match found for: '{assetName}'");
     }
 
     /// <summary>
@@ -589,6 +785,12 @@ public class ScanViewModel : INotifyPropertyChanged
                     InventoryId = session.InventoryId
                 });
             }
+            else
+            {
+                // Успешная отправка — перезагружаем список активов с сервера
+                System.Diagnostics.Debug.WriteLine($"[SendToServer] Success for {rfidTag}, reloading assets...");
+                await ReloadAssetsAfterScanAsync();
+            }
         }
         catch (Exception ex)
         {
@@ -600,6 +802,53 @@ public class ScanViewModel : INotifyPropertyChanged
                 RfidTags = rfidTag,
                 InventoryId = session.InventoryId
             });
+        }
+    }
+
+    /// <summary>
+    /// Перезагрузка списка активов после успешного сканирования
+    /// Обновляет UI с серверными статусами
+    /// </summary>
+    private async Task ReloadAssetsAfterScanAsync()
+    {
+        try
+        {
+            var inventoryItems = await _apiClient.GetInventoryAssetsAsync(_sessionManager.CurrentSession!.InventoryId);
+            
+            System.Diagnostics.Debug.WriteLine($"[ReloadAssetsAfterScan] Got {inventoryItems.Count} items from server");
+            
+            // Обновляем RoomAssets с серверными статусами
+            System.Windows.Application.Current.Dispatcher.Invoke(() =>
+            {
+                RoomAssets.Clear();
+                foreach (var item in inventoryItems)
+                {
+                    var asset = new Asset
+                    {
+                        RfidTag = item.RfidTag,
+                        Name = item.Name,
+                        InventoryNumber = item.InventoryNumber,
+                        Model = item.Model,
+                        Location = item.Location,
+                        Responsible = item.Responsible,
+                    };
+                    var displayItem = new AssetDisplayItem { Asset = asset };
+                    
+                    // Восстанавливаем статус из сервера
+                    if (item.CheckStatus == "found")
+                    {
+                        displayItem.MarkAsChecked();
+                    }
+                    
+                    RoomAssets.Add(displayItem);
+                }
+                
+                System.Diagnostics.Debug.WriteLine($"[ReloadAssetsAfterScan] Updated UI with {RoomAssets.Count} assets");
+            });
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ReloadAssetsAfterScan] Error: {ex.Message}");
         }
     }
 
@@ -892,7 +1141,9 @@ public class ScanViewModel : INotifyPropertyChanged
             ExtraCount = session.ExtraCount;
             MissingCount = session.MissingCount;
             // TotalCount обновляется в LoadSessionAssetsAsync из API
-            System.Diagnostics.Debug.WriteLine($"[OnSessionChanged] Counts: Matched={MatchedCount}, Extra={ExtraCount}, Missing={MissingCount}, Total={TotalCount}");
+            // ConfirmedCount пересчитывается из RoomAssets
+            UpdateConfirmedCount();
+            System.Diagnostics.Debug.WriteLine($"[OnSessionChanged] Counts: Matched={MatchedCount}, Extra={ExtraCount}, Missing={MissingCount}, Confirmed={ConfirmedCount}, Total={TotalCount}");
             IsPaused = session.IsPaused;
             IsFinished = session.IsFinished;
 
@@ -915,6 +1166,8 @@ public class ScanViewModel : INotifyPropertyChanged
             if (session.State == SessionState.Active && session.InventoryId > 0 && !_isSkippingOrFinishing)
             {
                 _ = LoadSessionAssetsAsync();
+                // Проверяем реальную доступность сервера при старте сессии
+                _ = CheckConnectivityAsync();
             }
 
             // Цветовой статус
@@ -1107,12 +1360,48 @@ public class ScanViewModel : INotifyPropertyChanged
 
     private void UpdateSyncStatus()
     {
-        var pending = _localStore.GetPendingCount();
+        // Счётчик ожидающих отправки записей — берём из очереди (не из session-файлов)
+        var pending = _offlineQueue.GetPendingItems().Count;
         PendingSyncCount = pending;
         SyncStatus = pending > 0 ? $"⏳ В очереди: {pending}" : "✅ Готово к работе";
-        
-        // Обновляем индикатор сети
-        IsOnline = pending == 0 || _offlineQueue.GetPendingItems().Count == 0;
+    }
+
+    /// <summary>
+    /// Проверка реальной доступности бэкенда.
+    /// Вызывается при создании сессии и после успешной синхронизации.
+    /// </summary>
+    public async Task CheckConnectivityAsync()
+    {
+        bool connected;
+        try
+        {
+            connected = await _apiClient.AuthenticateAsync();
+        }
+        catch
+        {
+            connected = false;
+        }
+
+        // IsOnline также перекрашивает NetworkIndicatorColor (зелёный/красный)
+        IsOnline = connected;
+        SyncStatus = connected ? "✅ Подключено" : "⚠ Нет связи с сервером";
+    }
+
+    /// <summary>
+    /// Показывает предупреждение, если у активов не проставлены RFID-метки.
+    /// </summary>
+    public void ReportTagsCoverage(int total, int withTag)
+    {
+        if (total > 0 && withTag == 0)
+        {
+            StatusText = $"⚠️ Загружено {total} активов, но ни у одного не проставлена RFID-метка";
+            HintText = "⚠️ В карточке каждого актива (вкладка «Инвентаризация») нужно заполнить поле «RFID-метка». Без этого сканер не найдёт актив.";
+        }
+        else if (total > 0 && withTag < total)
+        {
+            StatusText = $"⚠️ Загружено {total} активов, с меткой: {withTag}";
+            HintText = $"У {total - withTag} активов не заполнена RFID-метка. Сканер найдёт только активы с меткой.";
+        }
     }
 
     // ==================== INotifyPropertyChanged ====================
@@ -1121,6 +1410,11 @@ public class ScanViewModel : INotifyPropertyChanged
     /// Событие обновления результатов сканирования
     /// </summary>
     public event Action? ResultsUpdated;
+
+    /// <summary>
+    /// Событие завершения инвентаризации
+    /// </summary>
+    public event Action? InventoryCompleted;
 
     public event PropertyChangedEventHandler? PropertyChanged;
     protected void OnPropertyChanged([CallerMemberName] string? name = null)

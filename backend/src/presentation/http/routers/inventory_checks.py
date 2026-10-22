@@ -577,6 +577,7 @@ async def confirm_asset(
     db.commit()
 
     return JSONResponse(content={
+        "success": True,
         "message": f"Актив {asset_status}",
         "asset_id": asset_id,
         "result": item.result,
@@ -659,6 +660,80 @@ async def complete_inventory_check(
     })
 
 
+@router.post("/{check_id}/complete-and-save")
+async def complete_and_save_inventory(
+    check_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Завершить инвентаризацию и сохранить результаты (публичный endpoint для сканера).
+    Автоматически завершает инвентаризацию, когда все активы подтверждены.
+    """
+    inv_check = db.query(InventoryCheck).filter(InventoryCheck.id == check_id).first()
+    if not inv_check:
+        raise HTTPException(status_code=404, detail="Инвентаризация не найдена")
+
+    if inv_check.status != "in_progress":
+        raise HTTPException(status_code=400, detail="Инвентаризация не в процессе или уже завершена")
+
+    # Помечаем непроверенные активы как отсутствующие
+    skipped_count = 0
+    pending_items = db.query(InventoryCheckItem).filter(
+        InventoryCheckItem.inventory_check_id == check_id,
+        InventoryCheckItem.result == "pending",
+    ).all()
+
+    for item in pending_items:
+        item.result = "missing"
+        item.comment = "Пропущено при завершении инвентаризации"
+        item.confirmed_at = datetime.now()
+        skipped_count += 1
+
+    inv_check.missing += skipped_count
+
+    inv_check.status = "completed"
+    inv_check.completed_at = datetime.now()
+
+    db.commit()
+
+    # Логирование в аудит
+    try:
+        from src.core.services.audit_service import AuditService
+        audit_service = AuditService(db)
+        audit_service.log_inventory_complete(
+            inv_check.id,
+            inv_check.name,
+            user_id=current_user.id,
+        )
+    except Exception:
+        pass
+
+    # Отправляем уведомления о завершении
+    try:
+        from src.core.services.notification_service import NotificationService
+        service = NotificationService()
+        if inv_check.responsible_id:
+            responsible = db.query(User).filter(User.id == inv_check.responsible_id).first()
+            if responsible:
+                service.send_inventory_notification(responsible, inv_check)
+        if inv_check.created_by and inv_check.created_by != inv_check.responsible_id:
+            creator = db.query(User).filter(User.id == inv_check.created_by).first()
+            if creator:
+                service.send_inventory_notification(creator, inv_check)
+    except Exception as e:
+        logger.warning(f"Failed to send completion notifications: {e}")
+
+    return JSONResponse(content={
+        "success": True,
+        "message": "Инвентаризация завершена и результаты сохранены",
+        "total": inv_check.total_checked,
+        "found": inv_check.found,
+        "missing": inv_check.missing,
+        "skipped": skipped_count,
+        "accuracy": f"{(inv_check.found / inv_check.total_checked * 100):.1f}%" if inv_check.total_checked > 0 else "0%",
+    })
+
+
 @router.post("/{check_id}/cancel")
 async def cancel_inventory_check(
     check_id: int,
@@ -694,6 +769,65 @@ async def delete_inventory_check(
     db.commit()
 
     return JSONResponse(content={"message": "Инвентаризация удалена"})
+
+
+@router.post("/{check_id}/mark-all-found")
+async def mark_all_found(
+    check_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Пометить все pending-активы как найденные (found).
+    Используется при массовой проверке — все найденные активы подтверждаются одной кнопкой.
+    """
+    inv_check = db.query(InventoryCheck).filter(InventoryCheck.id == check_id).first()
+    if not inv_check:
+        raise HTTPException(status_code=404, detail="Инвентаризация не найдена")
+
+    if inv_check.status != "in_progress":
+        raise HTTPException(status_code=400, detail="Инвентаризация не в процессе")
+
+    # Находим все pending-элементы
+    pending_items = db.query(InventoryCheckItem).filter(
+        InventoryCheckItem.inventory_check_id == check_id,
+        InventoryCheckItem.result == "pending",
+    ).all()
+
+    if not pending_items:
+        return JSONResponse(content={
+            "message": "Нет активов для подтверждения",
+            "marked": 0,
+            "found_count": inv_check.found,
+            "missing_count": inv_check.missing,
+            "remaining": inv_check.total_checked - inv_check.found - inv_check.missing,
+        })
+
+    # Помечаем все как found
+    for item in pending_items:
+        item.result = "found"
+        item.confirmed_by = current_user.id
+        item.confirmed_at = datetime.now()
+        
+        # Обновляем актив
+        if item.asset:
+            item.asset.last_inventory_date = datetime.now()
+            item.asset.last_inventory_confirmed = True
+            item.asset.last_inventory_source = 'manual'
+            if current_user:
+                item.asset.last_inventory_by_id = current_user.id
+
+    # Обновляем счётчики
+    inv_check.found += len(pending_items)
+    db.commit()
+
+    return JSONResponse(content={
+        "message": f"Все активы отмечены как найденные",
+        "marked": len(pending_items),
+        "found_count": inv_check.found,
+        "missing_count": inv_check.missing,
+        "remaining": inv_check.total_checked - inv_check.found - inv_check.missing,
+    })
 
 
 @router.post("/{check_id}/reset-asset/{asset_id:int}")

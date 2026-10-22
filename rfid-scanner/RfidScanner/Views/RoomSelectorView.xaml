@@ -184,9 +184,82 @@
                                         <Border x:Name="ItemBorder" Padding="12" Margin="0,2" CornerRadius="6"
                                                Background="#FAFAFA" BorderThickness="2" BorderBrush="#E0E0E0">
                                             <StackPanel>
-                                                <TextBlock Text="{Binding Name}" FontSize="15" FontWeight="Bold" 
-                                                          Foreground="#212121"/>
-                                                <TextBlock FontSize="12" Foreground="#757575" Margin="0,2,0,0">
+                                                <!-- Название + статус -->
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    
+                                                    <TextBlock Text="{Binding Name}" FontSize="15" FontWeight="Bold" 
+                                                              Foreground="#212121"/>
+                                                    
+                                                    <!-- Индикатор статуса -->
+                                                    <ContentControl Grid.Column="1" Padding="8,4" HorizontalAlignment="Right">
+                                                        <ContentControl.Style>
+                                                            <Style TargetType="ContentControl">
+                                                                <Setter Property="Template">
+                                                                    <Setter.Value>
+                                                                        <ControlTemplate TargetType="ContentControl">
+                                                                            <Border Padding="{TemplateBinding Padding}" Background="#E0E0E0" CornerRadius="12">
+                                                                                <StackPanel Orientation="Horizontal">
+                                                                                    <TextBlock Text="⏳" FontSize="10" Margin="0,0,4,0"/>
+                                                                                    <TextBlock Text="Черновик" FontSize="10" Foreground="White" FontWeight="Bold"/>
+                                                                                </StackPanel>
+                                                                            </Border>
+                                                                        </ControlTemplate>
+                                                                    </Setter.Value>
+                                                                </Setter>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding Status}" Value="in_progress">
+                                                                        <Setter Property="Template">
+                                                                            <Setter.Value>
+                                                                                <ControlTemplate TargetType="ContentControl">
+                                                                                    <Border Padding="{TemplateBinding Padding}" Background="#4CAF50" CornerRadius="12">
+                                                                                        <StackPanel Orientation="Horizontal">
+                                                                                            <TextBlock Text="🔄" FontSize="10" Margin="0,0,4,0"/>
+                                                                                            <TextBlock Text="Проводится" FontSize="10" Foreground="White" FontWeight="Bold"/>
+                                                                                        </StackPanel>
+                                                                                    </Border>
+                                                                                </ControlTemplate>
+                                                                            </Setter.Value>
+                                                                        </Setter>
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Status}" Value="completed">
+                                                                        <Setter Property="Template">
+                                                                            <Setter.Value>
+                                                                                <ControlTemplate TargetType="ContentControl">
+                                                                                    <Border Padding="{TemplateBinding Padding}" Background="#9E9E9E" CornerRadius="12">
+                                                                                        <StackPanel Orientation="Horizontal">
+                                                                                            <TextBlock Text="✅" FontSize="10" Margin="0,0,4,0"/>
+                                                                                            <TextBlock Text="Завершена" FontSize="10" Foreground="White" FontWeight="Bold"/>
+                                                                                        </StackPanel>
+                                                                                    </Border>
+                                                                                </ControlTemplate>
+                                                                            </Setter.Value>
+                                                                        </Setter>
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Status}" Value="cancelled">
+                                                                        <Setter Property="Template">
+                                                                            <Setter.Value>
+                                                                                <ControlTemplate TargetType="ContentControl">
+                                                                                    <Border Padding="{TemplateBinding Padding}" Background="#F44336" CornerRadius="12">
+                                                                                        <StackPanel Orientation="Horizontal">
+                                                                                            <TextBlock Text="❌" FontSize="10" Margin="0,0,4,0"/>
+                                                                                            <TextBlock Text="Отменена" FontSize="10" Foreground="White" FontWeight="Bold"/>
+                                                                                        </StackPanel>
+                                                                                    </Border>
+                                                                                </ControlTemplate>
+                                                                            </Setter.Value>
+                                                                        </Setter>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </ContentControl.Style>
+                                                    </ContentControl>
+                                                </Grid>
+                                                
+                                                <TextBlock FontSize="12" Foreground="#757575" Margin="0,4,0,0">
                                                     <Run Text="📊 Найдено: "/>
                                                     <Run Text="{Binding Found}" Foreground="Green"/>
                                                     <Run Text=" / "/>
@@ -199,6 +272,9 @@
                                                 <TextBlock FontSize="11" Foreground="#9E9E9E" Margin="0,2,0,0">
                                                     <Run Text="Прогресс: "/>
                                                     <Run Text="{Binding ProgressPercentText, Mode=OneWay}"/>
+                                                    <Run Text=" | "/>
+                                                    <Run Text="Осталось: "/>
+                                                    <Run Text="{Binding Pending, Mode=OneWay}"/>
                                                 </TextBlock>
                                             </StackPanel>
                                         </Border>

@@ -26,6 +26,15 @@ public partial class MainWindow : Window
     private RoomSelectorView? _roomSelectorView;
     private bool _isSwitchingView;
     private Task? _finishTask;
+    
+    // Буфер для HID-сканера (посимвольный ввод)
+    private readonly System.Text.StringBuilder _hidBuffer = new();
+    private DateTime _lastHidKeyTime = DateTime.MinValue;
+
+    // Максимальный интервал между символами одной метки (мс).
+    // HID-ридер печатает всю метку потоком, поэтому пауза больше этой
+    // значения означает начало новой метки / посторонний ввод.
+    private const int HidCharTimeoutMs = 200;
 
     public MainWindow(ConfigService config, RoleService roleService, AppUser currentUser)
     {
@@ -67,6 +76,14 @@ public partial class MainWindow : Window
         
         // Подписываемся на события
         _scanView.Finished += OnFinished;
+        _scanView.InventoryCompleted += () =>
+        {
+            System.Diagnostics.Debug.WriteLine("[InventoryCompleted] Inventory completed, switching to room selector...");
+            System.Windows.Application.Current.Dispatcher.Invoke(() =>
+            {
+                SwitchToRoomSelector();
+            });
+        };
         
         _scanView.Reset += () =>
         {
@@ -344,24 +361,48 @@ public partial class MainWindow : Window
         
         // Только если активна вкладка "Инвентаризация"
         if (TabControl.SelectedIndex != 0) return;
-        
-        if (e.Key >= Key.D0 && e.Key <= Key.Z)
+
+        // HID-сканер эмулирует клавиатуру: метка вводится ПОСИВОЛЬНО,
+        // а в конце приходит Enter. Собираем символы в буфер и передаём
+        // в ProcessTagCommand только целиком готовую метку (по Enter).
+        var now = DateTime.Now;
+        if ((now - _lastHidKeyTime).TotalMilliseconds > HidCharTimeoutMs)
+            _hidBuffer.Clear(); // длинная пауза — начинаем новую метку
+        _lastHidKeyTime = now;
+
+        if (e.Key == Key.Return || e.Key == Key.Enter)
         {
-            var charCode = char.ToLower((char)e.Key);
-            _scanViewModel.ProcessTagCommand.Execute(charCode.ToString());
+            var tag = _hidBuffer.ToString().Trim();
+            _hidBuffer.Clear();
+
+            if (tag.Length > 0)
+                _scanViewModel.ProcessTagCommand.Execute(tag);
+
+            e.Handled = true;
+            return;
+        }
+
+        var ch = KeyToChar(e.Key);
+        if (ch != null)
+        {
+            _hidBuffer.Append(ch.Value);
             e.Handled = true;
         }
-        else if (e.Key >= Key.NumPad0 && e.Key <= Key.NumPad9)
-        {
-            var charCode = (char)(e.Key - Key.NumPad0 + '0');
-            _scanViewModel.ProcessTagCommand.Execute(charCode.ToString());
-            e.Handled = true;
-        }
-        else if (e.Key == Key.Return || e.Key == Key.Enter)
-        {
-            _scanViewModel.ProcessTagCommand.Execute(string.Empty);
-            e.Handled = true;
-        }
+    }
+
+    /// <summary>
+    /// Преобразует клавишу в символ (для HID-сканера в режиме клавиатуры).
+    /// Возвращает null, если клавиша не является частью метки.
+    /// </summary>
+    private static char? KeyToChar(Key key)
+    {
+        if (key >= Key.A && key <= Key.Z)
+            return (char)('a' + (key - Key.A));
+        if (key >= Key.D0 && key <= Key.D9)
+            return (char)('0' + (key - Key.D0));
+        if (key >= Key.NumPad0 && key <= Key.NumPad9)
+            return (char)('0' + (key - Key.NumPad0));
+        return null;
     }
 
     private void SkipButton_Click(object sender, RoutedEventArgs e)
@@ -432,19 +473,25 @@ public partial class MainWindow : Window
     {
         System.Diagnostics.Debug.WriteLine("[SwitchToRoomSelector] Switching to RoomSelectorView");
         _isSwitchingView = true;
-        // Сбрасываем сессию перед переключением
+        
+        // Завершаем сессию ТОЛЬКО если она активна
         if (_sessionManager.HasActiveSession)
         {
             _sessionManager.FinishSession();
             System.Diagnostics.Debug.WriteLine("[SwitchToRoomSelector] Session finished during switch");
         }
+        else
+        {
+            System.Diagnostics.Debug.WriteLine("[SwitchToRoomSelector] No active session, skipping finish");
+        }
+        
         _scanView.Visibility = System.Windows.Visibility.Collapsed;
         _roomSelectorView.Visibility = System.Windows.Visibility.Visible;
         _isSwitchingView = false;
 
         // По умолчанию показываем вкладки "Помещения" → "Начать инвентаризацию"
         _roomSelectorViewModel?.SetShowInventoriesList(false);
-        // and reload data so completed inventories disappear from the active list
+        // Reload data so completed inventories disappear from the active list
         _roomSelectorViewModel?.RefreshOnEnter();
 
         System.Diagnostics.Debug.WriteLine("[SwitchToRoomSelector] Done, data refresh requested");

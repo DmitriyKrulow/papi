@@ -1,6 +1,7 @@
 # backend/src/presentation/http/routers/rfid.py
 """API для RFID-сканера — аутентификация, инвентаризация, поиск активов"""
 import logging
+import time
 from datetime import datetime
 from typing import Optional, List
 
@@ -20,6 +21,55 @@ from src.infrastructure.db.models.user import User
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/rfid", tags=["rfid"])
+
+# Глобальный словарь для дедупликации RFID-меток
+# tag_normalized -> timestamp последнего сканирования
+_last_scan_times: dict[str, float] = {}
+_DEDUPE_WINDOW = 2.0  # секунды
+
+
+def _normalize_tag(rfid_tag: Optional[str]) -> Optional[str]:
+    """
+    Нормализация RFID-метки: верхний регистр + обрезка пробелов.
+    Разные ридеры и разное ПО передают одну и ту же метку в разном регистре,
+    поэтому сравнение всегда выполняется в верхнем регистре.
+    """
+    if rfid_tag is None:
+        return None
+    tag = rfid_tag.strip().upper()
+    return tag or None
+
+
+def _is_duplicate_scan(rfid_tag: str) -> bool:
+    """
+    Проверяет, не было ли сканирования этой RFID-метки в последние N секунд.
+    Возвращает True если это повторное сканирование.
+    """
+    normalized = _normalize_tag(rfid_tag)
+    if not normalized:
+        return False
+    
+    now = time.time()
+    last_time = _last_scan_times.get(normalized)
+    
+    if last_time is not None:
+        if (now - last_time) < _DEDUPE_WINDOW:
+            return True
+    
+    # Запоминаем время сканирования
+    _last_scan_times[normalized] = now
+    return False
+
+
+def _find_asset_by_tag(db: Session, rfid_tag: str):
+    """Поиск активного актива по RFID-метке (без учёта регистра и пробелов)."""
+    normalized = _normalize_tag(rfid_tag)
+    if not normalized:
+        return None
+    return db.query(Asset).filter(
+        func.upper(func.trim(Asset.rfid_tag)) == normalized,
+        Asset.is_active == True
+    ).first()
 
 
 # ======================================================================
@@ -194,12 +244,22 @@ async def get_asset_by_rfid(
     Header: X-API-Key: rfid_abc123...
     
     Возвращает полную информацию об активе.
+    Проверяет дублирование сканирования по метке.
     """
+    # Проверяем дублирование по метке
+    if _is_duplicate_scan(rfid_tag):
+        return {
+            "found": True,
+            "duplicate": True,
+            "message": "Повторное сканирование пропущено",
+            "rfid_tag": rfid_tag
+        }
+    
     asset = db.query(Asset).options(
         joinedload(Asset.assigned_employee),
         joinedload(Asset.assigned_room),
     ).filter(
-        Asset.rfid_tag == rfid_tag,
+        func.upper(func.trim(Asset.rfid_tag)) == (_normalize_tag(rfid_tag) or ""),
         Asset.is_active == True
     ).first()
     
@@ -273,6 +333,16 @@ async def scan_rfid_for_inventory(
     if not rfid_tag:
         raise HTTPException(status_code=400, detail="Не указана RFID-метка (rfid_tag)")
 
+    # Проверяем дублирование сканирования по метке
+    if _is_duplicate_scan(rfid_tag):
+        return {
+            "success": True,
+            "message": "Повторное сканирование пропущено (дубликат метки)",
+            "rfid_tag": rfid_tag,
+            "duplicate": True,
+            "inventory_id": inventory_id,
+        }
+
     result = (result or "found").lower()
     if result not in ("found", "missing", "surplus"):
         raise HTTPException(status_code=400, detail=f"Недопустимый результат: {result}")
@@ -290,10 +360,7 @@ async def scan_rfid_for_inventory(
         )
     
     # Ищем актив по RFID
-    asset = db.query(Asset).filter(
-        Asset.rfid_tag == rfid_tag,
-        Asset.is_active == True
-    ).first()
+    asset = _find_asset_by_tag(db, rfid_tag)
     
     if not asset:
         return {
@@ -343,7 +410,7 @@ async def scan_rfid_for_inventory(
             "surplus_count": inv_check.surplus,
         }
 
-    # Уже отмечен тем же результатом — ничего не делаем
+    # Уже отмечен тем же результатом — игнорируем повторное сканирование
     if item.result == result:
         return {
             "success": True,
@@ -443,11 +510,8 @@ async def scan_rfid_batch(
     }
     
     for rfid_tag in rfid_tags:
-        # Ищем актив
-        asset = db.query(Asset).filter(
-            Asset.rfid_tag == rfid_tag,
-            Asset.is_active == True
-        ).first()
+        # Ищем актив (без учёта регистра)
+        asset = _find_asset_by_tag(db, rfid_tag)
         
         if not asset:
             results["not_found"].append({
@@ -543,8 +607,8 @@ async def passive_room_scan(
         Asset.rfid_tag.isnot(None),  # Только активы с RFID-метками
     ).all()
     
-    # Создаём словарь: rfid_tag -> asset
-    known_tags = {a.rfid_tag: a for a in room_assets if a.rfid_tag}
+    # Создаём словарь: normalized_rfid_tag -> asset
+    known_tags = {(_normalize_tag(a.rfid_tag) or ""): a for a in room_assets if a.rfid_tag}
     
     # Определяем найденные и отсутствующие
     found_assets = []
@@ -552,8 +616,9 @@ async def passive_room_scan(
     unknown_tags = []
     
     for tag in rfid_tags:
-        if tag in known_tags:
-            asset = known_tags[tag]
+        normalized = _normalize_tag(tag)
+        if normalized and normalized in known_tags:
+            asset = known_tags[normalized]
             found_assets.append({
                 "asset_id": asset.id,
                 "inventory_number": asset.inventory_number or "",
@@ -566,7 +631,7 @@ async def passive_room_scan(
             unknown_tags.append(tag)
     
     # Активы, которые должны быть в помещении, но не отсканированы
-    scanned_tags = set(rfid_tags)
+    scanned_tags = {_normalize_tag(t) for t in rfid_tags if _normalize_tag(t)}
     for tag, asset in known_tags.items():
         if tag not in scanned_tags:
             missing_assets.append({
@@ -806,10 +871,7 @@ async def sync_scan_results(
         if res not in ("found", "missing", "surplus"):
             res = "found"
 
-        asset = db.query(Asset).filter(
-            Asset.rfid_tag == tag,
-            Asset.is_active == True
-        ).first()
+        asset = _find_asset_by_tag(db, tag)
 
         if not asset:
             stats["unknown"] += 1
@@ -907,10 +969,7 @@ async def receive_assets_via_rfid(
     }
     
     for rfid_tag in rfid_tags:
-        asset = db.query(Asset).filter(
-            Asset.rfid_tag == rfid_tag,
-            Asset.is_active == True
-        ).first()
+        asset = _find_asset_by_tag(db, rfid_tag)
         
         if not asset:
             results["not_found"].append({
@@ -998,10 +1057,7 @@ async def move_assets_via_rfid(
     }
     
     for rfid_tag in rfid_tags:
-        asset = db.query(Asset).filter(
-            Asset.rfid_tag == rfid_tag,
-            Asset.is_active == True
-        ).first()
+        asset = _find_asset_by_tag(db, rfid_tag)
         
         if not asset:
             results["not_found"].append({

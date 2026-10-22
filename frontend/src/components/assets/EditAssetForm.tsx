@@ -245,7 +245,7 @@ const handleSubmitForm = async (data: any) => {
         crypto_token_symbol: data.crypto_token_symbol,
         depreciation_years: data.depreciation_years ? Number(data.depreciation_years) : undefined,
         next_maintenance_date: data.next_maintenance_date || undefined,
-        rfid_tag: data.rfid_tag || undefined,
+        rfid_tag: data.rfid_tag || '',
         storage_address_id: data.storage_address_id || undefined,
         employee_id: selectedEmployeeId ? Number(selectedEmployeeId) : undefined,
         is_active: existingAsset.is_active,
@@ -990,12 +990,24 @@ const handleSubmitForm = async (data: any) => {
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
           📡 RFID-метка
         </label>
-        <input
-          type="text"
-          {...register('rfid_tag')}
-          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          placeholder="Уникальный ID RFID-метки (для сканера)"
-        />
+        <div className="flex gap-2">
+          <input
+            type="text"
+            {...register('rfid_tag')}
+            className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="Уникальный ID RFID-метки (для сканера)"
+          />
+          {existingAsset.rfid_tag && (
+            <button
+              type="button"
+              onClick={() => setValue('rfid_tag', '')}
+              className="px-3 py-2 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-300 dark:border-red-700 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/50 transition text-sm whitespace-nowrap"
+              title="Очистить RFID-метку"
+            >
+              ✕ Очистить
+            </button>
+          )}
+        </div>
         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
           Если заполнено, RFID-сканер сможет находить этот актив по метке
         </p>
