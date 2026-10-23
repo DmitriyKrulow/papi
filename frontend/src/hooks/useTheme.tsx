@@ -14,6 +14,8 @@ function getInitialTheme(): Theme {
   try {
     const saved = localStorage.getItem('theme');
     if (saved === 'dark' || saved === 'light') return saved;
+    // Check system preference
+    if (window.matchMedia?.('(prefers-color-scheme: dark)').matches) return 'dark';
   } catch {
     // localStorage not available
   }
@@ -27,8 +29,12 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const root = document.documentElement;
     if (theme === 'dark') {
       root.classList.add('dark');
+      root.style.setProperty('--bg-primary', '#121314');
+      root.style.setProperty('--text-primary', '#E5E7EB');
     } else {
       root.classList.remove('dark');
+      root.style.setProperty('--bg-primary', '#F9FAFB');
+      root.style.setProperty('--text-primary', '#111827');
     }
     try {
       localStorage.setItem('theme', theme);

@@ -127,113 +127,112 @@ const InventoryMobile: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20">
+    <div className="min-h-screen bg-gray-50 dark:bg-graphite-950 pb-20">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
-        <div className="flex items-center justify-between p-4">
+      <div className="sticky top-0 z-20 bg-white/80 dark:bg-graphite-900/80 backdrop-blur-md border-b border-gray-100 dark:border-graphite-800">
+        <div className="flex items-center justify-between p-3">
           <button
             onClick={() => navigate('/inventory')}
-            className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+            className="flex items-center gap-1.5 text-gray-600 dark:text-gray-400 hover:text-brand-600 dark:hover:text-accent-400 transition"
           >
-            <ArrowLeft className="w-5 h-5" />
-            <span className="font-medium">Назад</span>
+            <ArrowLeft className="w-4 h-4" />
+            <span className="font-medium text-sm">Назад</span>
           </button>
-          <h1 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+          <h1 className="text-base font-bold text-gray-900 dark:text-gray-100">
             Инвентаризация
           </h1>
-          <div className="w-20"></div>
+          <div className="w-16"></div>
         </div>
       </div>
 
       {/* Progress */}
       {activeInventory && myAssets.length > 0 && (
-        <div className="p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+        <div className="p-3">
+          <div className="card-modern p-3">
+            <div className="flex justify-between items-center mb-1.5">
+              <span className="text-xs font-medium text-gray-700 dark:text-gray-300 truncate max-w-[60%]">
                 {activeInventory.name}
               </span>
-              <span className="text-sm font-bold text-blue-600 dark:text-blue-400">
+              <span className="text-xs font-bold text-accent-600 dark:text-accent-400 ml-2">
                 {progress}%
               </span>
             </div>
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+            <div className="progress-bar-modern">
               <div
-                className="bg-blue-600 dark:bg-blue-500 h-3 rounded-full transition-all duration-500"
+                className="progress-bar-fill bg-accent-400"
                 style={{ width: `${progress}%` }}
               ></div>
             </div>
-            <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-2">
+            <div className="flex justify-between text-[10px] text-gray-500 dark:text-gray-400 mt-1.5">
               <span>Проверено: {confirmedAssets.length}/{myAssets.length}</span>
               <span>Осталось: {pendingAssets.length}</span>
             </div>
-            <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
-              <span className="text-green-600 dark:text-green-400">Найдено: {activeInventory.found}</span>
-              <span className="text-red-600 dark:text-red-400">Отсутствует: {activeInventory.missing}</span>
+            <div className="flex justify-between text-[10px] mt-0.5">
+              <span className="text-green-600 dark:text-green-400">✓ {activeInventory.found}</span>
+              <span className="text-red-600 dark:text-red-400">✗ {activeInventory.missing}</span>
             </div>
           </div>
         </div>
       )}
 
       {/* My Assets */}
-      <div className="p-4">
-        <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-3">
+      <div className="p-3">
+        <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">
           Моё имущество
         </h2>
 
         {myAssets.length === 0 ? (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-8 text-center border border-gray-200 dark:border-gray-700">
-            <p className="text-gray-500 dark:text-gray-400">У вас нет назначенного имущества</p>
+          <div className="card-modern p-6 text-center">
+            <p className="text-gray-500 dark:text-gray-400 text-sm">У вас нет назначенного имущества</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {myAssets.map((asset) => (
               <div
                 key={asset.id}
-                className={`bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border ${
+                className={`card-modern p-3 ${
                   asset.last_inventory_confirmed
-                    ? 'border-green-200 dark:border-green-800'
-                    : 'border-gray-200 dark:border-gray-700'
+                    ? 'border-l-2 border-l-green-500'
+                    : ''
                 }`}
               >
                 <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <h3 className="font-medium text-gray-900 dark:text-gray-100">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-medium text-sm text-gray-900 dark:text-gray-100 truncate">
                       {asset.name}
                     </h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 font-mono mt-1">
-                      Инв. №: {asset.inventory_number}
+                    <p className="text-[10px] text-gray-500 dark:text-gray-400 font-mono mt-0.5">
+                      {asset.inventory_number}
                     </p>
                     {asset.model && (
-                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                        Модель: {asset.model}
+                      <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
+                        {asset.model}
                       </p>
                     )}
                     {asset.location && (
-                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                      <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
                         📍 {asset.location}
                       </p>
                     )}
                   </div>
-                  <div className="ml-3">
+                  <div className="ml-2 flex-shrink-0">
                     {asset.last_inventory_confirmed ? (
-                      <CheckCircle2 className="w-6 h-6 text-green-600 dark:text-green-400" />
+                      <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
                     ) : (
-                      <XCircle className="w-6 h-6 text-gray-300 dark:text-gray-600" />
+                      <XCircle className="w-5 h-5 text-gray-300 dark:text-gray-600" />
                     )}
                   </div>
                 </div>
                 
-                {/* Click to view details */}
                 {!asset.last_inventory_confirmed && activeInventory && (
                   <button
                     onClick={() => {
                       const checkId = forcedCheckId || activeInventory.id;
                       navigate(`/inventory/asset/${asset.id}?check_id=${checkId}`);
                     }}
-                    className="mt-3 w-full px-4 py-2 bg-blue-600 dark:bg-blue-700 text-white rounded-lg text-sm hover:bg-blue-700 dark:hover:bg-blue-600 transition font-medium"
+                    className="mt-2 w-full px-3 py-1.5 bg-brand-500 dark:bg-brand-600 text-white rounded-card-sm text-xs hover:bg-brand-600 dark:hover:bg-brand-700 transition font-medium"
                   >
-                    Проверить актив
+                    Проверить
                   </button>
                 )}
               </div>
@@ -244,14 +243,14 @@ const InventoryMobile: React.FC = () => {
 
       {/* No Active Inventory */}
       {!activeInventory && (
-        <div className="p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-8 text-center border border-gray-200 dark:border-gray-700">
-            <p className="text-gray-500 dark:text-gray-400 mb-4">
+        <div className="p-3">
+          <div className="card-modern p-6 text-center">
+            <p className="text-gray-500 dark:text-gray-400 mb-3 text-sm">
               Нет активных инвентаризаций
             </p>
             <button
               onClick={() => navigate('/assets')}
-              className="px-4 py-2 bg-blue-600 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition"
+              className="px-4 py-2 bg-brand-500 text-white rounded-card-sm hover:bg-brand-600 transition text-sm font-medium"
             >
               Перейти к активам
             </button>

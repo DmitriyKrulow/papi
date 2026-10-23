@@ -54,7 +54,7 @@ public class InventoryViewModel : BaseViewModel
     public int MissingCount => _items.Count(i => i.CheckStatus == "missing");
 
     public ICommand LoadInventoryCommand => new RelayCommand<int>(async id => await LoadInventory(id));
-    public ICommand ScanCommand => new RelayCommand<string>(async tag => await ScanTag(tag));
+    public ICommand ScanCommand => new RelayCommand<string>(async tag => await ScanTag(tag ?? string.Empty));
 
     private async Task LoadInventory(int inventoryId)
     {

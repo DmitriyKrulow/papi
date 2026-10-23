@@ -4,8 +4,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './hooks/useTheme';
 import { useAuth } from './hooks/useAuth';
-import Navbar from './components/common/Navbar';
-import Footer from './components/common/Footer';
+import Sidebar from './components/navigation/Sidebar';
+import TopBar from './components/common/TopBar';
 import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
 import Assets from './pages/Assets';
@@ -137,187 +137,211 @@ function App() {
     <Router>
       <AuthProvider>
         <ThemeProvider>
-          <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900">
-            <Navbar />
-            <main className="flex-grow container mx-auto px-4 py-8">
-              <Routes>
-                {/* Публичные маршруты (доступны без авторизации) */}
-                <Route path="/" element={<Home />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
-                <Route path="/password-reset" element={<PasswordReset />} />
-                
-                {/* Защищенные маршруты (требуется авторизация) */}
-                <Route path="/dashboard" element={
-                  <PrivateRoute>
-                    <Dashboard />
-                  </PrivateRoute>
-                } />
-                <Route path="/assets" element={
-                  <PrivateRoute>
-                    <Assets />
-                  </PrivateRoute>
-                } />
-                <Route path="/assets/create" element={
-                  <PrivateRoute>
-                    <AssetCreate />
-                  </PrivateRoute>
-                } />
-                <Route path="/assets/:id" element={
-                  <PrivateRoute>
-                    <AssetDetail />
-                  </PrivateRoute>
-                } />
-                <Route path="/assets/:id/edit" element={
-                  <PrivateRoute>
-                    <AssetEdit />
-                  </PrivateRoute>
-                } />
+          <LayoutWithSidebar>
+            <Routes>
+              {/* Публичные маршруты (доступны без авторизации) */}
+              <Route path="/" element={<Home />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/password-reset" element={<PasswordReset />} />
+              
+              {/* Защищенные маршруты (требуется авторизация) */}
+              <Route path="/dashboard" element={
+                <PrivateRoute>
+                  <Dashboard />
+                </PrivateRoute>
+              } />
+              <Route path="/assets" element={
+                <PrivateRoute>
+                  <Assets />
+                </PrivateRoute>
+              } />
+              <Route path="/assets/create" element={
+                <PrivateRoute>
+                  <AssetCreate />
+                </PrivateRoute>
+              } />
+              <Route path="/assets/:id" element={
+                <PrivateRoute>
+                  <AssetDetail />
+                </PrivateRoute>
+              } />
+              <Route path="/assets/:id/edit" element={
+                <PrivateRoute>
+                  <AssetEdit />
+                </PrivateRoute>
+              } />
 <Route path="/reports" element={
-                  <PrivateRoute>
-                    <Reports />
-                  </PrivateRoute>
-                } />
-                <Route path="/inventory" element={
-                  <PrivateRoute>
-                    <Inventory />
-                  </PrivateRoute>
-                } />
-                <Route path="/inventory-mobile" element={
-                  <PrivateRoute>
-                    <InventoryMobile />
-                  </PrivateRoute>
-                } />
-                <Route path="/inventory/asset/:assetId" element={
-                  <PrivateRoute>
-                    <InventoryAssetMobile />
-                  </PrivateRoute>
-                } />
-                <Route path="/marking" element={
-                  <PrivateRoute>
-                    <Marking />
-                  </PrivateRoute>
-                } />
-                
-                {/* Маршруты для заявок на ремонт */}
-                <Route path="/repairs" element={
-                  <PrivateRoute>
-                    <RepairList />
-                  </PrivateRoute>
-                } />
-                <Route path="/repairs/create" element={
-                  <PrivateRoute>
-                    <RepairCreate />
-                  </PrivateRoute>
-                } />
-                <Route path="/repairs/:id" element={
-                  <PrivateRoute>
-                    <RepairEdit />
-                  </PrivateRoute>
-                } />
-                <Route path="/repairs/:id/edit" element={
-                  <PrivateRoute>
-                    <RepairEdit />
-                  </PrivateRoute>
-                } />
-                <Route path="/profile" element={
-                  <PrivateRoute>
-                    <Profile />
-                  </PrivateRoute>
-                } />
-                
-                {/* Админ-маршрут (требуется роль admin) */}
-                <Route path="/admin" element={
-                  <AdminRoute>
-                    <AdminPanel />
-                  </AdminRoute>
-                } />
-                
-                {/* Журнал аудита (только админ) */}
-                <Route path="/audit" element={
-                  <AdminRoute>
-                    <AuditLog />
-                  </AdminRoute>
-                } />
-                
-                {/* Уведомления */}
-                <Route path="/notifications" element={
-                  <PrivateRoute>
-                    <NotificationsPage />
-                  </PrivateRoute>
-                } />
-                
-                {/* Календарь событий — доступен всем авторизованным пользователям */}
-                <Route path="/schedule" element={
-                  <PrivateRoute>
-                    <SchedulePage />
-                  </PrivateRoute>
-                } />
-                
-                {/* Аналитика поломок */}
-                <Route path="/analytics" element={
-                  <PrivateRoute>
-                    <AnalyticsPage />
-                  </PrivateRoute>
-                } />
-                
-                {/* Списание активов (только админ) */}
-                <Route path="/disposal" element={
-                  <AdminRoute>
-                    <DisposalPage />
-                  </AdminRoute>
-                } />
-                
-                {/* Нормативные документы (только админ) */}
-                <Route path="/regulatory" element={
-                  <AdminRoute>
-                    <RegulatoryPage />
-                  </AdminRoute>
-                } />
-                
-                {/* Сверка с бухгалтерией (только админ) */}
-                <Route path="/reconciliation" element={
-                  <AdminRoute>
-                    <ReconciliationPage />
-                  </AdminRoute>
-                } />
-                
-                {/* Распечатка описи помещения (только админ) */}
-                <Route path="/room-inventory-print" element={
-                  <AdminRoute>
-                    <RoomInventoryPrint />
-                  </AdminRoute>
-                } />
-                
-                {/* 404 - перенаправление на главную */}
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </main>
-            <Footer />
-            <Toaster
-              position="top-right"
-              toastOptions={{
-                duration: 4000,
-                style: {
-                  borderRadius: '8px',
-                  background: '#1f2937',
-                  color: '#f9fafb',
-                  fontSize: '14px',
-                },
-                success: {
-                  iconTheme: { primary: '#22c55e', secondary: '#ffffff' },
-                },
-                error: {
-                  iconTheme: { primary: '#ef4444', secondary: '#ffffff' },
-                },
-              }}
-            />
-          </div>
+                <PrivateRoute>
+                  <Reports />
+                </PrivateRoute>
+              } />
+              <Route path="/inventory" element={
+                <PrivateRoute>
+                  <Inventory />
+                </PrivateRoute>
+              } />
+              <Route path="/inventory-mobile" element={
+                <PrivateRoute>
+                  <InventoryMobile />
+                </PrivateRoute>
+              } />
+              <Route path="/inventory/asset/:assetId" element={
+                <PrivateRoute>
+                  <InventoryAssetMobile />
+                </PrivateRoute>
+              } />
+              <Route path="/marking" element={
+                <PrivateRoute>
+                  <Marking />
+                </PrivateRoute>
+              } />
+              
+              {/* Маршруты для заявок на ремонт */}
+              <Route path="/repairs" element={
+                <PrivateRoute>
+                  <RepairList />
+                </PrivateRoute>
+              } />
+              <Route path="/repairs/create" element={
+                <PrivateRoute>
+                  <RepairCreate />
+                </PrivateRoute>
+              } />
+              <Route path="/repairs/:id" element={
+                <PrivateRoute>
+                  <RepairEdit />
+                </PrivateRoute>
+              } />
+              <Route path="/repairs/:id/edit" element={
+                <PrivateRoute>
+                  <RepairEdit />
+                </PrivateRoute>
+              } />
+              <Route path="/profile" element={
+                <PrivateRoute>
+                  <Profile />
+                </PrivateRoute>
+              } />
+              
+              {/* Админ-маршрут (требуется роль admin) */}
+              <Route path="/admin" element={
+                <AdminRoute>
+                  <AdminPanel />
+                </AdminRoute>
+              } />
+              
+              {/* Журнал аудита (только админ) */}
+              <Route path="/audit" element={
+                <AdminRoute>
+                  <AuditLog />
+                </AdminRoute>
+              } />
+              
+              {/* Уведомления */}
+              <Route path="/notifications" element={
+                <PrivateRoute>
+                  <NotificationsPage />
+                </PrivateRoute>
+              } />
+              
+              {/* Календарь событий — доступен всем авторизованным пользователям */}
+              <Route path="/schedule" element={
+                <PrivateRoute>
+                  <SchedulePage />
+                </PrivateRoute>
+              } />
+              
+              {/* Аналитика поломок */}
+              <Route path="/analytics" element={
+                <PrivateRoute>
+                  <AnalyticsPage />
+                </PrivateRoute>
+              } />
+              
+              {/* Списание активов (только админ) */}
+              <Route path="/disposal" element={
+                <AdminRoute>
+                  <DisposalPage />
+                </AdminRoute>
+              } />
+              
+              {/* Нормативные документы (только админ) */}
+              <Route path="/regulatory" element={
+                <AdminRoute>
+                  <RegulatoryPage />
+                </AdminRoute>
+              } />
+              
+              {/* Сверка с бухгалтерией (только админ) */}
+              <Route path="/reconciliation" element={
+                <AdminRoute>
+                  <ReconciliationPage />
+                </AdminRoute>
+              } />
+              
+              {/* Распечатка описи помещения (только админ) */}
+              <Route path="/room-inventory-print" element={
+                <AdminRoute>
+                  <RoomInventoryPrint />
+                </AdminRoute>
+              } />
+              
+              {/* 404 - перенаправление на главную */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </LayoutWithSidebar>
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              duration: 4000,
+              style: {
+                borderRadius: '10px',
+                background: '#2C323A',
+                color: '#E5E7EB',
+                fontSize: '13px',
+              },
+              success: {
+                iconTheme: { primary: '#22c55e', secondary: '#ffffff' },
+              },
+              error: {
+                iconTheme: { primary: '#ef4444', secondary: '#ffffff' },
+              },
+            }}
+          />
         </ThemeProvider>
       </AuthProvider>
     </Router>
     </ErrorBoundary>
   );
 }
+
+// Компонент layout с боковой панелью и верхней панелью
+const LayoutWithSidebar: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated } = useAuth();
+
+  if (!isAuthenticated) {
+    return (
+      <>
+        <TopBar />
+        <main className="flex-grow">
+          {children}
+        </main>
+      </>
+    );
+  }
+
+  return (
+    <div className="min-h-screen flex bg-gray-50 dark:bg-graphite-950">
+      <Sidebar />
+      <div className="flex-1 flex flex-col min-w-0">
+        <TopBar />
+        <main className="flex-grow">
+          {children}
+        </main>
+      </div>
+    </div>
+  );
+};
 
 export default App;

@@ -3,24 +3,37 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:RfidScanner.ViewModels"
              xmlns:conv="clr-namespace:RfidScanner.Converters"
-             Background="#F5F5F5">
+             Background="{DynamicResource ThemeBg}">
 
     <UserControl.Resources>
         <conv:StatusToBrushConverter x:Key="StatusToBrushConverter"/>
         <conv:StatusToIconConverter x:Key="StatusToIconConverter"/>
         <conv:StatusToTextConverter x:Key="StatusToTextConverter"/>
+        <conv:CountToBackgroundConverter x:Key="CountToBackgroundConverter"/>
+        <conv:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+        <conv:InverseBooleanConverter x:Key="InverseBooleanConverter"/>
         
+        <!-- Анимация пульсации при сканировании -->
+        <Storyboard x:Key="ScanPulseStoryboard">
+            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                           From="0" To="0.3" Duration="0:0:0.1"
+                           AutoReverse="True" RepeatBehavior="3x"/>
+        </Storyboard>
+
         <Style x:Key="SummaryCard" TargetType="Border">
-            <Setter Property="Background" Value="White"/>
-            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="CornerRadius" Value="10"/>
             <Setter Property="Padding" Value="15"/>
             <Setter Property="Margin" Value="0,0,5,0"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect Color="#000000" BlurRadius="6" ShadowDepth="1" Opacity="0.05"/>
+                </Setter.Value>
+            </Setter>
         </Style>
         
         <Style x:Key="ResultItem" TargetType="Border">
-            <Setter Property="Background" Value="White"/>
-            <Setter Property="CornerRadius" Value="6"/>
-            <Setter Property="Padding" Value="12"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="14"/>
             <Setter Property="Margin" Value="0,3"/>
             <Setter Property="BorderThickness" Value="3,0,0,0"/>
         </Style>
@@ -34,15 +47,23 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- ===== СВODКА (Summary) ===== -->
-        <Border Grid.Row="0" Background="White" Padding="20" BorderThickness="0,0,0,1" BorderBrush="#E0E0E0">
-            <StackPanel>
-                <!-- Заголовок с помещением -->
-                <TextBlock Text="{Binding SessionRoomName, FallbackValue='Помещение не выбрано'}" 
-                          FontSize="20" FontWeight="Bold" Foreground="#212121" Margin="0,0,0,5"/>
+        <!-- ===== СВОДКА (Summary) ===== -->
+        <Border Grid.Row="0" Padding="20" BorderThickness="0,0,0,1"
+                Background="{DynamicResource ThemeCardBg}" 
+                BorderBrush="{DynamicResource ThemeBorderBrush}">
+            <Grid>
+                <!-- Пульсация при сканировании -->
+                <Border x:Name="ScanPulseBorder" Background="{DynamicResource ThemeSuccess}" 
+                        Opacity="0" CornerRadius="8" Margin="-20"/>
                 
-                <!-- Сводка -->
-                <Grid Margin="0,5,0,10">
+                <StackPanel>
+                    <!-- Заголовок с помещением -->
+                    <TextBlock Text="{Binding SessionRoomName, FallbackValue='Помещение не выбрано'}" 
+                              FontSize="20" FontWeight="Bold" 
+                              Foreground="{DynamicResource ThemeTextPrimary}" Margin="0,0,0,5"/>
+                    
+                    <!-- Сводка -->
+                    <Grid Margin="0,5,0,10">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
@@ -52,50 +73,45 @@
                     </Grid.ColumnDefinitions>
 
                     <!-- Найдено -->
-                    <Border Grid.Column="0" Style="{StaticResource SummaryCard}" Background="#E8F5E9">
+                    <Border Grid.Column="0" Style="{StaticResource SummaryCard}" 
+                            Background="{DynamicResource ThemeWidgetSuccessBg}">
                         <StackPanel>
-                            <TextBlock Text="✅ Найдено" FontSize="12" Foreground="#2E7D32"/>
-                            <TextBlock Text="{Binding MatchedCount}" FontSize="24" FontWeight="Bold" Foreground="#1B5E20"/>
+                            <TextBlock Text="✅ Найдено" FontSize="12" 
+                                      Foreground="{DynamicResource ThemeSuccess}"/>
+                            <TextBlock Text="{Binding MatchedCount}" FontSize="24" FontWeight="Bold" 
+                                      Foreground="{DynamicResource ThemeSuccess}"/>
                         </StackPanel>
                     </Border>
 
                     <!-- Лишние -->
-                    <Border Grid.Column="2" Style="{StaticResource SummaryCard}" Background="{Binding ExtraCount, Converter={StaticResource CountToBackgroundConverter}}">
+                    <Border Grid.Column="2" Style="{StaticResource SummaryCard}" 
+                            Background="{Binding ExtraCount, Converter={StaticResource CountToBackgroundConverter}}">
                         <StackPanel>
-                            <TextBlock Text="⚠️ Лишние" FontSize="12" Foreground="#E65100"/>
-                            <TextBlock Text="{Binding ExtraCount}" FontSize="24" FontWeight="Bold" Foreground="#E65100"/>
+                            <TextBlock Text="⚠️ Лишние" FontSize="12" 
+                                      Foreground="{DynamicResource ThemeWarning}"/>
+                            <TextBlock Text="{Binding ExtraCount}" FontSize="24" FontWeight="Bold" 
+                                      Foreground="{DynamicResource ThemeWarning}"/>
                         </StackPanel>
                     </Border>
 
                     <!-- Пропущены -->
-                    <Border Grid.Column="4" Style="{StaticResource SummaryCard}" Background="#FFF3E0">
+                    <Border Grid.Column="4" Style="{StaticResource SummaryCard}" 
+                            Background="{DynamicResource ThemeWidgetErrorBg}">
                         <StackPanel>
-                            <TextBlock Text="❌ Пропущены" FontSize="12" Foreground="#BF360C"/>
-                            <TextBlock Text="{Binding MissingCount}" FontSize="24" FontWeight="Bold" Foreground="#BF360C"/>
+                            <TextBlock Text="❌ Пропущены" FontSize="12" 
+                                      Foreground="{DynamicResource ThemeError}"/>
+                            <TextBlock Text="{Binding MissingCount}" FontSize="24" FontWeight="Bold" 
+                                      Foreground="{DynamicResource ThemeError}"/>
                         </StackPanel>
                     </Border>
-                </Grid>
-
-                <!-- Прогресс-бар -->
-                <ProgressBar Height="8" Value="{Binding ProgressPercent}" Maximum="100" 
-                            Background="#E0E0E0" Foreground="#4CAF50" Margin="0,0,0,5"/>
-                
-                <!-- Подсказка при сканировании -->
-                <TextBlock Text="{Binding HintText, FallbackValue='Сканируйте RFID-метки сканером...'}" 
-                          FontSize="13" Foreground="#757575" TextWrapping="Wrap" Margin="0,0,0,5"/>
-                
-                <!-- Кнопка-подсказка -->
-                <TextBlock FontWeight="Bold" Foreground="#1976D2" Cursor="Hand" Margin="0,0,0,5">
-                    <TextBlock.Inlines>
-                        <Run Text="💡"/>
-                        <Run Text=" Как правильно сканировать: поднесите сканер на 1-3 см к метке, подождите сигнал"/>
-                    </TextBlock.Inlines>
-                </TextBlock>
-            </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Grid>
         </Border>
 
         <!-- ===== ПОИСК И ФИЛЬТРЫ ===== -->
-        <Border Grid.Row="1" Background="White" Padding="20" BorderThickness="0,0,0,1" BorderBrush="#E0E0E0">
+        <Border Grid.Row="1" Background="{DynamicResource ThemeCardBg}" 
+                Padding="20" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource ThemeBorderBrush}">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -105,46 +121,47 @@
                 </Grid.ColumnDefinitions>
 
                 <!-- Поиск -->
-                <TextBox Grid.Column="0" 
-                        Text="{Binding SearchQuery, UpdateSourceTrigger=PropertyChanged}" 
-                        FontSize="14" Padding="10,8"
-                        Background="#FAFAFA" BorderBrush="#E0E0E0" BorderThickness="1"
-                        VerticalContentAlignment="Center">
-                    <TextBox.Resources>
-                        <Style TargetType="Border">
-                            <Setter Property="CornerRadius" Value="6"/>
-                        </Style>
-                    </TextBox.Resources>
-                </TextBox>
+                <Border Grid.Column="0" Background="{DynamicResource ThemeInputBg}" 
+                        CornerRadius="6" BorderBrush="{DynamicResource ThemeInputBorder}" 
+                        BorderThickness="1">
+                    <TextBox Text="{Binding SearchQuery, UpdateSourceTrigger=PropertyChanged}" 
+                             FontSize="14" Padding="10,8"
+                             BorderThickness="0"
+                             VerticalContentAlignment="Center"/>
+                </Border>
 
                 <!-- Фильтр: Все -->
                 <RadioButton Grid.Column="1" Content="Все" 
                             IsChecked="{Binding FilterAll, Converter={StaticResource BooleanToVisibilityConverter}}"
-                            Margin="10,0,5,0" Foreground="#424242" FontSize="13"
+                            Margin="10,0,5,0" 
+                            Foreground="{DynamicResource ThemeTextPrimary}" FontSize="13"
                             GroupName="FilterGroup"/>
 
                 <!-- Фильтр: Найдено -->
                 <RadioButton Grid.Column="2" Content="✅ Найдено" 
-                            Margin="5,0,5,0" Foreground="#2E7D32" FontSize="13"
+                            Margin="5,0,5,0" 
+                            Foreground="{DynamicResource ThemeSuccess}" FontSize="13"
                             GroupName="FilterGroup"
                             IsChecked="{Binding FilterFound}"/>
 
                 <!-- Фильтр: Лишние -->
                 <RadioButton Grid.Column="3" Content="⚠️ Лишние" 
-                            Margin="5,0,5,0" Foreground="#E65100" FontSize="13"
+                            Margin="5,0,5,0" 
+                            Foreground="{DynamicResource ThemeWarning}" FontSize="13"
                             GroupName="FilterGroup"
                             IsChecked="{Binding FilterExtra}"/>
 
                 <!-- Фильтр: Пропущены -->
                 <RadioButton Grid.Column="4" Content="❌ Пропущены" 
-                            Margin="5,0,5,0" Foreground="#BF360C" FontSize="13"
+                            Margin="5,0,5,0" 
+                            Foreground="{DynamicResource ThemeError}" FontSize="13"
                             GroupName="FilterGroup"
                             IsChecked="{Binding FilterMissing}"/>
             </Grid>
         </Border>
 
         <!-- ===== СПИСОК РЕЗУЛЬТАТОВ ===== -->
-        <Border Grid.Row="2" Background="White" Margin="20" CornerRadius="8" Padding="15">
+        <Border Grid.Row="2" Background="{DynamicResource ThemeCardBg}" Margin="20" CornerRadius="12" Padding="15">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*"/>
@@ -152,14 +169,16 @@
 
                 <!-- Список результатов -->
                 <ListView Grid.Row="0" ItemsSource="{Binding FilteredResults}"
-                         SelectedItem="{Binding SelectedResult}"
-                         BorderThickness="0"
-                         ScrollViewer.VerticalScrollBarVisibility="Auto"
-                         MouseDoubleClick="ResultListView_MouseDoubleClick">
+                          SelectedItem="{Binding SelectedResult}"
+                          BorderThickness="0"
+                          ScrollViewer.VerticalScrollBarVisibility="Auto"
+                          MouseDoubleClick="ResultListView_MouseDoubleClick"
+                          Background="Transparent">
                     <ListView.ItemTemplate>
                         <DataTemplate>
                             <Border Style="{StaticResource ResultItem}"
-                                   BorderBrush="{Binding Status, Converter={StaticResource StatusToBrushConverter}}">
+                                    BorderBrush="{Binding Status, Converter={StaticResource StatusToBrushConverter}}"
+                                    Background="{DynamicResource ThemeCardBg}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
@@ -175,8 +194,9 @@
                                     <!-- Информация об активе -->
                                     <StackPanel Grid.Column="1">
                                         <TextBlock Text="{Binding AssetName, FallbackValue='Неизвестный актив'}" 
-                                                  FontSize="14" FontWeight="Bold" Foreground="#212121"/>
-                                        <TextBlock FontSize="12" Foreground="#757575" Margin="0,2,0,0">
+                                                  FontSize="14" FontWeight="SemiBold" 
+                                                  Foreground="{DynamicResource ThemeTextPrimary}"/>
+                                        <TextBlock FontSize="12" Foreground="{DynamicResource ThemeTextSecondary}" Margin="0,2,0,0">
                                             <Run Text="📋 "/>
                                             <Run Text="{Binding InventoryNumber, FallbackValue='—'}"/>
                                             <Run Text=" | "/>
@@ -197,14 +217,16 @@
                 </ListView>
 
                 <!-- Пустое состояние -->
-                <TextBlock Text="Сканируйте RFID-метки..." FontSize="16" Foreground="#BDBDBD" 
+                <TextBlock Text="Сканируйте RFID-метки..." FontSize="16" 
+                          Foreground="{DynamicResource ThemeTextSecondary}" 
                           HorizontalAlignment="Center" VerticalAlignment="Center"
                           Visibility="{Binding HasResults, Converter={StaticResource InverseBooleanConverter}}"/>
             </Grid>
         </Border>
 
         <!-- ===== КНОПКИ УПРАВЛЕНИЯ ===== -->
-        <Border Grid.Row="3" Background="White" Padding="20" BorderThickness="0,1,0,0" BorderBrush="#E0E0E0">
+        <Border Grid.Row="3" Background="{DynamicResource ThemeCardBg}" 
+                Padding="20" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource ThemeBorderBrush}">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -225,7 +247,8 @@
 
                     <!-- Статус синхронизации -->
                     <TextBlock Grid.Column="0" Text="{Binding SyncStatus, FallbackValue='Готово'}" 
-                              FontSize="13" Foreground="#757575" VerticalAlignment="Center"/>
+                              FontSize="13" Foreground="{DynamicResource ThemeTextSecondary}" 
+                              VerticalAlignment="Center"/>
 
                     <!-- Ручной ввод -->
                     <Button Grid.Column="1" Content="✏️ Ввести вручную" 

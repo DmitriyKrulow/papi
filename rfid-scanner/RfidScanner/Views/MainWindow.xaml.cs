@@ -2,6 +2,7 @@ using System;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Controls;
+using System.Windows.Media;
 using RfidScanner.Models;
 using RfidScanner.Services;
 using RfidScanner.ViewModels;
@@ -9,7 +10,7 @@ using RfidScanner.ViewModels;
 namespace RfidScanner.Views;
 
 /// <summary>
-/// Interaction logic for MainWindow.xaml
+/// Interaction logic for MainWindow
 /// </summary>
 public partial class MainWindow : Window
 {
@@ -21,19 +22,19 @@ public partial class MainWindow : Window
     private readonly AuditViewModel _auditViewModel;
     private readonly RoomSelectorViewModel _roomSelectorViewModel;
     private readonly ScanView _scanView;
+    private readonly SearchView _searchView;
+    private readonly AuditView _auditView;
     private readonly RoleService _roleService;
     private readonly AppUser _currentUser;
     private RoomSelectorView? _roomSelectorView;
     private bool _isSwitchingView;
     private Task? _finishTask;
+    private bool _suppressSessionViewSwitch;
+    private bool _wasInventoriesTab;
     
     // Буфер для HID-сканера (посимвольный ввод)
     private readonly System.Text.StringBuilder _hidBuffer = new();
     private DateTime _lastHidKeyTime = DateTime.MinValue;
-
-    // Максимальный интервал между символами одной метки (мс).
-    // HID-ридер печатает всю метку потоком, поэтому пауза больше этой
-    // значения означает начало новой метки / посторонний ввод.
     private const int HidCharTimeoutMs = 200;
 
     public MainWindow(ConfigService config, RoleService roleService, AppUser currentUser)
@@ -45,13 +46,13 @@ public partial class MainWindow : Window
         
         InitializeComponent();
         
-        // Устанавливаем информацию о пользователе в верхней панели
+        // Устанавливаем информацию о пользователе
         UpdateUserInfo();
         
         // Инициализация сервисов
         var localStore = new LocalStoreService();
         var auditService = new AuditService(localStore);
-        auditService.SetCurrentUser(_currentUser.Username); // Устанавливаем текущего пользователя
+        auditService.SetCurrentUser(_currentUser.Username);
         _assetCache = new AssetCacheService();
         _sessionManager = new SessionManager(localStore, auditService);
         var silentMode = new SilentModeService();
@@ -64,81 +65,70 @@ public partial class MainWindow : Window
         // RoomSelectorView создан в XAML — инициализируем
         _roomSelectorView = RoomSelectorHostView;
         _roomSelectorView.Initialize(apiClient, _sessionManager, _assetCache, auditService);
-        
-        // Используем ViewModel из RoomSelectorView
         _roomSelectorViewModel = _roomSelectorView.ViewModel!;
         
         // ScanView создан в XAML
         _scanView = ScanHostView;
-        _scanView.Visibility = System.Windows.Visibility.Collapsed;
-        // Инициализируем ScanView сразу (до первой сессии), чтобы ItemsSource был привязан
+        _scanView.Visibility = Visibility.Collapsed;
         _scanView.Initialize(_scanViewModel);
+        
+        // SearchView создан в XAML
+        _searchView = SearchHostView;
+        _searchView.Initialize(_searchViewModel);
+        
+        // AuditView создан в XAML
+        _auditView = AuditHostView;
+        _auditView.Initialize(_auditViewModel);
         
         // Подписываемся на события
         _scanView.Finished += OnFinished;
         _scanView.InventoryCompleted += () =>
         {
-            System.Diagnostics.Debug.WriteLine("[InventoryCompleted] Inventory completed, switching to room selector...");
-            System.Windows.Application.Current.Dispatcher.Invoke(() =>
-            {
-                SwitchToRoomSelector();
-            });
+            Dispatcher.Invoke(() => SwitchToRoomSelector());
         };
         
         _scanView.Reset += () =>
         {
-            System.Windows.Application.Current.Dispatcher.Invoke(() =>
+            Dispatcher.Invoke(() =>
             {
                 if (MessageBox.Show("Сбросить сессию? Все данные будут удалены.", 
                     "Подтверждение", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes)
                 {
-                    System.Diagnostics.Debug.WriteLine("[Reset] Resetting session...");
                     _sessionManager.ResetSession();
-                    System.Diagnostics.Debug.WriteLine($"[Reset] After ResetSession: HasActiveSession={_sessionManager.HasActiveSession}, State={_sessionManager.CurrentSession?.State}");
                     SwitchToRoomSelector();
-                }
-            });
-        };
-        _scanView.Exit += () =>
-        {
-            System.Windows.Application.Current.Dispatcher.Invoke(() =>
-            {
-                System.Diagnostics.Debug.WriteLine("[Exit] EXIT BUTTON CLICKED");
-                try
-                {
-                    // SwitchToRoomSelector reloads rooms + inventories
-                    System.Diagnostics.Debug.WriteLine("[Exit] Switching view...");
-                    SwitchToRoomSelector();
-                    System.Diagnostics.Debug.WriteLine("[Exit] View switched successfully");
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[Exit] ERROR: {ex.GetType().Name}: {ex.Message}");
-                    System.Diagnostics.Debug.WriteLine($"[Exit] StackTrace: {ex.StackTrace}");
                 }
             });
         };
         
-        // Подписка на загрузку помещений для обновления статуса
-        if (_roomSelectorView?.ViewModel != null)
+        _scanView.Exit += () =>
         {
-            _roomSelectorView.ViewModel.RoomsLoaded += () =>
+            Dispatcher.Invoke(() => SwitchToRoomSelector());
+        };
+        
+        // Подписка на загрузку помещений
+        _roomSelectorView.ViewModel!.RoomsLoaded += () =>
+        {
+            Dispatcher.Invoke(() =>
             {
-                System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                UpdateWidgets();
+                if (_roomSelectorView!.ViewModel!.Rooms.Count > 0)
                 {
-                    if (_roomSelectorView.ViewModel!.Rooms.Count > 0)
-                    {
-                        ConnectionStatus.Text = "Подключено";
-                        ConnectionStatus.Foreground = System.Windows.Media.Brushes.Green;
-                    }
-                    else
-                    {
-                        ConnectionStatus.Text = "Нет данных";
-                        ConnectionStatus.Foreground = System.Windows.Media.Brushes.Orange;
-                    }
-                });
-            };
-        }
+                    ConnectionStatus.Text = "Подключено к серверу";
+                    ConnectionStatus.Foreground = (Brush)FindResource("ThemeSuccess");
+                }
+                else
+                {
+                    ConnectionStatus.Text = "Нет данных";
+                    ConnectionStatus.Foreground = (Brush)FindResource("ThemeWarning");
+                }
+            });
+        };
+        
+        // Подписка на загрузку инвентаризаций
+        _roomSelectorView.ViewModel.InventoriesLoaded += () =>
+        {
+            Dispatcher.Invoke(() => UpdateWidgets());
+        };
         
         // HID-сканер
         PreviewKeyDown += MainWindow_PreviewKeyDown;
@@ -148,12 +138,9 @@ public partial class MainWindow : Window
         
         // Статус по умолчанию
         ConnectionStatus.Text = "Проверка подключения...";
-        ConnectionStatus.Foreground = System.Windows.Media.Brushes.Orange;
+        ConnectionStatus.Foreground = (Brush)FindResource("ThemeWarning");
     }
 
-    /// <summary>
-    /// Обновляет отображение информации о текущем пользователе
-    /// </summary>
     private void UpdateUserInfo()
     {
         var roleText = RoleService.GetRoleText(_currentUser.Role);
@@ -161,8 +148,106 @@ public partial class MainWindow : Window
             ? string.Empty 
             : $" | {_currentUser.Department}";
         
-        ConnectionStatus.Text = $"👤 {_currentUser.Username} ({roleText}{departmentText})";
-        ConnectionStatus.Foreground = System.Windows.Media.Brushes.White;
+        UserDisplay.Text = $"{_currentUser.Username} ({roleText}{departmentText})";
+    }
+
+    /// <summary>
+    /// Обновляет виджеты-сводки на главной странице
+    /// </summary>
+    private void UpdateWidgets()
+    {
+        if (_roomSelectorView?.ViewModel == null) return;
+
+        var vm = _roomSelectorViewModel;
+        
+        // Показываем виджеты когда скан не активен
+        WidgetsPanel.Visibility = ScanHostView.Visibility == Visibility.Collapsed 
+            ? Visibility.Visible 
+            : Visibility.Collapsed;
+        
+        // Обновляем числа виджетов
+        WidgetRooms.Text = vm.Rooms.Count.ToString();
+        WidgetActive.Text = vm.Inventories.Count.ToString();
+    }
+
+    // ==================== Навигация ====================
+
+    private void NavInventory_Click(object sender, RoutedEventArgs e)
+    {
+        SetActiveNavItem(NavInventoryBtn);
+        ShowView("inventory");
+    }
+
+    private void NavSearch_Click(object sender, RoutedEventArgs e)
+    {
+        SetActiveNavItem(NavSearchBtn);
+        ShowView("search");
+    }
+
+    private void NavHistory_Click(object sender, RoutedEventArgs e)
+    {
+        SetActiveNavItem(NavHistoryBtn);
+        ShowView("audit");
+    }
+
+    private void SetActiveNavItem(Button activeBtn)
+    {
+        NavInventoryBtn.Style = FindResource("SidebarNavItem") as Style;
+        NavSearchBtn.Style = FindResource("SidebarNavItem") as Style;
+        NavHistoryBtn.Style = FindResource("SidebarNavItem") as Style;
+        
+        activeBtn.Style = FindResource("SidebarNavActive") as Style;
+    }
+
+    private void ShowView(string viewName)
+    {
+        if (_isSwitchingView) return;
+        _isSwitchingView = true;
+
+        try
+        {
+            // Скрываем все
+            RoomSelectorHostView.Visibility = Visibility.Collapsed;
+            ScanHostView.Visibility = Visibility.Collapsed;
+            SearchHostView.Visibility = Visibility.Collapsed;
+            AuditHostView.Visibility = Visibility.Collapsed;
+
+            // Показываем нужный
+            switch (viewName)
+            {
+                case "inventory":
+                    if (_sessionManager.HasActiveSession)
+                    {
+                        ScanHostView.Visibility = Visibility.Visible;
+                    }
+                    else
+                    {
+                        RoomSelectorHostView.Visibility = Visibility.Visible;
+                        UpdateWidgets();
+                    }
+                    break;
+                case "search":
+                    SearchHostView.Visibility = Visibility.Visible;
+                    _searchViewModel.SearchCommand.Execute(null);
+                    break;
+                case "audit":
+                    AuditHostView.Visibility = Visibility.Visible;
+                    _auditViewModel.Refresh();
+                    break;
+            }
+        }
+        finally
+        {
+            _isSwitchingView = false;
+        }
+    }
+
+    // ==================== Переключение тем ====================
+
+    private void ThemeToggle_Click(object sender, RoutedEventArgs e)
+    {
+        ThemeManager.Toggle(Application.Current);
+        ToastService.Show(this, "Тема переключена", ToastType.Info);
     }
 
     // ==================== Завершение инвентаризации ====================
@@ -170,10 +255,7 @@ public partial class MainWindow : Window
     private void OnFinished()
     {
         if (_finishTask != null && !_finishTask.IsCompleted)
-        {
-            System.Diagnostics.Debug.WriteLine("[Finished] Already finishing, ignoring duplicate");
             return;
-        }
         _finishTask = FinishInventoryAsync();
     }
 
@@ -181,39 +263,29 @@ public partial class MainWindow : Window
     {
         try
         {
-            System.Diagnostics.Debug.WriteLine("[Finished] Starting inventory completion...");
-
             var result = await _scanViewModel.FinishWithSyncAsync();
 
-            System.Diagnostics.Debug.WriteLine($"[Finished] FinishWithSync: Success={result.Success}, ServerError={result.ServerError}, Skipped={result.SkippedCount}");
-
-            System.Windows.Application.Current.Dispatcher.Invoke(() =>
+            Dispatcher.Invoke(() =>
             {
                 if (result.SkippedCount > 0)
                 {
                     var msg = $"Инвентаризация завершена.\n\n" +
                               $"✅ Найдено: {_scanViewModel.MatchedCount}\n" +
                               $"❌ Отсутствует: {_scanViewModel.MissingCount}\n" +
-                              $"⏭ Пропущено: {result.SkippedCount}\n\n";
+                              $"⏭ Пропущено: {result.SkippedCount}";
 
                     if (result.ServerError)
-                        msg += $"⚠ Ошибка сервера: {result.Message}";
-                    else if (result.Success)
-                        msg += "✅ Результаты отправлены на сервер.";
-
-                    MessageBox.Show(msg, "Завершение инвентаризации",
-                        MessageBoxButton.OK,
-                        result.ServerError ? MessageBoxImage.Warning : MessageBoxImage.Information);
+                        ToastService.ShowWarning(this, $"⚠ Ошибка сервера: {result.Message}");
+                    else
+                        ToastService.ShowSuccess(this, "✅ Результаты отправлены на сервер");
                 }
                 else if (result.ServerError)
                 {
-                    MessageBox.Show($"Инвентаризация завершена локально.\n\nОшибка: {result.Message}",
-                        "Завершение инвентаризации", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    ToastService.ShowWarning(this, $"Инвентаризация завершена локально. Ошибка: {result.Message}");
                 }
                 else
                 {
-                    MessageBox.Show($"Инвентаризация завершена.\n\nНайдено: {_scanViewModel.MatchedCount}\nОтсутствует: {_scanViewModel.MissingCount}",
-                        "Завершение инвентаризации", MessageBoxButton.OK, MessageBoxImage.Information);
+                    ToastService.ShowSuccess(this, $"Инвентаризация завершена. Найдено: {_scanViewModel.MatchedCount}, Отсутствует: {_scanViewModel.MissingCount}");
                 }
 
                 SwitchToRoomSelector();
@@ -221,12 +293,9 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[Finished] ERROR: {ex.GetType().Name}: {ex.Message}");
-            System.Diagnostics.Debug.WriteLine($"[Finished] StackTrace: {ex.StackTrace}");
-            System.Windows.Application.Current.Dispatcher.Invoke(() =>
+            Dispatcher.Invoke(() =>
             {
-                MessageBox.Show($"Ошибка завершения инвентаризации:\n{ex.Message}",
-                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                ToastService.ShowError(this, $"Ошибка завершения инвентаризации: {ex.Message}");
                 SwitchToRoomSelector();
             });
         }
@@ -236,138 +305,51 @@ public partial class MainWindow : Window
         }
     }
 
+    // ==================== Сессия ====================
+
     private void OnSessionCreated(ScanSession session)
     {
-        System.Diagnostics.Debug.WriteLine($"[OnSessionCreated] State={session.State}, HasActiveSession={_sessionManager.HasActiveSession}");
         if (session.State == SessionState.Active)
         {
-            System.Diagnostics.Debug.WriteLine("[OnSessionCreated] Calling Dispatcher.Invoke...");
-            System.Windows.Application.Current.Dispatcher.Invoke(() =>
+            Dispatcher.Invoke(() =>
             {
-                try
+                if (!_isSwitchingView)
                 {
-                    System.Diagnostics.Debug.WriteLine("[OnSessionCreated] Inside Dispatcher, switching to scan view...");
-                    if (!_isSwitchingView)
+                    _isSwitchingView = true;
+                    _suppressSessionViewSwitch = true;
+                    
+                    if (_scanView.DataContext == null)
+                        _scanView.Initialize(_scanViewModel);
+                    
+                    ScanHostView.Visibility = Visibility.Visible;
+                    RoomSelectorHostView.Visibility = Visibility.Collapsed;
+                    
+                    // Разрешаем переключение через 500мс (после полной загрузки UI)
+                    var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
+                    timer.Tick += (s, e) =>
                     {
-                        _isSwitchingView = true;
-                        TabControl.SelectedIndex = 0;
-                        
-                        // Инициализируем ScanView при первом показе
-                        if (_scanView.DataContext == null)
-                        {
-                            try
-                            {
-                                _scanView.Initialize(_scanViewModel);
-                                System.Diagnostics.Debug.WriteLine("[OnSessionCreated] ScanView initialized");
-                            }
-                            catch (Exception ex)
-                            {
-                                System.Diagnostics.Debug.WriteLine($"[OnSessionCreated] Init ERROR: {ex.Message}");
-                            }
-                        }
-                        else
-                        {
-                            System.Diagnostics.Debug.WriteLine("[OnSessionCreated] ScanView already initialized");
-                        }
-                        
-                        // Переключаем видимость — DataContext не меняем, каждый View имеет свой
-                        _scanView.Visibility = System.Windows.Visibility.Visible;
-                        _roomSelectorView.Visibility = System.Windows.Visibility.Collapsed;
-                        
-                        System.Diagnostics.Debug.WriteLine("[OnSessionCreated] ScanView shown, HasActiveSession=" + _sessionManager.HasActiveSession);
-                    }
-                    else
-                    {
-                        System.Diagnostics.Debug.WriteLine("[OnSessionCreated] SKIPPED: Already switching");
-                    }
+                        timer.Stop();
+                        _suppressSessionViewSwitch = false;
+                    };
+                    timer.Start();
                 }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[OnSessionCreated] ERROR: {ex.GetType().Name}: {ex.Message}");
-                    System.Diagnostics.Debug.WriteLine($"[OnSessionCreated] StackTrace: {ex.StackTrace}");
-                    MessageBox.Show($"Ошибка переключения: {ex.Message}", "Ошибка", 
-                        MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-                finally
-                {
-                    _isSwitchingView = false;
-                }
+                _isSwitchingView = false;
             });
-        }
-        else
-        {
-            System.Diagnostics.Debug.WriteLine($"[OnSessionCreated] SKIPPED: State={session.State}, HasActiveSession={_sessionManager.HasActiveSession}");
         }
     }
 
-    private void TabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        System.Diagnostics.Debug.WriteLine($"[TabControl_SelectionChanged] SelectedIndex={TabControl.SelectedIndex}, IsSwitching={_isSwitchingView}, HasActiveSession={_sessionManager.HasActiveSession}");
-        if (_isSwitchingView) 
-        {
-            System.Diagnostics.Debug.WriteLine("[TabControl_SelectionChanged] SKIPPED: IsSwitchingView=true");
-            return;
-        }
-        _isSwitchingView = true;
-        
-        try
-        {
-            // Если активное сканирование — не переключать DataContext на room selector
-            if (_sessionManager.HasActiveSession && TabControl.SelectedIndex == 0)
-            {
-                _scanView.Visibility = System.Windows.Visibility.Visible;
-                _roomSelectorView.Visibility = System.Windows.Visibility.Collapsed;
-                System.Diagnostics.Debug.WriteLine("[TabControl_SelectionChanged] Set ScanView (active session)");
-                return;
-            }
-            
-            // Если сессия завершена или нет активной сессии — показываем RoomSelector
-            if (TabControl.SelectedIndex == 0)
-            {
-                System.Diagnostics.Debug.WriteLine($"[TabControl_SelectionChanged] HasActiveSession={_sessionManager.HasActiveSession}, SessionState={_sessionManager.CurrentSession?.State}");
-                _scanView.Visibility = System.Windows.Visibility.Collapsed;
-                _roomSelectorView.Visibility = System.Windows.Visibility.Visible;
-                System.Diagnostics.Debug.WriteLine("[TabControl_SelectionChanged] Set RoomSelectorView");
-            }
-            else if (TabControl.SelectedIndex == 1)
-            {
-                System.Diagnostics.Debug.WriteLine("[TabControl_SelectionChanged] Set DataContext to SearchViewModel");
-                DataContext = _searchViewModel;
-            }
-            else if (TabControl.SelectedIndex == 2)
-            {
-                System.Diagnostics.Debug.WriteLine("[TabControl_SelectionChanged] Set DataContext to AuditViewModel");
-                DataContext = _auditViewModel;
-                _auditViewModel.Refresh();
-            }
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"[TabControl_SelectionChanged] ERROR: {ex.Message}");
-        }
-        finally
-        {
-            _isSwitchingView = false;
-        }
-    }
+    // ==================== HID-сканер ====================
 
     private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        // Если фокус в TextBox — пропускаем ввод
         var focused = Keyboard.FocusedElement as TextBox;
         if (focused != null) return;
-        
         if (Keyboard.FocusedElement is ComboBox) return;
-        
-        // Только если активна вкладка "Инвентаризация"
-        if (TabControl.SelectedIndex != 0) return;
+        if (ScanHostView.Visibility != Visibility.Visible) return;
 
-        // HID-сканер эмулирует клавиатуру: метка вводится ПОСИВОЛЬНО,
-        // а в конце приходит Enter. Собираем символы в буфер и передаём
-        // в ProcessTagCommand только целиком готовую метку (по Enter).
         var now = DateTime.Now;
         if ((now - _lastHidKeyTime).TotalMilliseconds > HidCharTimeoutMs)
-            _hidBuffer.Clear(); // длинная пауза — начинаем новую метку
+            _hidBuffer.Clear();
         _lastHidKeyTime = now;
 
         if (e.Key == Key.Return || e.Key == Key.Enter)
@@ -390,10 +372,6 @@ public partial class MainWindow : Window
         }
     }
 
-    /// <summary>
-    /// Преобразует клавишу в символ (для HID-сканера в режиме клавиатуры).
-    /// Возвращает null, если клавиша не является частью метки.
-    /// </summary>
     private static char? KeyToChar(Key key)
     {
         if (key >= Key.A && key <= Key.Z)
@@ -404,6 +382,8 @@ public partial class MainWindow : Window
             return (char)('0' + (key - Key.NumPad0));
         return null;
     }
+
+    // ==================== Кнопки ====================
 
     private void SkipButton_Click(object sender, RoutedEventArgs e)
     {
@@ -426,33 +406,6 @@ public partial class MainWindow : Window
         }
     }
 
-    private void SearchButton_Click(object sender, RoutedEventArgs e)
-    {
-        TabControl.SelectedIndex = 1;
-        DataContext = _searchViewModel;
-        _searchViewModel.SearchCommand.Execute(null);
-    }
-
-    private void SearchBox_KeyDown(object sender, KeyEventArgs e)
-    {
-        if (e.Key == Key.Enter)
-        {
-            _searchViewModel.SearchCommand.Execute(null);
-        }
-    }
-
-    private void HistoryButton_Click(object sender, RoutedEventArgs e)
-    {
-        TabControl.SelectedIndex = 2;
-        DataContext = _auditViewModel;
-        _auditViewModel.Refresh();
-    }
-
-    private void RefreshHistory_Click(object sender, RoutedEventArgs e)
-    {
-        _auditViewModel.Refresh();
-    }
-
     private void SettingsButton_Click(object sender, RoutedEventArgs e)
     {
         var settingsWindow = new SettingsWindow(_config);
@@ -469,31 +422,37 @@ public partial class MainWindow : Window
         }
     }
 
+    // ==================== Переключение на выбор помещения ====================
+
     private void SwitchToRoomSelector()
     {
-        System.Diagnostics.Debug.WriteLine("[SwitchToRoomSelector] Switching to RoomSelectorView");
+        // Не переключаемся если только что создали сессию (защита от цикла)
+        if (_suppressSessionViewSwitch) return;
+        
+        // Сохраняем состояние вкладки перед завершением сессии
+        _wasInventoriesTab = _roomSelectorViewModel?.ShowInventories ?? false;
+        
         _isSwitchingView = true;
         
-        // Завершаем сессию ТОЛЬКО если она активна
         if (_sessionManager.HasActiveSession)
-        {
             _sessionManager.FinishSession();
-            System.Diagnostics.Debug.WriteLine("[SwitchToRoomSelector] Session finished during switch");
+        
+        ScanHostView.Visibility = Visibility.Collapsed;
+        RoomSelectorHostView.Visibility = Visibility.Visible;
+        _isSwitchingView = false;
+
+        // Восстанавливаем вкладку если была инвентаризация
+        if (_wasInventoriesTab)
+        {
+            _roomSelectorViewModel?.SetShowInventoriesList(true);
+            _roomSelectorViewModel?.LoadInventoriesCommand.Execute(null);
         }
         else
         {
-            System.Diagnostics.Debug.WriteLine("[SwitchToRoomSelector] No active session, skipping finish");
+            _roomSelectorViewModel?.SetShowInventoriesList(false);
+            _roomSelectorViewModel?.LoadRoomsCommand.Execute(null);
         }
         
-        _scanView.Visibility = System.Windows.Visibility.Collapsed;
-        _roomSelectorView.Visibility = System.Windows.Visibility.Visible;
-        _isSwitchingView = false;
-
-        // По умолчанию показываем вкладки "Помещения" → "Начать инвентаризацию"
-        _roomSelectorViewModel?.SetShowInventoriesList(false);
-        // Reload data so completed inventories disappear from the active list
-        _roomSelectorViewModel?.RefreshOnEnter();
-
-        System.Diagnostics.Debug.WriteLine("[SwitchToRoomSelector] Done, data refresh requested");
+        UpdateWidgets();
     }
 }

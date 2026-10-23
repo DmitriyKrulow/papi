@@ -63,6 +63,7 @@ public class SessionManager
     public void FinishSession()
     {
         System.Diagnostics.Debug.WriteLine($"[SessionManager.FinishSession] BEFORE: State={_currentSession?.State}, HasActiveSession={HasActiveSession}");
+        System.Diagnostics.Debug.WriteLine($"[SessionManager.FinishSession] StackTrace: {System.Environment.StackTrace}");
         _currentSession?.Finish();
         System.Diagnostics.Debug.WriteLine($"[SessionManager.FinishSession] AFTER: State={_currentSession?.State}, HasActiveSession={HasActiveSession}");
         SessionChanged?.Invoke(_currentSession!);

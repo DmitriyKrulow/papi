@@ -1,22 +1,27 @@
 <UserControl x:Class="RfidScanner.Views.ScanView"
-             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             Background="#F5F5F5">
-    
-        <Grid Margin="15,12,15,12">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <!-- Список проверяемого имущества получает основной объём -->
-                <RowDefinition Height="2*" MinHeight="150"/>
-                <RowDefinition Height="*" MinHeight="70"/>
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
+              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+              xmlns:conv="clr-namespace:RfidScanner.Converters"
+              Background="{DynamicResource ThemeBg}">
+
+    <UserControl.Resources>
+        <conv:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+        <conv:InverseBooleanConverter x:Key="InverseBooleanConverter"/>
+    </UserControl.Resources>
+
+    <Grid Margin="15,12,15,12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="2*" MinHeight="150"/>
+            <RowDefinition Height="*" MinHeight="70"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
 
         <!-- Заголовок -->
-        <Border Grid.Row="0" Background="White" Padding="14,8" CornerRadius="8" Margin="0,0,0,8">
+        <Border Grid.Row="0" Background="{DynamicResource ThemeCardBg}" Padding="14,8" CornerRadius="8" Margin="0,0,0,8" BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -25,27 +30,26 @@
                 
                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="📡 Режим сканирования" FontSize="17" FontWeight="Bold" Foreground="#1976D2"/>
-                        <!-- Индикатор сети -->
+                        <TextBlock Text="📡 Режим сканирования" FontSize="17" FontWeight="Bold" Foreground="{DynamicResource ThemeAccent}"/>
                         <Ellipse Width="10" Height="10" Fill="{Binding NetworkIndicatorColor, Mode=OneWay}" 
                                  Margin="8,0,0,0" VerticalAlignment="Center"
                                  ToolTip="{Binding SyncStatus}"/>
                     </StackPanel>
-                    <TextBlock x:Name="RoomNameText" Text="Помещение: ..." FontSize="12" Foreground="#757575" Margin="0,2,0,0"/>
+                    <TextBlock x:Name="RoomNameText" Text="Помещение: ..." FontSize="12" Foreground="{DynamicResource ThemeTextSecondary}" Margin="0,2,0,0"/>
                 </StackPanel>
                 
-                <Border Grid.Column="1" Background="#E8F5E9" Padding="8,4" CornerRadius="4" VerticalAlignment="Center">
-                    <TextBlock x:Name="ProgressText" Text="0 / 0" FontSize="13" FontWeight="Bold" Foreground="#2E7D32"/>
+                <Border Grid.Column="1" Background="{DynamicResource ThemeWidgetSuccessBg}" Padding="8,4" CornerRadius="4" VerticalAlignment="Center">
+                    <TextBlock x:Name="ProgressText" Text="0 / 0" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource ThemeSuccess}"/>
                 </Border>
             </Grid>
         </Border>
 
         <!-- Статус последнего сканирования -->
-        <Border Grid.Row="1" Background="White" Padding="14,6" CornerRadius="8" Margin="0,0,0,8">
+        <Border Grid.Row="1" Background="{DynamicResource ThemeCardBg}" Padding="14,6" CornerRadius="8" Margin="0,0,0,8" BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1">
             <StackPanel>
-                <TextBlock Text="Последняя метка:" FontSize="11" Foreground="#9E9E9E"/>
-                <TextBlock x:Name="LastTagText" Text="—" FontSize="16" FontWeight="Bold" Foreground="#2196F3" Margin="0,1,0,0"/>
-                <TextBlock x:Name="StatusText" Text="Ожидание сканирования..." FontSize="12" Foreground="#757575" Margin="0,2,0,0"/>
+                <TextBlock Text="Последняя метка:" FontSize="11" Foreground="{DynamicResource ThemeTextSecondary}"/>
+                <TextBlock x:Name="LastTagText" Text="—" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource ThemeAccent}" Margin="0,1,0,0"/>
+                <TextBlock x:Name="StatusText" Text="Ожидание сканирования..." FontSize="12" Foreground="{DynamicResource ThemeTextSecondary}" Margin="0,2,0,0"/>
             </StackPanel>
         </Border>
 
@@ -58,55 +62,56 @@
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <Border Grid.Column="0" Background="#E8F5E9" Padding="10,6" CornerRadius="8" Margin="0,0,4,0">
+            <Border Grid.Column="0" Background="{DynamicResource ThemeWidgetSuccessBg}" Padding="10,6" CornerRadius="8" Margin="0,0,4,0">
                 <StackPanel HorizontalAlignment="Center">
-                    <TextBlock Text="✅ Найдено" FontSize="11" Foreground="#4CAF50" HorizontalAlignment="Center"/>
-                    <TextBlock x:Name="MatchedCountText" Text="0" FontSize="22" FontWeight="Bold" Foreground="#2E7D32" HorizontalAlignment="Center"/>
+                    <TextBlock Text="✅ Найдено" FontSize="11" Foreground="{DynamicResource ThemeSuccess}" HorizontalAlignment="Center"/>
+                    <TextBlock x:Name="MatchedCountText" Text="0" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource ThemeSuccess}" HorizontalAlignment="Center"/>
                 </StackPanel>
             </Border>
 
-            <Border Grid.Column="1" Background="#FFF3E0" Padding="10,6" CornerRadius="8" Margin="4,0,4,0">
+            <Border Grid.Column="1" Background="{DynamicResource ThemeWidgetWarningBg}" Padding="10,6" CornerRadius="8" Margin="4,0,4,0">
                 <StackPanel HorizontalAlignment="Center">
-                    <TextBlock Text="⚠️ Лишние" FontSize="11" Foreground="#FF9800" HorizontalAlignment="Center"/>
-                    <TextBlock x:Name="ExtraCountText" Text="0" FontSize="22" FontWeight="Bold" Foreground="#E65100" HorizontalAlignment="Center"/>
+                    <TextBlock Text="⚠️ Лишние" FontSize="11" Foreground="{DynamicResource ThemeWarning}" HorizontalAlignment="Center"/>
+                    <TextBlock x:Name="ExtraCountText" Text="0" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource ThemeWarning}" HorizontalAlignment="Center"/>
                 </StackPanel>
             </Border>
 
-            <Border Grid.Column="2" Background="#FFEBEE" Padding="10,6" CornerRadius="8" Margin="4,0,4,0">
+            <Border Grid.Column="2" Background="{DynamicResource ThemeWidgetErrorBg}" Padding="10,6" CornerRadius="8" Margin="4,0,4,0">
                 <StackPanel HorizontalAlignment="Center">
-                    <TextBlock Text="❌ Пропущены" FontSize="11" Foreground="#F44336" HorizontalAlignment="Center"/>
-                    <TextBlock x:Name="MissingCountText" Text="0" FontSize="22" FontWeight="Bold" Foreground="#C62828" HorizontalAlignment="Center"/>
+                    <TextBlock Text="❌ Пропущены" FontSize="11" Foreground="{DynamicResource ThemeError}" HorizontalAlignment="Center"/>
+                    <TextBlock x:Name="MissingCountText" Text="0" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource ThemeError}" HorizontalAlignment="Center"/>
                 </StackPanel>
             </Border>
 
-            <Border Grid.Column="3" Background="#E3F2FD" Padding="10,6" CornerRadius="8" Margin="4,0,0,0">
+            <Border Grid.Column="3" Background="{DynamicResource ThemeWidgetInfoBg}" Padding="10,6" CornerRadius="8" Margin="4,0,0,0">
                 <StackPanel HorizontalAlignment="Center">
-                    <TextBlock Text="📊 Всего" FontSize="11" Foreground="#2196F3" HorizontalAlignment="Center"/>
-                    <TextBlock x:Name="TotalCountText" Text="0" FontSize="22" FontWeight="Bold" Foreground="#1565C0" HorizontalAlignment="Center"/>
+                    <TextBlock Text="📊 Всего" FontSize="11" Foreground="{DynamicResource ThemeInfo}" HorizontalAlignment="Center"/>
+                    <TextBlock x:Name="TotalCountText" Text="0" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource ThemeInfo}" HorizontalAlignment="Center"/>
                 </StackPanel>
             </Border>
         </Grid>
 
         <!-- Прогресс-бар -->
-        <Border Grid.Row="3" Background="White" Padding="12,8" CornerRadius="8" Margin="0,0,0,8">
+        <Border Grid.Row="3" Background="{DynamicResource ThemeCardBg}" Padding="12,8" CornerRadius="8" Margin="0,0,0,8" BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1">
             <StackPanel>
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="Прогресс сканирования" FontSize="11" Foreground="#757575"/>
-                    <TextBlock Grid.Column="1" x:Name="ProgressPercentText" Text="0%" FontSize="12" FontWeight="Bold" Foreground="#1976D2" Margin="10,0,0,0"/>
+                    <TextBlock Text="Прогресс сканирования" FontSize="11" Foreground="{DynamicResource ThemeTextSecondary}"/>
+                    <TextBlock Grid.Column="1" x:Name="ProgressPercentText" Text="0%" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource ThemeAccent}" Margin="10,0,0,0"/>
                 </Grid>
                 <ProgressBar x:Name="ProgressPercentBar" Height="8" Margin="0,4,0,0" Minimum="0" Maximum="100"
                              Value="{Binding ProgressPercent, Mode=OneWay}"
-                             Background="#E0E0E0" Foreground="#1976D2"
-                             BorderBrush="#BDBDBD" BorderThickness="1"/>
+                             Background="{DynamicResource ThemeProgressBarBg}" 
+                             Foreground="{DynamicResource ThemeAccent}"
+                             BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"/>
             </StackPanel>
         </Border>
 
         <!-- Список активов помещения -->
-        <Border Grid.Row="4" Background="White" Padding="15" CornerRadius="8" Margin="0,0,0,15">
+        <Border Grid.Row="4" Background="{DynamicResource ThemeCardBg}" Padding="15" CornerRadius="8" Margin="0,0,0,15" BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -114,18 +119,18 @@
                 </Grid.RowDefinitions>
 
                 <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
-                    <TextBlock Text="📋 Проверяемое имущество" FontSize="14" FontWeight="Bold" Foreground="#424242"/>
-                    <TextBlock Text="(всего: " FontSize="11" Foreground="#9E9E9E" Margin="10,0,0,0"/>
-                    <TextBlock x:Name="TotalAssetsText" Text="0" FontSize="11" Foreground="#1976D2" FontWeight="Bold"/>
-                    <TextBlock Text=")" FontSize="11" Foreground="#9E9E9E"/>
+                    <TextBlock Text="📋 Проверяемое имущество" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource ThemeTextPrimary}"/>
+                    <TextBlock Text="(всего: " FontSize="11" Foreground="{DynamicResource ThemeTextSecondary}" Margin="10,0,0,0"/>
+                    <TextBlock x:Name="TotalAssetsText" Text="0" FontSize="11" Foreground="{DynamicResource ThemeAccent}" FontWeight="Bold"/>
+                    <TextBlock Text=")" FontSize="11" Foreground="{DynamicResource ThemeTextSecondary}"/>
                 </StackPanel>
 
-                <!-- Пустое состояние -->
-                <TextBlock x:Name="EmptyAssetsText" Grid.Row="1" FontSize="12" Foreground="#9E9E9E" 
+                <TextBlock x:Name="EmptyAssetsText" Grid.Row="1" FontSize="12" Foreground="{DynamicResource ThemeTextSecondary}" 
                            HorizontalAlignment="Center" VerticalAlignment="Center" Margin="10"
                            Text="Список имущества пуст или ещё не загружен" Visibility="Collapsed"/>
 
-                <ScrollViewer Grid.Row="1" x:Name="RoomAssetsScrollViewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <ScrollViewer Grid.Row="1" x:Name="RoomAssetsScrollViewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                              Background="{DynamicResource ThemeScrollViewerBg}">
                     <ListView x:Name="RoomAssetsList" BorderThickness="0" Background="Transparent"
                               HorizontalContentAlignment="Stretch">
                     <ListView.ItemContainerStyle>
@@ -137,7 +142,7 @@
                     </ListView.ItemContainerStyle>
                     <ListView.ItemTemplate>
                         <DataTemplate>
-                            <Border Background="#F5F5F5" Padding="10,6" CornerRadius="4" Margin="0,2">
+                            <Border Background="{DynamicResource ThemeListBoxItemBg}" Padding="10,6" CornerRadius="4" Margin="0,2">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
@@ -145,9 +150,9 @@
                                     </Grid.ColumnDefinitions>
                                     
                                     <StackPanel Grid.Column="0">
-                                        <TextBlock Text="{Binding AssetName, Mode=OneWay}" FontSize="12" FontWeight="Bold" Foreground="#212121"
+                                        <TextBlock Text="{Binding AssetName, Mode=OneWay}" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource ThemeTextPrimary}"
                                                    TextTrimming="CharacterEllipsis"/>
-                                        <TextBlock FontSize="10" Foreground="#757575" Margin="0,2,0,0" TextTrimming="CharacterEllipsis">
+                                        <TextBlock FontSize="10" Foreground="{DynamicResource ThemeTextSecondary}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis">
                                             <Run Text="Инв: "/>
                                             <Run Text="{Binding InventoryNumber, Mode=OneWay}"/>
                                             <Run Text=" | "/>
@@ -157,15 +162,13 @@
                                     </StackPanel>
                                     
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0">
-                                        <!-- Кнопка подтверждения (показывается только для ожидающих и не подтверждённых) -->
-                                        <Button Grid.Column="1" Content="✅ Подтвердить" Padding="6,3" Margin="0,0,6,0"
-                                                FontSize="10" Background="#4CAF50" Foreground="White"
+                                        <Button Content="✅ Подтвердить" Padding="6,3" Margin="0,0,6,0"
+                                                FontSize="10" Background="{DynamicResource ThemeSuccess}" Foreground="White"
                                                 Visibility="{Binding IsConfirmed, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"
                                                 IsEnabled="{Binding IsConfirmed, Converter={StaticResource InverseBooleanConverter}}"
                                                 ToolTip="Подтвердить, что актив найден"
                                                 Click="ConfirmAssetButton_Click"/>
                                         
-                                        <!-- Статус -->
                                         <Border Background="{Binding StatusColor}" Padding="8,3" CornerRadius="4"
                                                 VerticalAlignment="Center">
                                             <TextBlock Text="{Binding StatusText}" FontSize="11" FontWeight="Bold" Foreground="White"/>
@@ -181,7 +184,7 @@
         </Border>
 
         <!-- Результаты сканирования -->
-        <Border Grid.Row="5" Background="White" Padding="15" CornerRadius="8" Margin="0,0,0,15">
+        <Border Grid.Row="5" Background="{DynamicResource ThemeCardBg}" Padding="15" CornerRadius="8" Margin="0,0,0,15" BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -189,16 +192,16 @@
                 </Grid.RowDefinitions>
 
                 <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
-                    <TextBlock Text="Результаты сканирования" FontSize="14" FontWeight="Bold" Foreground="#424242"/>
-                    <TextBlock Text="(последние 50)" FontSize="11" Foreground="#9E9E9E" Margin="10,0,0,0"/>
+                    <TextBlock Text="Результаты сканирования" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource ThemeTextPrimary}"/>
+                    <TextBlock Text="(последние 50)" FontSize="11" Foreground="{DynamicResource ThemeTextSecondary}" Margin="10,0,0,0"/>
                 </StackPanel>
                 <ListView Grid.Row="1" x:Name="ResultsList" BorderThickness="0" Background="Transparent"
                           ScrollViewer.VerticalScrollBarVisibility="Auto">
                     <ListView.ItemTemplate>
                         <DataTemplate>
                             <StackPanel Margin="0,2">
-                                <TextBlock Text="{Binding AssetName, Mode=OneWay}" FontSize="12" FontWeight="Bold"/>
-                                <TextBlock FontSize="10" Foreground="#757575">
+                                <TextBlock Text="{Binding AssetName, Mode=OneWay}" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource ThemeTextPrimary}"/>
+                                <TextBlock FontSize="10" Foreground="{DynamicResource ThemeTextSecondary}">
                                     <Run Text="Инв: "/>
                                     <Run Text="{Binding InventoryNumber, Mode=OneWay}"/>
                                     <Run Text=" | "/>
@@ -213,7 +216,7 @@
         </Border>
 
         <!-- Кнопки управления -->
-        <Border Grid.Row="6" Background="White" Padding="12">
+        <Border Grid.Row="6" Background="{DynamicResource ThemeCardBg}" Padding="12" BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -223,12 +226,12 @@
                 <!-- Основные кнопки -->
                 <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,6">
                     <Button Content="✅ Подтвердить все" Click="ConfirmAllButton_Click" 
-                            Background="#4CAF50" Foreground="White" Padding="16,8" Margin="0,0,8,0" Width="160" FontWeight="Bold" FontSize="13"
+                            Background="{DynamicResource ThemeSuccess}" Foreground="White" Padding="16,8" Margin="0,0,8,0" Width="160" FontWeight="Bold" FontSize="13"
                             ToolTip="Подтвердить все найденные активы одной кнопкой"/>
                     <Button Content="⏸ Пауза" x:Name="PauseButton" Click="PauseButton_Click" 
-                            Background="#FF9800" Foreground="White" Padding="16,8" Margin="0,0,8,0" Width="130" FontSize="13" FontWeight="Bold"/>
+                            Background="{DynamicResource ThemeWarning}" Foreground="White" Padding="16,8" Margin="0,0,8,0" Width="130" FontSize="13" FontWeight="Bold"/>
                     <Button Content="✅ Завершить" Click="FinishButton_Click" 
-                            Background="#2196F3" Foreground="White" Padding="16,8" Width="150" FontWeight="Bold" FontSize="13"/>
+                            Background="{DynamicResource ThemeInfo}" Foreground="White" Padding="16,8" Width="150" FontWeight="Bold" FontSize="13"/>
                 </StackPanel>
                 
                 <!-- Дополнительные кнопки -->
@@ -237,9 +240,9 @@
                             Background="#9C27B0" Foreground="White" Padding="10,5" Margin="0,0,6,0" FontSize="11"
                             ToolTip="Пометить все непроверенные активы как отсутствующие"/>
                     <Button Content="🔄 Сбросить" Click="ResetButton_Click" 
-                            Background="#F44336" Foreground="White" Padding="10,5" Margin="0,0,6,0" Width="100" FontSize="11"/>
+                            Background="{DynamicResource ThemeError}" Foreground="White" Padding="10,5" Margin="0,0,6,0" Width="100" FontSize="11"/>
                     <Button Content="↩ Выйти" Click="ExitButton_Click" 
-                            Background="#757575" Foreground="White" Padding="10,5" Width="90" FontSize="11"/>
+                            Background="{DynamicResource ThemeTextSecondary}" Foreground="White" Padding="10,5" Width="90" FontSize="11"/>
                 </StackPanel>
             </Grid>
         </Border>

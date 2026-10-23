@@ -6,7 +6,7 @@ import {
   ClipboardList, Plus, FileText, CheckCircle2, XCircle, Loader2,
   Building2, Users, User, Camera, ChevronRight, QrCode,
   ChevronLeft, Play, Trash2, Search, Clock, Check, X,
-  RefreshCw, Package, Download, Printer, ArrowRight
+  RefreshCw, Package, Download, Printer, ArrowRight, AlertTriangle
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -355,39 +355,42 @@ const Inventory: React.FC = () => {
   if (loading) {
     return (
       <div className="flex justify-center items-center py-16">
-        <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent"></div>
+        <div className="text-center">
+          <Loader2 className="w-10 h-10 animate-spin mx-auto mb-3 text-brand-500 dark:text-accent-400" />
+          <p className="text-gray-500 dark:text-gray-400 text-sm">Загрузка...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="max-w-6xl mx-auto space-y-5">
       {/* Header */}
-      <div className="flex flex-wrap justify-between items-center gap-4">
+      <div className="flex flex-wrap justify-between items-center gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-            <ClipboardList className="w-7 h-7 text-blue-600" />
+          <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+            <ClipboardList className="w-6 h-6 text-brand-600 dark:text-accent-400" />
             Инвентаризация
           </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
             Сверка имущества по помещениям, сотрудникам и ответственным лицам
           </p>
         </div>
         <div className="flex gap-2">
           <button
             onClick={() => navigate('/inventory-mobile')}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-accent-400 text-graphite-900 text-xs rounded-card-sm hover:bg-accent-500 transition font-medium"
           >
-            <Camera className="w-4 h-4" />
-            Мобильная проверка
+            <Camera className="w-3.5 h-3.5" />
+            Мобильная
           </button>
           {isAdmin && (
             <button
               onClick={() => setShowCreateModal(true)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-500 text-white text-xs rounded-card-sm hover:bg-brand-600 transition font-medium"
             >
-              <Plus className="w-4 h-4" />
-              Создать инвентаризацию
+              <Plus className="w-3.5 h-3.5" />
+              Создать
             </button>
           )}
         </div>
@@ -397,71 +400,83 @@ const Inventory: React.FC = () => {
       {!selectedCheck && (
         <>
           {checks.length === 0 ? (
-            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-8 text-center">
-              <ClipboardList className="w-12 h-12 text-blue-400 mx-auto mb-3" />
-              <h3 className="text-lg font-semibold text-blue-800 dark:text-blue-200 mb-2">Нет инвентаризаций</h3>
-              <p className="text-blue-700 dark:text-blue-300 text-sm">
+            <div className="card-modern p-8 text-center">
+              <ClipboardList className="w-12 h-12 text-brand-300 dark:text-brand-600 mx-auto mb-3" />
+              <h3 className="text-base font-semibold text-gray-700 dark:text-gray-300 mb-1">Нет инвентаризаций</h3>
+              <p className="text-gray-500 dark:text-gray-400 text-sm">
                 {isAdmin
                   ? 'Создайте первую инвентаризацию для сверки имущества'
                   : 'Инвентаризации пока не созданы'}
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {checks.map((check) => (
-                <div
-                  key={check.id}
-                  className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 hover:shadow-md transition cursor-pointer"
-                  onClick={() => fetchCheckDetails(check.id)}
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
-                        {TYPE_ICONS[check.check_type]}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {checks.map((check) => {
+                const statusColor = {
+                  draft: 'badge-inactive',
+                  in_progress: 'badge-active',
+                  completed: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+                  cancelled: 'badge-inactive',
+                }[check.status] || 'badge-inactive';
+
+                const statusText = {
+                  draft: 'Черновик',
+                  in_progress: 'В процессе',
+                  completed: 'Завершена',
+                  cancelled: 'Отменена',
+                }[check.status];
+
+                return (
+                  <div
+                    key={check.id}
+                    className="card-modern p-4 cursor-pointer group"
+                    onClick={() => fetchCheckDetails(check.id)}
+                  >
+                    <div className="flex items-start justify-between mb-2.5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-card-sm bg-brand-50 dark:bg-brand-900/20 flex items-center justify-center text-brand-600 dark:text-accent-400 group-hover:bg-brand-100 dark:group-hover:bg-brand-900/30 transition-colors">
+                          {TYPE_ICONS[check.check_type]}
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-sm text-gray-900 dark:text-gray-100">{check.name}</h3>
+                          <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                            {TYPE_LABELS[check.check_type]}
+                            {check.scope_name ? ` • ${check.scope_name}` : ''}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <h3 className="font-semibold text-gray-900 dark:text-gray-100">{check.name}</h3>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          {TYPE_LABELS[check.check_type]}
-                          {check.scope_name ? ` • ${check.scope_name}` : ''}
-                        </p>
+                      <span className={statusColor}>{statusText}</span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 text-center mb-2.5">
+                      <div className="bg-gray-50 dark:bg-graphite-800/50 rounded-card-sm p-1.5">
+                        <p className="text-base font-bold text-gray-900 dark:text-gray-100">{check.total_checked}</p>
+                        <p className="text-[10px] text-gray-500 dark:text-gray-400">Всего</p>
+                      </div>
+                      <div className="bg-green-50 dark:bg-green-900/10 rounded-card-sm p-1.5">
+                        <p className="text-base font-bold text-green-600 dark:text-green-400">{check.found}</p>
+                        <p className="text-[10px] text-gray-500 dark:text-gray-400">Найдено</p>
+                      </div>
+                      <div className="bg-red-50 dark:bg-red-900/10 rounded-card-sm p-1.5">
+                        <p className="text-base font-bold text-red-600 dark:text-red-400">{check.missing}</p>
+                        <p className="text-[10px] text-gray-500 dark:text-gray-400">Нет</p>
                       </div>
                     </div>
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[check.status]}`}>
-                      {STATUS_LABELS[check.status]}
-                    </span>
-                  </div>
 
-                  <div className="grid grid-cols-3 gap-2 text-center mb-3">
-                    <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-2">
-                      <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{check.total_checked}</p>
-                      <p className="text-xs text-gray-500">Всего</p>
+                    <div className="flex items-center justify-between text-[10px] text-gray-400 dark:text-gray-500 mb-2">
+                      <span>{check.creator_name || '—'}</span>
+                      <span>{check.created_at ? new Date(check.created_at).toLocaleDateString('ru-RU') : '—'}</span>
                     </div>
-                    <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-2">
-                      <p className="text-lg font-bold text-green-600 dark:text-green-400">{check.found}</p>
-                      <p className="text-xs text-gray-500">Найдено</p>
-                    </div>
-                    <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-2">
-                      <p className="text-lg font-bold text-red-600 dark:text-red-400">{check.missing}</p>
-                      <p className="text-xs text-gray-500">Отсутствует</p>
-                    </div>
-                  </div>
 
-                  <div className="flex items-center justify-between text-xs text-gray-400 dark:text-gray-500">
-                    <span>{check.creator_name || '—'}</span>
-                    <span>{check.created_at ? new Date(check.created_at).toLocaleDateString('ru-RU') : '—'}</span>
-                  </div>
-
-                  <div className="mt-3 flex gap-2">
                     <button
                       onClick={(e) => { e.stopPropagation(); fetchCheckDetails(check.id); }}
-                      className="flex-1 px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center justify-center gap-1"
+                      className="w-full px-3 py-1.5 text-xs bg-brand-500 dark:bg-brand-600 text-white rounded-card-sm hover:bg-brand-600 dark:hover:bg-brand-700 transition flex items-center justify-center gap-1 font-medium"
                     >
                       <ChevronRight className="w-3.5 h-3.5" /> Открыть
                     </button>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </>
@@ -559,104 +574,109 @@ const CheckDetailView: React.FC<CheckDetailViewProps> = ({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <button
           onClick={onBack}
-          className="inline-flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition"
+          className="inline-flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400 hover:text-brand-600 dark:hover:text-accent-400 transition"
         >
-          <ChevronLeft className="w-4 h-4" /> Назад к списку
+          <ChevronLeft className="w-3.5 h-3.5" /> Назад к списку
         </button>
 
         <div className="flex gap-2 flex-wrap">
           {isAdmin && check.status === 'draft' && (
             <button
               onClick={() => onStart(check.id)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-accent-400 text-graphite-900 text-xs rounded-card-sm hover:bg-accent-500 transition font-medium"
             >
-              <Play className="w-4 h-4" /> Начать
+              <Play className="w-3.5 h-3.5" /> Начать
             </button>
           )}
           {isAdmin && check.status === 'in_progress' && (
             <>
               <button
                 onClick={onShowQr}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 text-sm rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 dark:border-graphite-700 text-gray-600 dark:text-gray-400 text-xs rounded-card-sm hover:bg-gray-50 dark:hover:bg-graphite-800 transition"
               >
-                <QrCode className="w-4 h-4" /> QR-код
+                <QrCode className="w-3.5 h-3.5" /> QR-код
               </button>
               <button
                 onClick={() => onComplete(check.id)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-500 text-white text-xs rounded-card-sm hover:bg-brand-600 transition font-medium"
               >
-                <CheckCircle2 className="w-4 h-4" /> Завершить
+                <CheckCircle2 className="w-3.5 h-3.5" /> Завершить
               </button>
             </>
           )}
           {isAdmin && (check.status === 'draft' || check.status === 'cancelled') && (
             <button
               onClick={() => onDelete(check.id)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400 text-sm rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40 transition"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400 text-xs rounded-card-sm hover:bg-red-100 dark:hover:bg-red-900/40 transition"
             >
-              <Trash2 className="w-4 h-4" /> Удалить
+              <Trash2 className="w-3.5 h-3.5" /> Удалить
             </button>
           )}
         </div>
       </div>
 
       {/* Info card */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
-        <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
+      <div className="card-modern p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
           <div>
-            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
               {TYPE_ICONS[check.check_type]}
               {check.name}
             </h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
               {TYPE_LABELS[check.check_type]}
               {check.scope_name ? ` • ${check.scope_name}` : ''}
               {check.department_name ? ` • ${check.department_name}` : ''}
             </p>
           </div>
-          <span className={`px-3 py-1 rounded-full text-sm font-medium ${STATUS_COLORS[check.status]}`}>
+          <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+            check.status === 'draft' ? 'badge-inactive' :
+            check.status === 'in_progress' ? 'badge-active' :
+            check.status === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+            'badge-inactive'
+          }`}>
             {STATUS_LABELS[check.status]}
           </span>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-          <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 text-center">
-            <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{check.total_checked}</p>
-            <p className="text-xs text-gray-500">Всего активов</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
+          <div className="bg-gray-50 dark:bg-graphite-800/50 rounded-card-sm p-2.5 text-center">
+            <p className="text-xl font-bold text-gray-900 dark:text-gray-100">{check.total_checked}</p>
+            <p className="text-[10px] text-gray-500 dark:text-gray-400">Всего активов</p>
           </div>
-          <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-3 text-center">
-            <p className="text-2xl font-bold text-green-600 dark:text-green-400">{foundCount}</p>
-            <p className="text-xs text-gray-500">Найдено</p>
+          <div className="bg-green-50 dark:bg-green-900/10 rounded-card-sm p-2.5 text-center">
+            <p className="text-xl font-bold text-green-600 dark:text-green-400">{foundCount}</p>
+            <p className="text-[10px] text-gray-500 dark:text-gray-400">Найдено</p>
           </div>
-          <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-3 text-center">
-            <p className="text-2xl font-bold text-red-600 dark:text-red-400">{missingCount}</p>
-            <p className="text-xs text-gray-500">Отсутствует</p>
+          <div className="bg-red-50 dark:bg-red-900/10 rounded-card-sm p-2.5 text-center">
+            <p className="text-xl font-bold text-red-600 dark:text-red-400">{missingCount}</p>
+            <p className="text-[10px] text-gray-500 dark:text-gray-400">Отсутствует</p>
           </div>
-          <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-3 text-center">
-            <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{pendingCount}</p>
-            <p className="text-xs text-gray-500">Осталось проверить</p>
+          <div className="bg-yellow-50 dark:bg-yellow-900/10 rounded-card-sm p-2.5 text-center">
+            <p className="text-xl font-bold text-yellow-600 dark:text-yellow-400">{pendingCount}</p>
+            <p className="text-[10px] text-gray-500 dark:text-gray-400">Осталось</p>
           </div>
         </div>
 
         {/* Progress bar */}
         {check.status === 'in_progress' && (
-          <div className="mb-2">
-            <div className="flex justify-between items-center text-xs text-gray-500 mb-1">
+          <div className="mb-3">
+            <div className="flex justify-between items-center text-[10px] text-gray-500 dark:text-gray-400 mb-1">
               <span>Прогресс проверки</span>
               <div className="flex items-center gap-2">
-                <span>{progress}%</span>
+                <span className="font-medium">{progress}%</span>
                 {autoRefresh && (
                   <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
-                    <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                    Автообновление
+                    <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
+                    Авто
                   </span>
                 )}
               </div>
             </div>
-            <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+            <div className="progress-bar-modern">
               <div
-                className="h-full bg-blue-600 rounded-full transition-all duration-500"
+                className="progress-bar-fill bg-accent-400"
                 style={{ width: `${progress}%` }}
               />
             </div>
@@ -664,7 +684,7 @@ const CheckDetailView: React.FC<CheckDetailViewProps> = ({
         )}
 
         {/* Meta info */}
-        <div className="flex flex-wrap gap-4 text-xs text-gray-400 dark:text-gray-500">
+        <div className="flex flex-wrap gap-3 text-[10px] text-gray-400 dark:text-gray-500">
           <span>Создал: {check.creator_name || '—'}</span>
           <span>Дата: {check.check_date ? new Date(check.check_date).toLocaleDateString('ru-RU') : '—'}</span>
           {check.started_at && <span>Начата: {new Date(check.started_at).toLocaleString('ru-RU')}</span>}
@@ -674,23 +694,28 @@ const CheckDetailView: React.FC<CheckDetailViewProps> = ({
 
       {/* Items */}
       {check.status === 'in_progress' || check.status === 'completed' ? (
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+        <div className="card-modern p-4">
           {/* Auto-scan notice */}
           {check.status === 'in_progress' && (
-            <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <div className="mb-3 p-2.5 bg-accent-50 dark:bg-accent-900/10 border border-accent-200 dark:border-accent-800/50 rounded-card-sm">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                  <p className="text-sm text-blue-800 dark:text-blue-200">
-                    При сканировании RFID-метки активы автоматически отмечаются в списке
+                  <span className="rfid-scan-indicator w-4 h-4">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-accent-500"></span>
+                    </span>
+                  </span>
+                  <p className="text-xs text-accent-800 dark:text-accent-300">
+                    RFID-метки сканируются автоматически
                   </p>
                 </div>
                 <button
                   onClick={() => setAutoRefresh(!autoRefresh)}
-                  className={`px-2 py-1 text-xs rounded transition ${
+                  className={`px-2 py-0.5 text-[10px] rounded transition ${
                     autoRefresh
-                      ? 'bg-blue-600 text-white hover:bg-blue-700'
-                      : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
+                      ? 'bg-accent-400 text-graphite-900 font-medium'
+                      : 'bg-gray-200 dark:bg-graphite-800 text-gray-600 dark:text-gray-400'
                   }`}
                 >
                   {autoRefresh ? 'Вкл' : 'Выкл'}
@@ -698,16 +723,17 @@ const CheckDetailView: React.FC<CheckDetailViewProps> = ({
               </div>
             </div>
           )}
-          {/* Filters */}
-          <div className="flex flex-wrap gap-3 mb-4">
-            <div className="flex-1 min-w-[200px] relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+
+          {/* Filters with search */}
+          <div className="flex flex-wrap gap-2 mb-3">
+            <div className="flex-1 min-w-[180px] relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Поиск по инв. номеру, названию, кабинету..."
-                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Поиск по инв. номеру..."
+                className="search-input-modern"
               />
             </div>
             <div className="flex gap-1">
@@ -715,77 +741,76 @@ const CheckDetailView: React.FC<CheckDetailViewProps> = ({
                 <button
                   key={f}
                   onClick={() => setFilter(f)}
-                  className={`px-3 py-1.5 text-xs rounded-lg transition ${
+                  className={`px-2.5 py-1 text-[11px] rounded-card-sm transition ${
                     filter === f
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      ? 'bg-brand-500 text-white font-medium'
+                      : 'bg-gray-100 dark:bg-graphite-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-graphite-700'
                   }`}
                 >
-                  {f === 'all' ? 'Все' : f === 'pending' ? 'Ожидают' : f === 'found' ? 'Найдены' : 'Отсутствуют'}
+                  {f === 'all' ? 'Все' : f === 'pending' ? 'Ожидают' : f === 'found' ? 'Найдены' : 'Нет'}
                 </button>
               ))}
             </div>
             {pendingCount > 0 && check.status === 'in_progress' && (
               <button
                 onClick={() => onMarkAllFound(check.id)}
-                className="px-3 py-1.5 text-xs bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center gap-1"
+                className="px-2.5 py-1 text-[11px] bg-green-600 text-white rounded-card-sm hover:bg-green-700 transition flex items-center gap-1 font-medium"
               >
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                Подтвердить все найденные ({pendingCount})
+                <CheckCircle2 className="w-3 h-3" />
+                Подтвердить все ({pendingCount})
               </button>
             )}
           </div>
 
           {/* Items list */}
           {filtered.length === 0 ? (
-            <p className="text-center text-gray-400 py-8">Нет активов для отображения</p>
+            <p className="text-center text-gray-400 py-6 text-sm">Нет активов для отображения</p>
           ) : (
-            <div className="space-y-2 max-h-[500px] overflow-y-auto">
+            <div className="space-y-1.5 max-h-[450px] overflow-y-auto pr-1">
               {filtered.map(item => (
                 <div
                   key={item.id}
-                  className={`flex items-center gap-3 p-3 rounded-lg border transition-all duration-300 ${
+                  className={`flex items-center gap-2.5 p-2.5 rounded-card-sm border transition-all duration-200 ${
                     item.result === 'found'
-                      ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20 shadow-sm'
+                      ? 'border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-900/10'
                       : item.result === 'missing'
-                      ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20 shadow-sm'
-                      : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700'
+                      ? 'border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-900/10'
+                      : 'border-gray-100 dark:border-graphite-800 hover:border-brand-200 dark:hover:border-brand-800'
                   }`}
                 >
                   {/* Status indicator */}
                   <div className="flex-shrink-0">
                     {item.result === 'found' ? (
-                      <div className="w-7 h-7 rounded-full bg-green-100 dark:bg-green-900/40 flex items-center justify-center">
-                        <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+                      <div className="w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                        <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
                       </div>
                     ) : item.result === 'missing' ? (
-                      <div className="w-7 h-7 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center">
-                        <XCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                      <div className="w-6 h-6 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                        <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400" />
                       </div>
                     ) : (
-                      <div className="w-7 h-7 rounded-full bg-yellow-100 dark:bg-yellow-900/40 flex items-center justify-center">
-                        <Clock className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+                      <div className="w-6 h-6 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center">
+                        <Clock className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
                       </div>
                     )}
                   </div>
 
                   {/* Asset info */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs text-gray-500 dark:text-gray-400">{item.inventory_number}</span>
-                      <span className="font-medium text-gray-900 dark:text-gray-100 truncate">{item.asset_name}</span>
-                      {/* Status badge */}
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-mono text-[10px] text-gray-500 dark:text-gray-400">{item.inventory_number}</span>
+                      <span className="font-medium text-sm text-gray-900 dark:text-gray-100 truncate">{item.asset_name}</span>
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
                         item.result === 'found'
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300'
+                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
                           : item.result === 'missing'
-                          ? 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300'
-                          : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300'
+                          ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                          : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
                       }`}>
-                        {item.result === 'found' ? 'Найден' : item.result === 'missing' ? 'Отсутствует' : 'Ожидает'}
+                        {item.result === 'found' ? 'Найден' : item.result === 'missing' ? 'Нет' : '—'}
                       </span>
                     </div>
-                    <div className="text-xs text-gray-400 dark:text-gray-500 flex flex-wrap gap-2 mt-0.5">
+                    <div className="text-[10px] text-gray-400 dark:text-gray-500 flex flex-wrap gap-1.5 mt-0.5">
                       {item.model && <span>{item.model}</span>}
                       {item.location && <span>📍 {item.location}</span>}
                       {item.responsible && <span>👤 {item.responsible}</span>}
@@ -801,39 +826,39 @@ const CheckDetailView: React.FC<CheckDetailViewProps> = ({
                           <>
                             <button
                               onClick={() => onConfirm(check.id, item.asset_id, true)}
-                              className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition flex items-center gap-1"
+                              className="px-2 py-0.5 text-[10px] bg-green-600 text-white rounded hover:bg-green-700 transition flex items-center gap-0.5"
                               title="Найден"
                             >
-                              <Check className="w-3.5 h-3.5" /> Найден
+                              <Check className="w-3 h-3" /> Да
                             </button>
                             <button
                               onClick={() => onConfirm(check.id, item.asset_id, false)}
-                              className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition flex items-center gap-1"
+                              className="px-2 py-0.5 text-[10px] bg-red-600 text-white rounded hover:bg-red-700 transition flex items-center gap-0.5"
                               title="Отсутствует"
                             >
-                              <X className="w-3.5 h-3.5" /> Нет
+                              <X className="w-3 h-3" /> Нет
                             </button>
                             <button
                               onClick={() => onSkip(check.id, item.asset_id)}
-                              className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 rounded hover:bg-gray-50 dark:hover:bg-gray-700 transition flex items-center gap-1"
+                              className="px-2 py-0.5 text-[10px] border border-gray-300 dark:border-graphite-700 text-gray-500 dark:text-gray-400 rounded hover:bg-gray-50 dark:hover:bg-graphite-800 transition"
                               title="Пропустить"
                             >
-                              <ArrowRight className="w-3.5 h-3.5" /> Пропуск
+                              ⏭
                             </button>
                           </>
                         )}
                         {item.result !== 'pending' && (
-                          <span className="px-2 py-1 text-xs text-gray-500 dark:text-gray-400">
-                            {item.result === 'found' ? '✓ Подтверждён' : '✗ Отмечен'}
+                          <span className="px-1.5 py-0.5 text-[10px] text-gray-500 dark:text-gray-400">
+                            {item.result === 'found' ? '✓' : '✗'}
                           </span>
                         )}
                         {isAdmin && item.result !== 'pending' && (
                           <button
                             onClick={() => onResetAsset(check.id, item.asset_id)}
-                            className="px-2 py-1 text-xs border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 rounded hover:bg-gray-50 dark:hover:bg-gray-700 transition flex items-center gap-1"
-                            title="Сбросить (админ)"
+                            className="px-1.5 py-0.5 text-[10px] border border-gray-200 dark:border-graphite-700 text-gray-400 rounded hover:bg-gray-50 dark:hover:bg-graphite-800 transition"
+                            title="Сбросить"
                           >
-                            <RefreshCw className="w-3.5 h-3.5" />
+                            <RefreshCw className="w-3 h-3" />
                           </button>
                         )}
                       </>
@@ -841,10 +866,10 @@ const CheckDetailView: React.FC<CheckDetailViewProps> = ({
                     {check.status === 'completed' && isAdmin && (
                       <button
                         onClick={() => onResetAsset(check.id, item.asset_id)}
-                        className="px-2 py-1 text-xs border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 rounded hover:bg-gray-50 dark:hover:bg-gray-700 transition flex items-center gap-1"
-                        title="Сбросить (админ)"
+                        className="px-1.5 py-0.5 text-[10px] border border-gray-200 dark:border-graphite-700 text-gray-400 rounded hover:bg-gray-50 dark:hover:bg-graphite-800 transition"
+                        title="Сбросить"
                       >
-                        <RefreshCw className="w-3.5 h-3.5" />
+                        <RefreshCw className="w-3 h-3" />
                       </button>
                     )}
                   </div>
@@ -854,11 +879,11 @@ const CheckDetailView: React.FC<CheckDetailViewProps> = ({
           )}
         </div>
       ) : (
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-8 text-center">
-          <FileText className="w-10 h-10 text-gray-400 mx-auto mb-2" />
-          <p className="text-gray-500 dark:text-gray-400">
+        <div className="card-modern p-6 text-center">
+          <FileText className="w-8 h-8 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
+          <p className="text-gray-500 dark:text-gray-400 text-sm">
             {check.status === 'draft'
-              ? 'Инвентаризация ещё не начата. Нажмите "Начать" для запуска проверки.'
+              ? 'Инвентаризация не начата. Нажмите "Начать" для запуска.'
               : 'Инвентаризация отменена'}
           </p>
         </div>

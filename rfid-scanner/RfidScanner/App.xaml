@@ -1,15 +1,96 @@
 <Application x:Class="RfidScanner.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:conv="clr-namespace:RfidScanner.Converters">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Application.Resources>
-        <conv:BooleanToBrushConverter x:Key="BooleanToBrushConverter"/>
-        <conv:StatusToBrushConverter x:Key="StatusToBrushConverter"/>
-        <conv:StatusToIconConverter x:Key="StatusToIconConverter"/>
-        <conv:StatusToTextConverter x:Key="StatusToTextConverter"/>
-        <conv:InverseBooleanConverter x:Key="InverseBooleanConverter"/>
-        <conv:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
-        <conv:CountToBackgroundConverter x:Key="CountToBackgroundConverter"/>
-        <conv:CollectionCountToVisibilityConverter x:Key="CollectionCountToVisibilityConverter"/>
+        <!-- Ресурсы темы будут загружены в App.xaml.cs -->
+        
+        <!-- Глобальные стили для темизации -->
+        <Style TargetType="TextBox">
+            <Setter Property="Background" Value="{DynamicResource ThemeTextBoxBg}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ThemeTextBoxForeground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource ThemeTextBoxBorder}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="8,4"/>
+        </Style>
+        
+        <Style TargetType="ListView">
+            <Setter Property="Background" Value="{DynamicResource ThemeListViewBg}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimary}"/>
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
+        </Style>
+        
+        <Style TargetType="ListBox">
+            <Setter Property="Background" Value="{DynamicResource ThemeListBoxBg}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimary}"/>
+        </Style>
+        
+        <Style TargetType="ListViewItem">
+            <Setter Property="Background" Value="{DynamicResource ThemeListBoxItemBg}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimary}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource ThemeListBoxItemHoverBg}"/>
+                </Trigger>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource ThemeListBoxItemSelectedBg}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        
+        <Style TargetType="ScrollBar">
+            <Setter Property="Background" Value="{DynamicResource ThemeScrollBarBg}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ThemeTextSecondary}"/>
+        </Style>
+        
+        <Style TargetType="RepeatButton">
+            <Setter Property="Background" Value="{DynamicResource ThemeScrollBarBg}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ThemeTextSecondary}"/>
+        </Style>
+        
+        <Style TargetType="TabItem">
+            <Setter Property="Background" Value="{DynamicResource ThemeTabItemBg}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ThemeTabItemForeground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="12,6"/>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource ThemeTabItemSelectedBg}"/>
+                    <Setter Property="Foreground" Value="{DynamicResource ThemeTabItemSelectedForeground}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        
+        <Style TargetType="Button">
+            <Setter Property="Background" Value="{DynamicResource ThemeButtonBg}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ThemeButtonForeground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource ThemeButtonBorder}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="12,6"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBg}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        
+        <Style TargetType="ProgressBar">
+            <Setter Property="Background" Value="{DynamicResource ThemeProgressBarBg}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ThemeAccentBright}"/>
+            <Setter Property="Height" Value="4"/>
+        </Style>
+        
+        <Style TargetType="ScrollViewer">
+            <Setter Property="Background" Value="{DynamicResource ThemeScrollViewerBg}"/>
+        </Style>
     </Application.Resources>
 </Application>

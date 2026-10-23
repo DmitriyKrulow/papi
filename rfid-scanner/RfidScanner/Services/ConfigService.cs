@@ -1,4 +1,5 @@
 using System.IO;
+using System.Net.Http;
 using Newtonsoft.Json;
 
 namespace RfidScanner.Services;
@@ -31,6 +32,9 @@ public class AppSettings
     
     /// <summary>Пауза между сканированиями (мс)</summary>
     public int ScanDebounceMs { get; set; } = 100;
+    
+    /// <summary>Сохранённая тема приложения</summary>
+    public string Theme { get; set; } = "Light";
 }
 
 public enum ScannerMode
@@ -96,5 +100,57 @@ public class ConfigService
     {
         _settings.ScannerMode = mode;
         Save();
+    }
+
+    public void SetTheme(string theme)
+    {
+        _settings.Theme = theme;
+        Save();
+    }
+
+    public string GetTheme()
+    {
+        return _settings.Theme ?? "Light";
+    }
+
+    /// <summary>
+    /// Проверяет доступность сервера по URL из настроек
+    /// </summary>
+    public async Task<bool> CheckConnectivityAsync()
+    {
+        try
+        {
+            var baseUrl = _settings.BackendUrl.TrimEnd('/');
+            using var client = new HttpClient();
+            client.Timeout = TimeSpan.FromSeconds(5);
+            
+            // Пытаемся достучаться до корня URL — это самый быстрый способ
+            var response = await client.GetAsync(baseUrl);
+            return response.IsSuccessStatusCode || response.StatusCode == System.Net.HttpStatusCode.NotFound;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Проверяет доступность сервера по произвольному URL
+    /// </summary>
+    public static async Task<bool> CheckConnectivityAsync(string url)
+    {
+        try
+        {
+            var baseUrl = url.TrimEnd('/');
+            using var client = new HttpClient();
+            client.Timeout = TimeSpan.FromSeconds(5);
+            
+            var response = await client.GetAsync(baseUrl);
+            return response.IsSuccessStatusCode || response.StatusCode == System.Net.HttpStatusCode.NotFound;
+        }
+        catch
+        {
+            return false;
+        }
     }
 }

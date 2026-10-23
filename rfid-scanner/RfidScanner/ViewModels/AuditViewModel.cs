@@ -2,6 +2,8 @@ using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Windows.Input;
+using CommunityToolkit.Mvvm.Input;
 using RfidScanner.Models;
 using RfidScanner.Services;
 
@@ -51,6 +53,8 @@ public class AuditViewModel : INotifyPropertyChanged
         foreach (var record in records)
             History.Add(record);
     }
+
+    public ICommand RefreshCommand => new RelayCommand(Refresh);
 
     public void Refresh()
     {

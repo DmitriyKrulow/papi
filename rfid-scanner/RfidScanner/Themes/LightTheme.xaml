@@ -1,0 +1,33 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- Light Theme Resources -->
+    <SolidColorBrush x:Key="ThemeBg" Color="#F5F5F5"/>
+    <SolidColorBrush x:Key="ThemeCardBg" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="ThemeSurfaceBg" Color="#FAFAFA"/>
+    <SolidColorBrush x:Key="ThemeHeaderBg" Color="#2C323A"/>
+    <SolidColorBrush x:Key="ThemeSidebarBg" Color="#1E2226"/>
+    <SolidColorBrush x:Key="ThemeSidebarActiveBg" Color="#3A4048"/>
+    <SolidColorBrush x:Key="ThemeSidebarHoverBg" Color="#2E333B"/>
+    <SolidColorBrush x:Key="ThemeTextPrimary" Color="#212121"/>
+    <SolidColorBrush x:Key="ThemeTextSecondary" Color="#757575"/>
+    <SolidColorBrush x:Key="ThemeTextOnDark" Color="#E5E7EB"/>
+    <SolidColorBrush x:Key="ThemeAccent" Color="#4F6A8C"/>
+    <SolidColorBrush x:Key="ThemeAccentLight" Color="#6B8AB0"/>
+    <SolidColorBrush x:Key="ThemeAccentBright" Color="#2DD4EB"/>
+    <SolidColorBrush x:Key="ThemeBorderBrush" Color="#E0E0E0"/>
+    <SolidColorBrush x:Key="ThemeCardBorder" Color="#E8E8E8"/>
+    <SolidColorBrush x:Key="ThemeSuccess" Color="#4CAF50"/>
+    <SolidColorBrush x:Key="ThemeWarning" Color="#FF9800"/>
+    <SolidColorBrush x:Key="ThemeError" Color="#F44336"/>
+    <SolidColorBrush x:Key="ThemeInfo" Color="#2196F3"/>
+    <SolidColorBrush x:Key="ThemeShadow" Color="#000000"/>
+    <SolidColorBrush x:Key="ThemeProgressBarBg" Color="#E0E0E0"/>
+    <SolidColorBrush x:Key="ThemeInputBg" Color="#FAFAFA"/>
+    <SolidColorBrush x:Key="ThemeInputBorder" Color="#E0E0E0"/>
+    <SolidColorBrush x:Key="ThemeWidgetSuccessBg" Color="#E8F5E9"/>
+    <SolidColorBrush x:Key="ThemeWidgetWarningBg" Color="#FFF8E1"/>
+    <SolidColorBrush x:Key="ThemeWidgetErrorBg" Color="#FFEBEE"/>
+    <SolidColorBrush x:Key="ThemeWidgetInfoBg" Color="#E3F2FD"/>
+    <SolidColorBrush x:Key="ThemeToastBg" Color="#323232"/>
+    <SolidColorBrush x:Key="ThemeToastText" Color="#FFFFFF"/>
+</ResourceDictionary>

@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Windows;
 using System.Windows.Threading;
+using RfidScanner.Models;
 using RfidScanner.Services;
 using RfidScanner.ViewModels;
 using RfidScanner.Views;
@@ -18,45 +19,75 @@ public partial class App : Application
     // (каскад приводил к StackOverflowException).
     private static bool _errorDialogShown;
 
+    public App()
+    {
+    }
+
     protected override void OnStartup(StartupEventArgs e)
     {
         DispatcherUnhandledException += OnDispatcherUnhandledException;
         AppDomain.CurrentDomain.UnhandledException += OnDomainUnhandledException;
-
-        // Пока показано окно входа, приложение не должно завершаться
-        // при его закрытии (ShutdownMode по умолчанию OnLastWindowClose
-        // убивает приложение, когда закрывается последнее окно —
-        // им является модальное окно авторизации).
-        ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
         try
         {
             // Загружаем настройки
             var config = new ConfigService();
             config.Load();
+            ThemeManager.SetConfigService(config);
 
-            // Создаём сервисы
-            var userService = new UserService();
-            var roleService = new RoleService();
-            var loginLogService = new LoginLogService();
-            var apiClient = new RfidApiClient(config.Settings.BackendUrl, config.Settings.ApiKey);
+            // Применяем сохранённую тему
+            var savedTheme = config.GetTheme();
+            var theme = savedTheme == "Dark" ? AppTheme.Dark : AppTheme.Light;
+            ThemeManager.Apply(theme, this);
 
-            // Показываем окно авторизации
-            var loginViewModel = new LoginViewModel(userService, roleService, loginLogService, apiClient);
-            var loginWindow = new LoginWindow(loginViewModel);
+            // Пока показано окно входа, приложение не должно завершаться
+            // при его закрытии (ShutdownMode по умолчанию OnLastWindowClose
+            // убивает приложение, когда закрывается последнее окно —
+            // им является модальное окно авторизации).
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
-            // Ждём результата авторизации (модальный диалог)
-            bool? loginResult = loginWindow.ShowDialog();
+            // Лооп авторизации: повторяем пока пользователь не войдёт или не откажется
+            AppUser? authenticatedUser = null;
+            RoleService? roleService = null;
 
-            if (loginResult != true || loginViewModel.AuthenticatedUser == null)
+            while (authenticatedUser == null)
             {
-                // Авторизация не удалась или окно закрыто — выходим
-                Shutdown();
-                return;
+                // Пересоздаём сервисы с актуальными настройками
+                var userService = new UserService();
+                roleService = new RoleService();
+                var loginLogService = new LoginLogService();
+                var apiClient = new RfidApiClient(config.Settings.BackendUrl, config.Settings.ApiKey);
+
+                // Показываем окно авторизации
+                var loginViewModel = new LoginViewModel(userService, roleService, loginLogService, apiClient, config);
+                var loginWindow = new LoginWindow(loginViewModel, config);
+
+                // Ждём результата авторизации (модальный диалог)
+                bool? loginResult = loginWindow.ShowDialog();
+
+                if (loginResult != true)
+                {
+                    // Пользователь нажал "Выход" — завершаем приложение
+                    Shutdown();
+                    return;
+                }
+
+                authenticatedUser = loginViewModel.AuthenticatedUser;
+
+                if (authenticatedUser == null)
+                {
+                    // Авторизация не удалась — пользователь может попробовать снова
+                    // или закрыть окно (в этом случае loginResult будет false)
+                    if (loginWindow.IsClosedByUserCancel)
+                    {
+                        Shutdown();
+                        return;
+                    }
+                }
             }
 
             // Авторизация успешна — показываем главное окно
-            var mainWindow = new MainWindow(config, roleService, loginViewModel.AuthenticatedUser);
+            var mainWindow = new MainWindow(config, roleService!, authenticatedUser);
             MainWindow = mainWindow;
             mainWindow.Show();
 

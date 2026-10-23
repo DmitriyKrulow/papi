@@ -1,5 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Windows.Input;
+using CommunityToolkit.Mvvm.Input;
 using RfidScanner.Models;
 using RfidScanner.Services;
 
@@ -11,11 +13,13 @@ public class LoginViewModel : INotifyPropertyChanged
     private readonly RoleService _roleService;
     private readonly LoginLogService _loginLogService;
     private readonly RfidApiClient _apiClient;
+    private readonly ConfigService _configService;
 
     private string _username = string.Empty;
     private string _password = string.Empty;
     private string _errorMessage = string.Empty;
     private bool _isLoading;
+    private bool _isConnected = true;
     private AppUser? _authenticatedUser;
 
     public string Username
@@ -70,14 +74,32 @@ public class LoginViewModel : INotifyPropertyChanged
         }
     }
 
+    public bool IsConnected
+    {
+        get => _isConnected;
+        private set
+        {
+            if (_isConnected != value)
+            {
+                _isConnected = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
     public AppUser? AuthenticatedUser => _authenticatedUser;
 
-    public LoginViewModel(UserService userService, RoleService roleService, LoginLogService loginLogService, RfidApiClient apiClient)
+    public Action? OnOpenSettings { get; set; }
+
+    public ICommand OpenSettingsCommand => new RelayCommand(() => OnOpenSettings?.Invoke());
+
+    public LoginViewModel(UserService userService, RoleService roleService, LoginLogService loginLogService, RfidApiClient apiClient, ConfigService configService)
     {
         _userService = userService;
         _roleService = roleService;
         _loginLogService = loginLogService;
         _apiClient = apiClient;
+        _configService = configService;
     }
 
     public async Task LoginAsync(string username, string password)
@@ -167,6 +189,33 @@ public class LoginViewModel : INotifyPropertyChanged
     {
         // Просто закрываем окно
     }
+
+    /// <summary>
+    /// Проверяет соединение с сервером при загрузке окна
+    /// </summary>
+    public async Task CheckConnectionAsync()
+    {
+        IsLoading = true;
+        try
+        {
+            IsConnected = await _configService.CheckConnectivityAsync();
+            if (!IsConnected)
+            {
+                ErrorMessage = "Нет соединения с сервером. Проверьте настройки подключения.";
+            }
+        }
+        catch
+        {
+            IsConnected = false;
+            ErrorMessage = "Не удалось проверить соединение с сервером.";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+
 
     public event PropertyChangedEventHandler? PropertyChanged;
 

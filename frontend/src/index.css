@@ -9,21 +9,137 @@
   }
   
   .dark body {
-    @apply bg-gray-900 text-white;
+    @apply bg-graphite-950 text-graphite-100;
   }
 }
 
 @layer components {
-  .card-hover {
-    @apply transition-all duration-200 hover:shadow-xl hover:-translate-y-1;
+  /* ===== Новые карточные стили ===== */
+  .card-modern {
+    @apply bg-white dark:bg-graphite-900 rounded-card shadow-card border border-gray-100 dark:border-graphite-800 transition-all duration-200;
   }
   
-  .btn-primary {
-    @apply bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition;
+  .card-modern:hover {
+    @apply shadow-card-hover -translate-y-0.5;
   }
   
-  .btn-secondary {
-    @apply bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 transition;
+  .card-modern.selected {
+    @apply ring-2 ring-accent-400/40 shadow-card-selected;
+  }
+
+  /* ===== Кнопки ===== */
+  .btn-primary-modern {
+    @apply bg-brand-500 text-white px-4 py-2 rounded-card-sm hover:bg-brand-600 active:scale-95 transition-all duration-200 flex items-center justify-center gap-2;
+  }
+  
+  .btn-accent-modern {
+    @apply bg-accent-400 text-graphite-900 px-4 py-2 rounded-card-sm hover:bg-accent-500 active:scale-95 transition-all duration-200 font-medium flex items-center justify-center gap-2;
+  }
+  
+  .btn-ghost-modern {
+    @apply bg-transparent text-brand-500 dark:text-brand-300 px-4 py-2 rounded-card-sm hover:bg-brand-50 dark:hover:bg-brand-900/20 active:scale-95 transition-all duration-200 flex items-center justify-center gap-2;
+  }
+
+  /* ===== Бейджи статусов ===== */
+  .badge-active {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400;
+  }
+  
+  .badge-warning {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400;
+  }
+  
+  .badge-inactive {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600 dark:bg-graphite-800 dark:text-graphite-400;
+  }
+
+  /* ===== Тег-фильтр ===== */
+  .filter-tag {
+    @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-brand-50 text-brand-600 dark:bg-brand-900/30 dark:text-brand-300 transition-colors;
+  }
+  
+  .filter-tag-remove {
+    @apply cursor-pointer hover:bg-brand-200 dark:hover:bg-brand-700 rounded-full p-0.5 transition-colors;
+  }
+
+  /* ===== RFID сканирование анимация ===== */
+  .rfid-scan-indicator {
+    @apply relative flex items-center justify-center;
+  }
+  
+  .rfid-scan-indicator::before {
+    content: '';
+    @apply absolute inset-0 rounded-full bg-accent-400/30 dark:bg-accent-400/20;
+    animation: scan-pulse 1.5s ease-in-out infinite;
+    z-index: 0;
+  }
+  
+  .rfid-scan-indicator::after {
+    content: '';
+    @apply absolute inset-0 rounded-full border-2 border-accent-400/50;
+    animation: scan-wave 1s ease-out infinite;
+    z-index: 1;
+  }
+
+  /* ===== Сворачиваемая боковая панель ===== */
+  .sidebar-collapsed {
+    @apply w-[64px] min-w-[64px];
+  }
+  
+  .sidebar-expanded {
+    @apply w-[220px] min-w-[220px];
+  }
+  
+  .sidebar-item {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-card-sm transition-all duration-200 cursor-pointer text-sm;
+  }
+  
+  .sidebar-item:hover {
+    @apply bg-brand-50 dark:bg-graphite-800;
+  }
+  
+  .sidebar-item.active {
+    @apply bg-brand-100 dark:bg-brand-900/30 text-brand-700 dark:text-accent-400 font-medium;
+  }
+  
+  .sidebar-item .label {
+    @apply truncate transition-opacity duration-200 whitespace-nowrap;
+  }
+  
+  .sidebar-item .icon {
+    @apply flex-shrink-0 w-5 h-5;
+  }
+  
+  .sidebar-collapsed .label {
+    @apply opacity-0 pointer-events-none;
+  }
+
+  /* ===== Виджет-сводка ===== */
+  .widget-summary {
+    @apply bg-white dark:bg-graphite-900 rounded-card shadow-card border border-gray-100 dark:border-graphite-800 p-4 flex items-center gap-3 transition-all duration-200 hover:shadow-card-hover;
+  }
+
+  /* ===== Прогресс-бар ===== */
+  .progress-bar-modern {
+    @apply w-full bg-gray-100 dark:bg-graphite-800 rounded-full h-2 overflow-hidden;
+  }
+  
+  .progress-bar-fill {
+    @apply h-full rounded-full transition-all duration-500 ease-out;
+  }
+
+  /* ===== Поиск ===== */
+  .search-input-modern {
+    @apply w-full pl-10 pr-4 py-2 text-sm border border-gray-200 dark:border-graphite-700 rounded-card-sm bg-white dark:bg-graphite-900 text-gray-900 dark:text-graphite-100 focus:outline-none focus:ring-2 focus:ring-accent-400/50 focus:border-accent-400 transition-all;
+  }
+
+  /* ===== Тёмная тема — улучшенная ===== */
+  .dark .card-modern {
+    @apply bg-graphite-900 border-graphite-800;
+  }
+  
+  .dark .widget-summary {
+    @apply bg-graphite-900 border-graphite-800;
   }
 }
 

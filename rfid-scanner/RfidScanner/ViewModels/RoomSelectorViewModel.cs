@@ -95,7 +95,7 @@ public class RoomSelectorViewModel : INotifyPropertyChanged
     public string StatusMessage
     {
         get => _statusMessage;
-        private set => SetProperty(ref _statusMessage, value);
+        set => SetProperty(ref _statusMessage, value);
     }
 
     /// <summary>
@@ -127,6 +127,7 @@ public class RoomSelectorViewModel : INotifyPropertyChanged
     public IAsyncRelayCommand ContinueInventoryCommand => new AsyncRelayCommand(ContinueInventory, () => !_isInventoryInProgress);
 
     public event Action? RoomsLoaded;
+    public event Action? InventoriesLoaded;
     
     /// <summary>
     /// Установить режим отображения (определяется выбранной вкладкой)
@@ -224,6 +225,8 @@ public class RoomSelectorViewModel : INotifyPropertyChanged
             StatusMessage = inventories.Count > 0 
                 ? $"✅ Найдено {inventories.Count} активных инвентаризаций" 
                 : "⚠ Нет активных инвентаризаций";
+            
+            InventoriesLoaded?.Invoke();
             
             System.Diagnostics.Debug.WriteLine($"[LoadInventoriesAsync] Loaded {inventories.Count} inventories");
         }

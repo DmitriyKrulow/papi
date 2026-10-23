@@ -1,0 +1,105 @@
+<UserControl x:Class="RfidScanner.Views.SearchView"
+              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+              xmlns:vm="clr-namespace:RfidScanner.ViewModels"
+              xmlns:conv="clr-namespace:RfidScanner.Converters"
+              Background="{DynamicResource ThemeBg}">
+    
+    <UserControl.Resources>
+        <conv:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+        <conv:InverseBooleanConverter x:Key="InverseBooleanConverter"/>
+
+        <Style x:Key="SearchCard" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource ThemeCardBg}"/>
+            <Setter Property="CornerRadius" Value="14"/>
+            <Setter Property="Padding" Value="24"/>
+            <Setter Property="Margin" Value="20"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect Color="#000000" BlurRadius="12" ShadowDepth="2" Opacity="0.08"/>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Поиск -->
+        <Border Grid.Row="0" Style="{StaticResource SearchCard}" Padding="24,20" Margin="20,20,20,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                
+                <Border Grid.Column="0" Background="{DynamicResource ThemeInputBg}" 
+                        CornerRadius="10" BorderBrush="{DynamicResource ThemeInputBorder}" 
+                        BorderThickness="1">
+                    <TextBox Text="{Binding SearchQuery, UpdateSourceTrigger=PropertyChanged}" 
+                             FontSize="16" Padding="14,10"
+                             BorderThickness="0"
+                             VerticalContentAlignment="Center"
+                             x:Name="SearchBox"/>
+                </Border>
+                
+                <Border Grid.Column="1" Background="{DynamicResource ThemeAccent}" 
+                        CornerRadius="10" Padding="16,10" Margin="12,0,0,0">
+                    <Button Content="🔍" 
+                            Command="{Binding SearchCommand}"
+                            Foreground="White" 
+                            BorderThickness="0"
+                            FontSize="18"
+                            Background="Transparent"/>
+                </Border>
+            </Grid>
+        </Border>
+
+        <!-- Результат -->
+        <Border Grid.Row="1" Style="{StaticResource SearchCard}" Margin="20,10,20,20">
+            <StackPanel>
+                <!-- Статус поиска -->
+                <TextBlock Text="{Binding SearchStatus, FallbackValue='Введите запрос'}" 
+                          FontSize="14" 
+                          Foreground="{DynamicResource ThemeTextSecondary}" 
+                          Margin="0,0,0,16"/>
+                
+                <!-- Результат -->
+                <Border Background="{DynamicResource ThemeWidgetInfoBg}" 
+                        CornerRadius="10" Padding="20" Margin="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock Text="{Binding SearchResult.InventoryNumber, FallbackValue='Не найдено'}" 
+                                  FontSize="24" FontWeight="Bold" 
+                                  Foreground="{DynamicResource ThemeSuccess}" 
+                                  Margin="0,0,0,8"/>
+                        <TextBlock Text="{Binding SearchResult.Name, FallbackValue=''}" 
+                                  FontSize="18" 
+                                  Foreground="{DynamicResource ThemeTextPrimary}" 
+                                  Margin="0,0,0,6"/>
+                        <TextBlock Text="{Binding SearchResult.Location, FallbackValue=''}" 
+                                  FontSize="14" 
+                                  Foreground="{DynamicResource ThemeWarning}" 
+                                  Margin="0,0,0,6"/>
+                        <TextBlock Text="{Binding SearchResult.Responsible, FallbackValue=''}" 
+                                  FontSize="14" 
+                                  Foreground="{DynamicResource ThemeAccent}" 
+                                  Margin="0,0,0,6"/>
+                        <TextBlock Text="{Binding SearchResult.RfidTag, FallbackValue=''}" 
+                                  FontSize="13" 
+                                  Foreground="{DynamicResource ThemeTextSecondary}" 
+                                  Margin="0,4,0,0"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Индикатор загрузки -->
+                <ProgressBar IsIndeterminate="True" Height="4" 
+                            Background="{DynamicResource ThemeProgressBarBg}" 
+                            Foreground="{DynamicResource ThemeAccentBright}"
+                            Visibility="{Binding IsSearching, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>
