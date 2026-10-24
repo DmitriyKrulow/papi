@@ -123,8 +123,8 @@ const NotificationsPage: React.FC = () => {
   const unreadCountTotal = notifications.filter(n => !n.is_read).length;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+    <div className="min-h-screen bg-gray-50 dark:bg-graphite-950">
+      <main className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
           <div>
@@ -141,7 +141,7 @@ const NotificationsPage: React.FC = () => {
           <div className="flex gap-2">
             <button
               onClick={handleGenerateAuto}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm"
+              className="btn-primary-modern"
             >
               <RefreshCw className="w-4 h-4" />
               Проверить
@@ -149,7 +149,7 @@ const NotificationsPage: React.FC = () => {
             <button
               onClick={fetchNotifications}
               disabled={loading}
-              className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition text-sm"
+              className="btn-ghost-modern"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               Обновить
@@ -159,7 +159,7 @@ const NotificationsPage: React.FC = () => {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-6">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-gray-100 dark:border-gray-700">
+          <div className="card-modern p-5">
             <div className="flex items-center gap-2 mb-1">
               <Bell className="w-4 h-4 text-blue-600 dark:text-blue-400" />
               <span className="text-xs text-gray-500 dark:text-gray-400">Всего</span>
@@ -168,7 +168,7 @@ const NotificationsPage: React.FC = () => {
               {notifications.length}
             </p>
           </div>
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-gray-100 dark:border-gray-700">
+          <div className="card-modern p-5">
             <div className="flex items-center gap-2 mb-1">
               <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
               <span className="text-xs text-gray-500 dark:text-gray-400">Непрочитанные</span>
@@ -177,7 +177,7 @@ const NotificationsPage: React.FC = () => {
               {unreadCountTotal}
             </p>
           </div>
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-gray-100 dark:border-gray-700">
+          <div className="card-modern p-5">
             <div className="flex items-center gap-2 mb-1">
               <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
               <span className="text-xs text-gray-500 dark:text-gray-400">Прочитанные</span>
@@ -189,7 +189,7 @@ const NotificationsPage: React.FC = () => {
         </div>
 
         {/* Filters */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-6 border border-gray-100 dark:border-gray-700 p-4">
+        <div className="card-modern p-5">
           <div className="flex flex-wrap gap-3 items-center">
             <div className="flex items-center gap-2">
               <Filter className="w-4 h-4 text-gray-400" />
@@ -243,7 +243,7 @@ const NotificationsPage: React.FC = () => {
               </div>
             </div>
           ) : notifications.length === 0 ? (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-100 dark:border-gray-700 p-12 text-center">
+            <div className="card-modern p-12 text-center">
               <Bell className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
                 Уведомлений нет
@@ -260,10 +260,10 @@ const NotificationsPage: React.FC = () => {
               return (
                 <div
                   key={notif.id}
-                  className={`bg-white dark:bg-gray-800 rounded-lg shadow border transition ${
+                  className={`card-modern transition ${
                     notif.is_read
-                      ? 'border-gray-100 dark:border-gray-700'
-                      : `${colors.border} ring-1 ring-offset-1 dark:ring-offset-gray-900 ${colors.text.replace('text-', 'ring-')}`
+                      ? ''
+                      : `${colors.border} ring-1 ring-offset-1 dark:ring-offset-gray-950 ${colors.text.replace('text-', 'ring-')}`
                   } ${!notif.is_read ? 'hover:shadow-md' : ''}`}
                 >
                   <div className="p-4">
@@ -342,7 +342,7 @@ const NotificationsPage: React.FC = () => {
               <button
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page === 1}
-                className="px-3 py-1.5 border border-gray-200 dark:border-gray-700 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn-ghost-modern px-3 py-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Назад
               </button>
@@ -351,7 +351,7 @@ const NotificationsPage: React.FC = () => {
               </span>
               <button
                 onClick={() => setPage(p => p + 1)}
-                className="px-3 py-1.5 border border-gray-200 dark:border-gray-700 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn-ghost-modern px-3 py-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Вперёд
               </button>

@@ -18,6 +18,8 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | ''>('');
   const [loadingOptions, setLoadingOptions] = useState(true);
   const [responsibleOptions, setResponsibleOptions] = useState<any[]>([]);
+  const [storageAddresses, setStorageAddresses] = useState<any[]>([]);
+  const [selectedStorageAddressId, setSelectedStorageAddressId] = useState<number | ''>('');
 
   const {
     register,
@@ -59,10 +61,12 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
     fetch('/api/admin/placements/tree', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()).catch(() => []),
     fetch('/api/admin/placement-assignments/employees', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()).catch(() => []),
     fetch('/api/admin/placement-assignments/responsible-persons', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()).catch(() => []),
-    ]).then(([tree, emps, responsibleUsers]) => {
+    fetch('/api/storage-addresses', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()).catch(() => []),
+    ]).then(([tree, emps, responsibleUsers, storageAddrs]) => {
       const safeTree = Array.isArray(tree) ? tree : [];
       const safeEmps = Array.isArray(emps) ? emps : [];
       const safeResponsibleUsers = Array.isArray(responsibleUsers) ? responsibleUsers : [];
+      const safeStorageAddrs = Array.isArray(storageAddrs) ? storageAddrs : [];
       setDeptTree(safeTree);
       setEmployees(safeEmps);
       const empList = safeEmps.map((emp: any) => ({
@@ -76,6 +80,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
         name: u.name,
         fullName: u.full_name,
       })));
+      setStorageAddresses(safeStorageAddrs);
       setLoadingOptions(false);
     });
   }, []);
@@ -144,7 +149,7 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
         depreciation_years: data.depreciation_years ? Number(data.depreciation_years) : undefined,
         next_maintenance_date: data.next_maintenance_date,
         rfid_tag: data.rfid_tag,
-        storage_address_id: data.storage_address_id || undefined,
+        storage_address_id: selectedStorageAddressId || undefined,
         is_active: true,
       });
       reset();
@@ -899,17 +904,37 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
-            📍 Адрес хранения
+            📍 Склад/Ячейка
           </label>
-          <input
-            type="text"
-            {...register('storage_address_name')}
+          <select
+            value={selectedStorageAddressId}
+            onChange={(e) => {
+              const addrId = e.target.value ? Number(e.target.value) : null;
+              setSelectedStorageAddressId(addrId || '');
+              if (addrId) {
+                const addr = storageAddresses.find((a: any) => a.id === addrId);
+                if (addr) {
+                  setValue('storage_address_id', addrId);
+                  setValue('storage_address_name', addr.name || addr.full_address || addr.code);
+                }
+              } else {
+                setValue('storage_address_id', undefined);
+                setValue('storage_address_name', '');
+              }
+            }}
             className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="Стеллаж A-3-5 (код адреса)"
-          />
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            Адрес хранения: корпус → этаж → зона → ряд → стеллаж → ячейка
-          </p>
+            disabled={loadingOptions || storageAddresses.length === 0}
+          >
+            <option value="">Не выбрано</option>
+            {storageAddresses.map((addr: any) => (
+              <option key={addr.id} value={addr.id}>
+                {addr.name} {addr.code ? `(${addr.code})` : ''} {addr.full_address ? `- ${addr.full_address}` : ''}
+              </option>
+            ))}
+          </select>
+          {storageAddresses.length === 0 && !loadingOptions && (
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Нет доступных ячеек</p>
+          )}
         </div>
 
         <div className="flex gap-3 pt-4">

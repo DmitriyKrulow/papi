@@ -1006,7 +1006,7 @@ const AdminPanel: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen flex bg-gray-50 dark:bg-graphite-950">
       {sidebarOpen && (
         <div className="fixed inset-0 bg-black/50 z-20 lg:hidden" onClick={() => setSidebarOpen(false)} />
       )}
@@ -1057,8 +1057,7 @@ const AdminPanel: React.FC = () => {
             </h2>
           </div>
         </div>
-        <div className="flex-grow container mx-auto px-4 py-6">
-          <div className="max-w-6xl mx-auto">
+        <div className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
             {loading ? (
               <div className="text-center py-8 text-gray-500 dark:text-gray-400">Загрузка...</div>
             ) : (
@@ -1076,7 +1075,7 @@ const AdminPanel: React.FC = () => {
                   <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Пользователи системы</h2>
                   <button
                     onClick={() => { setEditingUser(null); setUserFormData({ username: '', email: '', full_name: '', phone: '', max_user_id: '', role: 'user', is_active: true }); setShowUserForm(true); setShowPasswordReset(false); }}
-                    className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition text-sm"
+                    className="btn-primary-modern"
                   >
                     ➕ Создать пользователя
                   </button>
@@ -1652,7 +1651,7 @@ const AdminPanel: React.FC = () => {
             {activeTab === 'notifications' && (
               <>
                 {/* Settings */}
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-6 border border-gray-200 dark:border-gray-700">
+                <div className="card-modern p-5 mb-6">
                   <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">⚙️ Настройки уведомлений</h2>
                   
                   <div className="grid grid-cols-2 gap-4 mb-4">
@@ -1785,7 +1784,7 @@ const AdminPanel: React.FC = () => {
                 </div>
 
                 {/* Send Notification */}
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-6 border border-gray-200 dark:border-gray-700">
+                <div className="card-modern p-5 mb-6">
                   <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">📤 Отправить уведомление</h2>
                   
                   <div className="grid grid-cols-2 gap-3 mb-4">
@@ -1926,7 +1925,6 @@ const AdminPanel: React.FC = () => {
           {activeTab === 'reconciliation' && <ReconciliationPage />}
           {activeTab === 'regulatory' && <RegulatoryPage />}
           </div>
-        </div>
       </main>
     </div>
   );

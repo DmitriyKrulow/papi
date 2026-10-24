@@ -4,6 +4,35 @@
 @tailwind utilities;
 
 @layer base {
+  /* ===== Кастомный скроллбар ===== */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 dark:bg-graphite-700 rounded-full;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-400 dark:bg-graphite-600;
+  }
+  
+  /* Sidebar — скрытый скроллбар */
+  .sidebar-nav::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
+  
+  .sidebar-nav {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  
   body {
     @apply bg-gray-50 text-gray-900 antialiased;
   }

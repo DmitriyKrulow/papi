@@ -148,6 +148,8 @@ async def list_assets(
     department: Optional[str] = None,
     responsible: Optional[str] = None,
     employee: Optional[str] = None,
+    storage_address: Optional[int] = Query(None, description="ID storage_address для фильтра"),
+    recursive_storage: bool = Query(True, description="Рекурсивно включать дочерние локации"),
     include_hidden: bool = False,
     sort_by: Optional[str] = Query(None, pattern="^(inventory_number|name|status|current_value|department_name|responsible_person|location_address|employee_name|asset_type)$"),
     sort_dir: Optional[str] = Query(None, pattern="^(asc|desc)$"),
@@ -214,6 +216,31 @@ async def list_assets(
                 )
             else:
                 query = query.filter(text("0=1"))
+        
+        # Фильтр по адресу хранения (storage_address_id)
+        if storage_address:
+            # Если recursive=True, собираем все дочерние ID
+            if recursive_storage:
+                all_ids = [storage_address]
+                queue = [storage_address]
+                while queue:
+                    current = queue.pop(0)
+                    children = db.query(Asset.storage_address_id).filter(
+                        Asset.__table__.c.parent_id == current  # type: ignore
+                    ).all()
+                    # Получаем children через StorageAddress model
+                    from src.infrastructure.db.models.storage_address import StorageAddress
+                    sa_children = db.query(StorageAddress).filter(
+                        StorageAddress.parent_id == current,
+                        StorageAddress.is_active == True,
+                    ).all()
+                    for child in sa_children:
+                        if child.id not in all_ids:
+                            all_ids.append(child.id)
+                            queue.append(child.id)
+                query = query.filter(Asset.storage_address_id.in_(all_ids))
+            else:
+                query = query.filter(Asset.storage_address_id == storage_address)
         
         # Фильтры по пустым полям — ищем записи где поле IS NULL или пустая строка
         if empty_department:

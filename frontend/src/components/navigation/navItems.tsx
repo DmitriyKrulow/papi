@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import {
   LayoutDashboard, Package, ClipboardList, Tag, BarChart3,
   FileText, Wrench, Calendar, Bell, Settings,
-  Printer, TrendingUp, FileCheck, Scale, X,
+  Printer, TrendingUp, FileCheck, Scale, X, Boxes,
 } from 'lucide-react';
 
 export interface NavItem {
@@ -36,6 +36,7 @@ export const useNavSections = (isAdmin: boolean): NavSection[] => [
     title: 'Управление',
     items: isAdmin ? [
       { path: '/admin', label: 'Панель управления', icon: <Settings className="w-5 h-5" /> },
+      { path: '/warehouse', label: 'Склад', icon: <Boxes className="w-5 h-5" /> },
       { path: '/audit', label: 'Журнал аудита', icon: <FileText className="w-5 h-5" /> },
       { path: '/analytics', label: 'Аналитика', icon: <TrendingUp className="w-5 h-5" /> },
       { path: '/disposal', label: 'Списание', icon: <X className="w-5 h-5" /> },

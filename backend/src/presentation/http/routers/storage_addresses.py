@@ -971,3 +971,217 @@ async def get_warehouse_locations_stats(
         "total_storage_addresses": total_storage_addresses,
         "total_assets": total_assets, "by_type": by_type,
     }
+
+
+# ======================================================================
+# Управление типами помещений (room <-> warehouse)
+# ======================================================================
+
+@router.put("/rooms/{room_id}/toggle-type")
+async def toggle_room_type(
+    room_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin),
+):
+    """
+    Переключить тип помещения: room <-> warehouse.
+    
+    При переключении room -> warehouse:
+    - room_type устанавливается в 'warehouse'
+    - Создаётся дерево storage_addresses: rack -> shelf -> cell
+    - Создаётся WarehouseLocation по умолчанию
+    
+    При переключении warehouse -> room:
+    - room_type устанавливается в 'room'
+    - Деактивируются storage_addresses и warehouse_locations
+    - Активы, привязанные к storage_address, сохраняют ссылку
+    """
+    from src.infrastructure.db.models.department import Room as RoomModel
+    
+    room = db.query(RoomModel).filter(RoomModel.id == room_id).first()
+    if not room:
+        raise HTTPException(status_code=404, detail="Помещение не найдено")
+    
+    if room.room_type == "room":
+        # Конвертируем в склад
+        room.room_type = "warehouse"
+        
+        # Создаём WarehouseLocation по умолчанию
+        wl = WarehouseLocation(
+            room_id=room_id,
+            name="Основная зона",
+            code=f"STO-{room_id:03d}",
+            location_type="storage",
+        )
+        db.add(wl)
+        db.flush()
+        
+        # Создаём дерево storage_addresses
+        # Уровень 1: Стеллажи (racks)
+        rack_names = ["A", "B", "C", "D", "E"]
+        wl_id = wl.id
+        for rack_letter in rack_names:
+            rack = StorageAddress(
+                warehouse_location_id=wl_id,
+                room_id=room_id,
+                level="rack",
+                name=f"Стеллаж {rack_letter}",
+                code=f"{room_id}-{rack_letter}",
+            )
+            db.add(rack)
+            db.flush()
+            
+            # Уровень 2: Полки (shelves)
+            for shelf_num in range(1, 6):
+                shelf = StorageAddress(
+                    parent_id=rack.id,
+                    warehouse_location_id=wl_id,
+                    room_id=room_id,
+                    level="shelf",
+                    name=f"Полка {shelf_num}",
+                    code=f"{room_id}-{rack_letter}-{shelf_num}",
+                )
+                db.add(shelf)
+                db.flush()
+                
+                # Уровень 3: Ячейки (cells)
+                for cell_num in range(1, 11):
+                    cell = StorageAddress(
+                        parent_id=shelf.id,
+                        warehouse_location_id=wl_id,
+                        room_id=room_id,
+                        level="cell",
+                        name=f"Ячейка {cell_num}",
+                        code=f"{room_id}-{rack_letter}-{shelf_num}-{cell_num}",
+                        capacity=1,
+                    )
+                    db.add(cell)
+        
+        db.commit()
+        db.refresh(room)
+        
+        return {
+            "success": True,
+            "message": f"Помещение '{room.name}' преобразовано в склад",
+            "room_type": "warehouse",
+            "storage_tree_created": True,
+        }
+    
+    else:
+        # Конвертируем в обычное помещение
+        room.room_type = "room"
+        
+        # Деактивируем warehouse_locations
+        wls = db.query(WarehouseLocation).filter(
+            WarehouseLocation.room_id == room_id,
+            WarehouseLocation.is_active == True,
+        ).all()
+        for wl in wls:
+            wl.is_active = False
+            # Деактивируем связанные storage_addresses
+            sas = db.query(StorageAddress).filter(
+                StorageAddress.warehouse_location_id == wl.id,
+                StorageAddress.is_active == True,
+            ).all()
+            for sa in sas:
+                sa.is_active = False
+        
+        db.commit()
+        db.refresh(room)
+        
+        return {
+            "success": True,
+            "message": f"Помещение '{room.name}' преобразовано в обычное помещение",
+            "room_type": "room",
+            "storage_tree_deactivated": True,
+        }
+
+
+@router.get("/rooms/{room_id}/convert-preview")
+async def preview_room_conversion(
+    room_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Предпросмотр дерева storage_addresses при конвертации помещения в склад.
+    Возвращает структуру без сохранения в БД.
+    """
+    from src.infrastructure.db.models.department import Room as RoomModel
+    
+    room = db.query(RoomModel).filter(RoomModel.id == room_id).first()
+    if not room:
+        raise HTTPException(status_code=404, detail="Помещение не найдено")
+    
+    rack_names = ["A", "B", "C", "D", "E"]
+    tree = []
+    for rack_letter in rack_names:
+        rack_node = {
+            "id": None, "name": f"Стеллаж {rack_letter}",
+            "level": "rack", "code": f"{room_id}-{rack_letter}",
+            "children": [],
+        }
+        for shelf_num in range(1, 6):
+            shelf_node = {
+                "id": None, "name": f"Полка {shelf_num}",
+                "level": "shelf", "code": f"{room_id}-{rack_letter}-{shelf_num}",
+                "children": [],
+            }
+            for cell_num in range(1, 11):
+                shelf_node["children"].append({
+                    "id": None, "name": f"Ячейка {cell_num}",
+                    "level": "cell", "code": f"{room_id}-{rack_letter}-{shelf_num}-{cell_num}",
+                    "children": [],
+                })
+            rack_node["children"].append(shelf_node)
+        tree.append(rack_node)
+    
+    return {
+        "room_id": room.id,
+        "room_name": room.name,
+        "current_type": room.room_type,
+        "would_be_type": "warehouse" if room.room_type == "room" else "room",
+        "preview_tree": tree,
+        "total_racks": len(rack_names),
+        "total_shelves": len(rack_names) * 5,
+        "total_cells": len(rack_names) * 5 * 10,
+    }
+
+
+@router.get("/rooms/all")
+async def get_all_rooms(
+    room_type: Optional[str] = Query(None, description="filter by room_type: room or warehouse"),
+    search: Optional[str] = Query(None, description="Search by name or department"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Список всех помещений с фильтрацией по типу"""
+    from src.infrastructure.db.models.department import Room as RoomModel
+    
+    query = db.query(RoomModel).filter(RoomModel.is_active == True)
+    if room_type:
+        query = query.filter(RoomModel.room_type == room_type)
+    if search:
+        search_pattern = f"%{search}%"
+        query = query.filter(
+            or_(
+                RoomModel.name.ilike(search_pattern),
+                RoomModel.building.ilike(search_pattern),
+            )
+        )
+    rooms = query.order_by(RoomModel.department_id, RoomModel.name).all()
+    
+    return [
+        {
+            "id": r.id,
+            "name": r.name,
+            "department_id": r.department_id,
+            "department_name": r.department.name if r.department else "",
+            "floor": r.floor,
+            "building": r.building,
+            "room_type": r.room_type,
+            "storage_addresses_count": len(r.storage_addresses) if r.storage_addresses else 0,
+            "warehouse_locations_count": len(r.warehouse_locations) if hasattr(r, 'warehouse_locations') and r.warehouse_locations else 0,
+        }
+        for r in rooms
+    ]

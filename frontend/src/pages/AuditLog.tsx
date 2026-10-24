@@ -225,7 +225,7 @@ const AuditLogPage: React.FC = () => {
 
   if (!isAuthenticated || !isAdmin) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-graphite-950">
         <div className="text-center p-8">
           <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
@@ -240,8 +240,8 @@ const AuditLogPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900">
-      <main className="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+    <div className="min-h-screen bg-gray-50 dark:bg-graphite-950">
+      <main className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto">
         {/* Заголовок */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
           <div>
@@ -265,21 +265,21 @@ const AuditLogPage: React.FC = () => {
         {/* Статистика за периоды */}
         {stats && (
           <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-6">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-gray-100 dark:border-gray-700">
+            <div className="card-modern p-5">
               <div className="flex items-center gap-2 mb-1">
                 <Calendar className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                 <span className="text-xs text-gray-500 dark:text-gray-400">Сегодня</span>
               </div>
               <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats.today}</p>
             </div>
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-gray-100 dark:border-gray-700">
+            <div className="card-modern p-5">
               <div className="flex items-center gap-2 mb-1">
                 <Clock className="w-4 h-4 text-green-600 dark:text-green-400" />
                 <span className="text-xs text-gray-500 dark:text-gray-400">7 дней</span>
               </div>
               <p className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.last_7_days}</p>
             </div>
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-gray-100 dark:border-gray-700">
+            <div className="card-modern p-5">
               <div className="flex items-center gap-2 mb-1">
                 <BarChart3 className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                 <span className="text-xs text-gray-500 dark:text-gray-400">30 дней</span>
@@ -292,7 +292,7 @@ const AuditLogPage: React.FC = () => {
         {/* Сводка по действиям и сущностям */}
         {summary && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-gray-100 dark:border-gray-700">
+            <div className="card-modern p-5">
               <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
                 По действиям
               </h3>
@@ -316,7 +316,7 @@ const AuditLogPage: React.FC = () => {
                 ))}
               </div>
             </div>
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-gray-100 dark:border-gray-700">
+            <div className="card-modern p-5">
               <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
                 По сущностям
               </h3>
@@ -344,10 +344,10 @@ const AuditLogPage: React.FC = () => {
         )}
 
         {/* Фильтры */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-6 border border-gray-100 dark:border-gray-700">
+        <div className="card-modern p-5">
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className="w-full flex items-center justify-between p-4 text-left"
+            className="w-full flex items-center justify-between p-1 text-left"
           >
             <span className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
               <Filter className="w-4 h-4" />
@@ -423,7 +423,7 @@ const AuditLogPage: React.FC = () => {
         </div>
 
         {/* Таблица */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-100 dark:border-gray-700 overflow-hidden">
+        <div className="card-modern p-5 overflow-hidden">
           {loading ? (
             <div className="flex justify-center items-center py-16">
               <div className="text-center">

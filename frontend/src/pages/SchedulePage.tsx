@@ -95,26 +95,30 @@ function SchedulePage() {
   const totalItems=stats?.scheduled+stats?.in_progress+stats?.completed+stats?.overdue||0;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4 md:p-6 lg:p-8">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="min-h-screen bg-gray-50 dark:bg-graphite-950">
+      <main className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto space-y-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div><h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-gray-100">Расписание</h1></div>
-          {(isAdmin && <button onClick={()=>setShowAutoGenerateModal(true)} className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium shadow-sm">Автогенерация</button>)}
+          {(isAdmin &&           <button onClick={()=>setShowAutoGenerateModal(true)} className="btn-primary-modern">Автогенерация</button>)}
         </div>
         {(error && <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg text-sm" role="alert">{error}</div>)}
         {(stats && <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700"><p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Всего</p><p className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">{totalItems}</p></div>
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700"><p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Запланировано</p><p className="text-2xl font-bold text-blue-600 mt-1">{stats.scheduled}</p></div>
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700"><p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Выполнено</p><p className="text-2xl font-bold text-green-600 mt-1">{stats.completed}</p></div>
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700"><p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Просрочено</p><p className="text-2xl font-bold text-red-600 mt-1">{stats.overdue}</p></div>
+          <div className="card-modern p-5">
+            <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Всего</p><p className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">{totalItems}</p></div>
+          <div className="card-modern p-5">
+            <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Запланировано</p><p className="text-2xl font-bold text-blue-600 mt-1">{stats.scheduled}</p></div>
+          <div className="card-modern p-5">
+            <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Выполнено</p><p className="text-2xl font-bold text-green-600 mt-1">{stats.completed}</p></div>
+          <div className="card-modern p-5">
+            <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Просрочено</p><p className="text-2xl font-bold text-red-600 mt-1">{stats.overdue}</p></div>
         </div>)}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+        <div className="card-modern p-5">
           <div className="flex flex-col md:flex-row gap-4 items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <button onClick={prevMonth} className="px-3 py-1.5 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition text-sm">Назад</button>
               <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{MONTHS_RU[currentMonth]} {currentYear}</h2>
               <button onClick={nextMonth} className="px-3 py-1.5 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition text-sm">Вперёд</button>
-              <button onClick={goToday} className="px-3 py-1.5 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-lg hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition text-sm">Сегодня</button>
+              <button onClick={goToday} className="px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/50 transition text-sm">Сегодня</button>
             </div>
             <div className="flex gap-2">
               <select value={filterCategory} onChange={e=>setFilterCategory(e.target.value)} className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
@@ -145,7 +149,7 @@ function SchedulePage() {
             ))}
           </div>
         </div>
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+        <div className="card-modern p-5">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">Предстоящие проверки</h3>
           {upcomingChecks.length === 0 ? (
             <p className="text-gray-500 dark:text-gray-400 text-sm">Нет предстоящих проверок</p>
@@ -166,7 +170,7 @@ function SchedulePage() {
           )}
         </div>
         {(showEditModal && <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 w-full max-w-md">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 w-full max-w-md">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Редактирование</h3>
             <div className="space-y-3">
               <div><label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Дата</label>
@@ -184,13 +188,13 @@ function SchedulePage() {
               </div>
             </div>
             <div className="flex gap-2 mt-4">
-              <button onClick={handleSaveEdit} disabled={saving} className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm font-medium disabled:opacity-50">{saving?<span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>:<span>Сохранить</span>}</button>
+              <button onClick={handleSaveEdit} disabled={saving} className="btn-primary-modern flex-1">{saving?<span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>:<span>Сохранить</span>}</button>
               <button onClick={()=>setShowEditModal(false)} className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition text-sm">Отмена</button>
             </div>
           </div>
         </div>)}
         {(showAutoGenerateModal && <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 w-full max-w-md">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 w-full max-w-md">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Автогенерация расписания</h3>
             <div className="space-y-3">
               <div><label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Категория</label>
@@ -210,12 +214,12 @@ function SchedulePage() {
               </div>
             </div>
             <div className="flex gap-2 mt-4">
-              <button onClick={handleAutoGenerate} disabled={generating} className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm font-medium disabled:opacity-50">{generating?<span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>:<span>Создать</span>}</button>
+              <button onClick={handleAutoGenerate} disabled={generating} className="btn-primary-modern flex-1">{generating?<span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>:<span>Создать</span>}</button>
               <button onClick={()=>setShowAutoGenerateModal(false)} className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition text-sm">Отмена</button>
             </div>
           </div>
         </div>)}
-      </div>
+      </main>
     </div>
   );
 };

@@ -79,7 +79,7 @@ const Sidebar = () => {
       </div>
 
       {/* Nav items */}
-      <nav className="flex-1 overflow-y-auto overflow-x-hidden p-2 space-y-1">
+      <nav className="flex-1 overflow-y-auto overflow-x-hidden p-2 space-y-1 sidebar-nav">
         {navSections.map(section => {
           const items = section.items.filter(i => !i.adminOnly || isAdmin);
           if (items.length === 0) return null;

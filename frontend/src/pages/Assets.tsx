@@ -53,6 +53,12 @@ const Assets: React.FC = () => {
   const [filterDepartment, setFilterDepartment] = useState('');
   const [filterLocation, setFilterLocation] = useState('');
   const [filterEmployee, setFilterEmployee] = useState('');
+  const [filterStorageAddress, setFilterStorageAddress] = useState('');
+  const [storageAddresses, setStorageAddresses] = useState<Array<{id: number; name: string; code?: string; level?: string; full_address?: string}>>([]);
+  const [storageDropdownOpen, setStorageDropdownOpen] = useState(false);
+  const [storageSearch, setStorageSearch] = useState('');
+  const [debouncedStorageSearch, setDebouncedStorageSearch] = useState('');
+  const storageSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Фильтры по пустым полям
   const [emptyDepartment, setEmptyDepartment] = useState(false);
   const [emptyLocation, setEmptyLocation] = useState(false);
@@ -207,6 +213,15 @@ const Assets: React.FC = () => {
     return () => { if (employeeSearchTimerRef.current) clearTimeout(employeeSearchTimerRef.current); };
   }, [employeeSearch]);
 
+  // Debounce для поиска по складам внутри dropdown
+  useEffect(() => {
+    if (storageSearchTimerRef.current) clearTimeout(storageSearchTimerRef.current);
+    storageSearchTimerRef.current = setTimeout(() => {
+      setDebouncedStorageSearch(storageSearch);
+    }, 200);
+    return () => { if (storageSearchTimerRef.current) clearTimeout(storageSearchTimerRef.current); };
+  }, [storageSearch]);
+
   // Очистка таймеров при размонтировании
   useEffect(() => {
     return () => {
@@ -214,6 +229,7 @@ const Assets: React.FC = () => {
       if (roomSearchTimerRef.current) clearTimeout(roomSearchTimerRef.current);
       if (deptSearchTimerRef.current) clearTimeout(deptSearchTimerRef.current);
       if (employeeSearchTimerRef.current) clearTimeout(employeeSearchTimerRef.current);
+      if (storageSearchTimerRef.current) clearTimeout(storageSearchTimerRef.current);
     };
   }, []);
 
@@ -247,7 +263,7 @@ const Assets: React.FC = () => {
     return assets;
   }, [assets]);
 
-  const activeFilterCount = [filterStatus, filterAssetType, filterDepartment, filterLocation, filterEmployee].filter(Boolean).length;
+  const activeFilterCount = [filterStatus, filterAssetType, filterDepartment, filterLocation, filterEmployee, filterStorageAddress].filter(Boolean).length;
 
   const getToken = async () => localStorage.getItem('token') || '';
   
@@ -293,6 +309,20 @@ fetch('/api/asset-types/', { headers })
         }))
       )); })
       .catch(e => console.error('Failed to load rooms:', e));
+    fetch('/api/storage-addresses', { headers })
+      .then(r => { if (r.ok) return r.json(); })
+      .then((data: any) => {
+        if (Array.isArray(data)) {
+          setStorageAddresses(data.map((sa: any) => ({
+            id: sa.id,
+            name: sa.name,
+            code: sa.code,
+            level: sa.level,
+            full_address: sa.full_address || sa.name,
+          })));
+        }
+      })
+      .catch(e => console.error('Failed to load storage addresses:', e));
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
@@ -737,6 +767,7 @@ const handleEditClick = (asset: Asset) => {
       if (filterDepartment) params.set('department', filterDepartment);
       if (filterLocation) params.set('location', filterLocation);
       if (filterEmployee) params.set('employee', filterEmployee);
+      if (filterStorageAddress) params.set('storage_address_id', filterStorageAddress);
       if (showHidden) params.set('include_hidden', 'true');
       if (emptyDepartment) params.set('empty_department', 'true');
       if (emptyLocation) params.set('empty_location', 'true');
@@ -775,7 +806,7 @@ const handleEditClick = (asset: Asset) => {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, pageSize, debouncedSearchTerm, filterStatus, filterAssetType, filterDepartment, filterLocation, filterEmployee, showHidden, sortConfig, emptyDepartment, emptyLocation, emptyResponsible, emptySerialNumber, emptyModel, emptyPurchaseDate, emptyWarrantyExpiry]);
+  }, [currentPage, pageSize, debouncedSearchTerm, filterStatus, filterAssetType, filterDepartment, filterLocation, filterEmployee, filterStorageAddress, showHidden, sortConfig, emptyDepartment, emptyLocation, emptyResponsible, emptySerialNumber, emptyModel, emptyPurchaseDate, emptyWarrantyExpiry]);
 
   useEffect(() => {
     loadAssets();
@@ -953,7 +984,7 @@ const handleEditClick = (asset: Asset) => {
           </button>
           {activeFilterCount > 0 && (
             <button
-              onClick={() => { setFilterStatus(''); setFilterAssetType(''); setFilterDepartment(''); setFilterLocation(''); setFilterEmployee(''); setCurrentPage(1); setEmptyDepartment(false); setEmptyLocation(false); setEmptyResponsible(false); setEmptySerialNumber(false); setEmptyModel(false); setEmptyPurchaseDate(false); setEmptyWarrantyExpiry(false); }}
+              onClick={() => { setFilterStatus(''); setFilterAssetType(''); setFilterDepartment(''); setFilterLocation(''); setFilterEmployee(''); setFilterStorageAddress(''); setCurrentPage(1); setEmptyDepartment(false); setEmptyLocation(false); setEmptyResponsible(false); setEmptySerialNumber(false); setEmptyModel(false); setEmptyPurchaseDate(false); setEmptyWarrantyExpiry(false); }}
               className="px-3 py-2 text-sm text-blue-600 hover:text-blue-800 border border-blue-200 rounded-lg hover:bg-blue-50 transition whitespace-nowrap dark:text-blue-400 dark:hover:text-blue-300 dark:border-blue-700 dark:hover:bg-blue-900"
             >
               Сбросить
@@ -1117,6 +1148,81 @@ const handleEditClick = (asset: Asset) => {
                         room.full_name.toLowerCase().includes(debouncedRoomSearch.toLowerCase()) ||
                         room.name.toLowerCase().includes(debouncedRoomSearch.toLowerCase()) ||
                         (room.department_name || '').toLowerCase().includes(debouncedRoomSearch.toLowerCase())
+                      ).length === 0 && (
+                        <div className="px-3 py-4 text-sm text-gray-400 text-center dark:text-gray-500">Ничего не найдено</div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="relative">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+                <button
+                  type="button"
+                  onClick={() => { setStorageDropdownOpen(!storageDropdownOpen); setDeptDropdownOpen(false); setRoomDropdownOpen(false); setEmployeeDropdownOpen(false); }}
+                  className="w-full pl-7 pr-8 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-left bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-600 transition"
+                >
+                  {filterStorageAddress
+                    ? storageAddresses.find(s => s.id === Number(filterStorageAddress))?.full_address
+                    : 'Все склады'}
+                </button>
+                {filterStorageAddress && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setFilterStorageAddress(''); setCurrentPage(1); }}
+                    className="absolute right-7 top-1.5 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                <ChevronDown className={`absolute right-2.5 top-2.5 w-3.5 h-3.5 text-gray-400 transition-transform ${storageDropdownOpen ? 'rotate-180' : ''}`} />
+              </div>
+              {storageDropdownOpen && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setStorageDropdownOpen(false)} />
+                  <div className="absolute z-20 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-hidden" style={{ top: '100%' }}>
+                    <div className="p-2 border-b border-gray-100 dark:border-gray-700">
+                      <div className="relative">
+                        <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+                        <input
+                          type="text"
+                          placeholder="Поиск..."
+                          value={storageSearch}
+                          onChange={(e) => setStorageSearch(e.target.value)}
+                          className="w-full pl-7 pr-2 py-1.5 border border-gray-200 dark:border-gray-600 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                        />
+                      </div>
+                    </div>
+                    <div className="overflow-y-auto max-h-48">
+                      {storageAddresses
+                        .filter(sa =>
+                          !debouncedStorageSearch ||
+                          sa.full_address?.toLowerCase().includes(debouncedStorageSearch.toLowerCase()) ||
+                          sa.name.toLowerCase().includes(debouncedStorageSearch.toLowerCase()) ||
+                          (sa.code || '').toLowerCase().includes(debouncedStorageSearch.toLowerCase()) ||
+                          (sa.level || '').toLowerCase().includes(debouncedStorageSearch.toLowerCase())
+                        )
+                        .map(sa => (
+                          <button
+                            key={sa.id}
+                            onClick={() => { setFilterStorageAddress(String(sa.id)); setCurrentPage(1); setStorageDropdownOpen(false); setStorageSearch(''); }}
+                            className={`w-full px-3 py-2 text-left text-sm hover:bg-blue-50 dark:hover:bg-gray-700 transition ${filterStorageAddress === String(sa.id) ? 'bg-blue-50 text-blue-700 font-medium dark:bg-blue-900 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'}`}
+                          >
+                            <div className="truncate">{sa.full_address || sa.name}</div>
+                            {(sa.code || sa.level) && (
+                              <div className="text-xs text-gray-400 truncate dark:text-gray-500">
+                                {sa.code ? `Код: ${sa.code}` : ''} {sa.level ? `Уровень: ${sa.level}` : ''}
+                              </div>
+                            )}
+                          </button>
+                        ))}
+                      {storageAddresses.filter(sa =>
+                        !debouncedStorageSearch ||
+                        sa.full_address?.toLowerCase().includes(debouncedStorageSearch.toLowerCase()) ||
+                        sa.name.toLowerCase().includes(debouncedStorageSearch.toLowerCase()) ||
+                        (sa.code || '').toLowerCase().includes(debouncedStorageSearch.toLowerCase()) ||
+                        (sa.level || '').toLowerCase().includes(debouncedStorageSearch.toLowerCase())
                       ).length === 0 && (
                         <div className="px-3 py-4 text-sm text-gray-400 text-center dark:text-gray-500">Ничего не найдено</div>
                       )}
