@@ -334,6 +334,7 @@ def room_to_dict(room):
         "name": safe_str(getattr(room, 'name', None)),
         "floor": safe_str(getattr(room, 'floor', None)),
         "building": safe_str(getattr(room, 'building', None)),
+        "room_type": safe_str(getattr(room, 'room_type', 'room'), 'room'),
         "is_active": getattr(room, 'is_active', True),
         "created_at": safe_isoformat(getattr(room, 'created_at', None)),
         "updated_at": safe_isoformat(getattr(room, 'updated_at', None)),
@@ -378,6 +379,7 @@ async def create_room(
         name=name,
         floor=data.get("floor"),
         building=data.get("building"),
+        room_type=data.get("room_type", "room"),
         is_active=True,
         created_at=datetime.now(),
         updated_at=datetime.now(),
@@ -407,6 +409,8 @@ async def update_room(
         room.floor = data["floor"]
     if "building" in data:
         room.building = data["building"]
+    if "room_type" in data:
+        room.room_type = data["room_type"]
     if "is_active" in data:
         room.is_active = data["is_active"]
     if "department_id" in data:

@@ -78,6 +78,11 @@ class Asset(Base):
     
     # Адрес хранения (стеллаж, полка, ячейка)
     storage_address_id = Column(Integer, ForeignKey("storage_addresses.id"), nullable=True, index=True)
+    
+    # Складская локация (зона/участок склада) — для привязки актива к зоне без конкретного стеллажа
+    warehouse_location_id = Column(
+        Integer, ForeignKey("warehouse_locations.id"), nullable=True, index=True
+    )
 
     __table_args__ = (
         Index("idx_assets_inventory_number", "inventory_number"),
@@ -100,6 +105,9 @@ class Asset(Base):
     inventory_check_items = relationship("InventoryCheckItem", back_populates="asset", cascade="all, delete-orphan")
     assigned_room = relationship("Room", backref="assets")
     storage_address = relationship("StorageAddress", back_populates="assets")
+    warehouse_location = relationship(
+        "WarehouseLocation", back_populates="assets", foreign_keys=[warehouse_location_id]
+    )
 
     def __repr__(self) -> str:
         return f"<Asset(id={self.id}, name='{self.name}', status='{self.status}')>"

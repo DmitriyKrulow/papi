@@ -169,6 +169,8 @@ def register_routers():
     from src.presentation.http.routers.reconciliation import router as reconciliation_router
     from src.presentation.http.routers.regulatory_documents import router as regulatory_documents_router
     from src.presentation.http.routers.transfer_acts import router as transfer_acts_router
+    from src.presentation.http.routers.asset_units import router as asset_units_router
+    from src.presentation.http.routers.asset_split import router as asset_split_router
 
     app.include_router(assets_router, prefix="/api")
     app.include_router(assets_export_router)
@@ -207,6 +209,8 @@ def register_routers():
     app.include_router(reconciliation_router)
     app.include_router(regulatory_documents_router)
     app.include_router(transfer_acts_router, prefix="/api")
+    app.include_router(asset_units_router, prefix="/api")
+    app.include_router(asset_split_router, prefix="/api")
 
 
 def seed_notification_templates(db):

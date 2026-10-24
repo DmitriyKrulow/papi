@@ -1,30 +1,76 @@
-﻿import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useAssets } from '../hooks/useAssets';
 import { Image } from 'lucide-react';
 import AssetPhotoGallery from '../components/assets/AssetPhotoGallery';
 
 const AssetDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { assets, loading, error } = useAssets();
   const [asset, setAsset] = useState<any>(null);
+  const [assetLoading, setAssetLoading] = useState(true);
+  const [assetError, setAssetError] = useState<string | null>(null);
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
 
-  useEffect(() => {
-    if (!loading && assets.length > 0) {
-      const found = assets.find((a) => a.id === parseInt(id || '0'));
-      if (found) {
-        setAsset(found);
-      } else {
-        navigate('/assets');
+  const loadAsset = useCallback(async () => {
+    if (!id) return;
+    
+    setAssetLoading(true);
+    setAssetError(null);
+    
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setAssetError('Токен авторизации не найден');
+        return;
       }
+      
+      const response = await fetch(`/api/assets/${id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          setAssetError('Актив не найден');
+        } else if (response.status === 401 || response.status === 403) {
+          setAssetError('Сессия истекла. Пожалуйста, войдите снова.');
+        } else {
+          setAssetError(`Ошибка загрузки: ${response.status}`);
+        }
+        return;
+      }
+      
+      const data = await response.json();
+      setAsset(data);
+    } catch (err) {
+      console.error('[AssetDetail] Failed to load asset:', err);
+      setAssetError('Не удалось загрузить актив');
+    } finally {
+      setAssetLoading(false);
     }
-  }, [assets, loading, id, navigate]);
+  }, [id]);
 
-  if (loading) return <div>Загрузка...</div>;
-  if (error) return <div className="text-red-500 dark:text-red-400">Ошибка: {error}</div>;
-  if (!asset) return <div>Актив не найден</div>;
+  useEffect(() => {
+    loadAsset();
+  }, [loadAsset]);
+
+  if (assetLoading) return <div className="p-8 text-center">Загрузка...</div>;
+  if (assetError) {
+    return (
+      <div className="p-8 text-center">
+        <div className="text-red-500 dark:text-red-400 mb-4">{assetError}</div>
+        <button
+          onClick={() => navigate('/assets')}
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+        >
+          ← Назад к списку
+        </button>
+      </div>
+    );
+  }
+  if (!asset) return <div className="p-8 text-center">Актив не найден</div>;
 
   return (
     <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">

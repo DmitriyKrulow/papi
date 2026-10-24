@@ -74,6 +74,96 @@ export interface Asset {
   // Адрес хранения
   storage_address_id?: number;
   storage_address_name?: string;
+  warehouse_location_id?: number;
+  warehouse_location_name?: string;
+}
+
+// ========== Складские локации ==========
+export interface WarehouseLocation {
+  id: number;
+  room_id: number;
+  room_name?: string;
+  code?: string;
+  name: string;
+  description?: string;
+  location_type: 'receiving' | 'storage' | 'shipping' | 'returns' | 'quarantine';
+  capacity?: number;
+  current_count: number;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+  storage_addresses_count?: number;
+  full_name?: string;
+  by_level?: {
+    rack?: { count: number; assets: number; capacity: number };
+    shelf?: { count: number; assets: number; capacity: number };
+    cell?: { count: number; assets: number; capacity: number };
+  };
+  total_assets?: number;
+}
+
+export interface WarehouseStats {
+  room_id?: number;
+  total_locations: number;
+  total_storage_addresses: number;
+  total_assets: number;
+  by_type: Record<string, { count: number; total_capacity: number; total_assets: number }>;
+}
+
+// ========== Адресное хранение (стеллажи, полки, ячейки) ==========
+export interface StorageAddress {
+  id: number;
+  name: string;
+  code?: string;
+  level: string; // building, floor, zone, aisle, rack, shelf, cell
+  parent_id?: number;
+  room_id?: number;
+  room_name?: string;
+  warehouse_location_id?: number;
+  warehouse_location_name?: string;
+  capacity?: number;
+  current_count: number;
+  children?: StorageAddress[];
+  full_address?: string;
+}
+
+export interface WarehouseRoom {
+  id: number;
+  name: string;
+  department_id: number;
+  department_name: string;
+  floor?: string;
+  building?: string;
+  room_type: string;
+}
+
+export interface WarehouseLocationItem {
+  id: number;
+  name: string;
+  code?: string;
+  location_type: string;
+  description?: string;
+  room_id: number;
+  room_name: string;
+  capacity?: number;
+  current_count: number;
+  storage_addresses_count: number;
+  full_name?: string;
+  by_level?: {
+    rack?: { count: number; assets: number; capacity: number };
+    shelf?: { count: number; assets: number; capacity: number };
+    cell?: { count: number; assets: number; capacity: number };
+  };
+  total_assets?: number;
+  assets?: Array<{
+    id: number;
+    inventory_number: string;
+    name: string;
+    model?: string;
+    responsible_person?: string;
+    storage_address_id?: number;
+    full_address?: string;
+  }>;
 }
 
 // ========== Пользователи ==========

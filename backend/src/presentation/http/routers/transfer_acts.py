@@ -15,6 +15,7 @@ from src.infrastructure.db.models.asset import Asset
 from src.infrastructure.db.models.employee import Employee
 from src.infrastructure.db.models.transfer_act import TransferAct
 from src.infrastructure.db.models.asset_transfer_history import AssetTransferHistory
+from src.infrastructure.db.models.asset_unit import AssetUnit
 from src.presentation.http.dependencies.auth import get_current_admin
 
 router = APIRouter(prefix="/admin/transfer-acts", tags=["transfer-acts"])
@@ -57,14 +58,40 @@ def _safe_file_path(directory: str, filename: str) -> str:
 
 
 def transfer_act_to_dict(act: TransferAct, db: Session) -> dict:
-    # Загружаем активы, входящие в акт
+    # Загружаем активы и их единицы, входящие в акт
     assets = []
     if act.asset_ids:
-        asset_rows = db.query(Asset).filter(Asset.id.in_(act.asset_ids), Asset.is_active == True).all()
+        # Получаем asset_ids и unit_ids из акта
+        asset_ids = act.asset_ids or []
+        unit_ids = act.unit_ids or []
+        
+        # Загружаем активы
+        asset_rows = db.query(Asset).filter(Asset.id.in_(asset_ids), Asset.is_active == True).all()
         by_id = {a.id: a for a in asset_rows}
-        for asset_id in act.asset_ids:
+        
+        # Загружаем единицы если есть
+        units_by_asset = {}
+        if unit_ids:
+            unit_rows = db.query(AssetUnit).filter(
+                AssetUnit.id.in_(unit_ids),
+                AssetUnit.is_active == True
+            ).all()
+            for u in unit_rows:
+                if u.asset_id not in units_by_asset:
+                    units_by_asset[u.asset_id] = []
+                units_by_asset[u.asset_id].append({
+                    "id": u.id,
+                    "unique_identifier": u.unique_identifier,
+                    "unit_number": u.unit_number,
+                    "current_employee_name": f"{u.current_employee.last_name} {u.current_employee.first_name}" if u.current_employee else None,
+                    "status": u.status,
+                    "rfid_tag": u.rfid_tag,
+                })
+        
+        for asset_id in asset_ids:
             a = by_id.get(asset_id)
             if a:
+                unit_list = units_by_asset.get(asset_id, [])
                 assets.append({
                     "id": a.id,
                     "name": a.name or "",
@@ -72,6 +99,8 @@ def transfer_act_to_dict(act: TransferAct, db: Session) -> dict:
                     "quantity": a.quantity or 1,
                     "model": a.model or "",
                     "serial_number": a.serial_number or "",
+                    "units": unit_list,
+                    "unit_count": len(unit_list),
                 })
 
     return {
@@ -86,8 +115,10 @@ def transfer_act_to_dict(act: TransferAct, db: Session) -> dict:
         "room_id": act.room_id,
         "room_name": act.room_name,
         "asset_ids": act.asset_ids or [],
+        "unit_ids": act.unit_ids or [],
         "assets": assets,
         "asset_count": len(act.asset_ids or []),
+        "unit_count": len(act.unit_ids or []),
         "file_path": act.file_path,
         "attachments": act.attachments or [],
         "signed": act.signed,
@@ -182,15 +213,16 @@ async def create_transfer_act(
     db: Session = Depends(get_db),
     current_user: Any = Depends(get_current_admin),
 ):
-    """Создать акт передачи: {asset_ids: [..], employee_id: int, room_id?: int}"""
+    """Создать акт передачи: {asset_ids: [..], unit_ids: [..], employee_id: int, room_id?: int}"""
     from src.infrastructure.reports.transfer_act_report import TransferActReportGenerator
 
     asset_ids = data.get("asset_ids") or []
+    unit_ids = data.get("unit_ids") or []
     employee_id = data.get("employee_id")
     room_id = data.get("room_id")
 
-    if not asset_ids:
-        raise HTTPException(status_code=400, detail="Не выбрано ни одного актива")
+    if not asset_ids and not unit_ids:
+        raise HTTPException(status_code=400, detail="Не выбрано ни одного актива или единицы")
     if not employee_id:
         raise HTTPException(status_code=400, detail="Не выбран сотрудник-получатель")
 
@@ -216,11 +248,25 @@ async def create_transfer_act(
     full_name = employee_display_name(employee)
     position = employee.position or ""
 
-    assets = db.query(Asset).filter(
-        Asset.id.in_(asset_ids), Asset.is_active == True
-    ).all()
-    if not assets:
-        raise HTTPException(status_code=400, detail="Активы не найдены или неактивны")
+    # Загружаем активы
+    assets = []
+    if asset_ids:
+        assets = db.query(Asset).filter(
+            Asset.id.in_(asset_ids), Asset.is_active == True
+        ).all()
+    
+    # Загружаем единицы
+    units = []
+    if unit_ids:
+        units = db.query(AssetUnit).filter(
+            AssetUnit.id.in_(unit_ids), AssetUnit.is_active == True
+        ).all()
+        # Добавляем asset_id к каждой единице для отчёта
+        for unit in units:
+            unit._asset = unit.asset
+
+    if not assets and not units:
+        raise HTTPException(status_code=400, detail="Активы или единицы не найдены или неактивны")
 
     act_number = _next_act_number(db)
     act_date = data.get("act_date")
@@ -229,20 +275,51 @@ async def create_transfer_act(
     except (ValueError, TypeError):
         act_date_dt = datetime.now()
 
-    # Генерируем Excel-акт
+    # Генерируем Excel-акт с поддержкой единиц
     from src.infrastructure.reports.transfer_act_report import TransferActReportGenerator as Gen
 
     generator = Gen()
-    assets_data = [
-        {
+    
+    # Формируем данные для отчёта
+    assets_data = []
+    for a in assets:
+        asset_units = [u for u in units if u.asset_id == a.id]
+        asset_data = {
             "name": a.name or "",
             "inventory_number": a.inventory_number or "",
             "quantity": a.quantity or 1,
             "model": a.model or "",
             "serial_number": a.serial_number or "",
+            "units": [
+                {
+                    "unique_identifier": u.unique_identifier,
+                    "unit_number": u.unit_number,
+                    "rfid_tag": u.rfid_tag,
+                    "status": u.status,
+                }
+                for u in asset_units
+            ],
         }
-        for a in assets
-    ]
+        assets_data.append(asset_data)
+    
+    # Если есть только единицы без активов в asset_ids
+    for unit in units:
+        if unit.asset_id not in [a.id for a in assets]:
+            asset_data = {
+                "name": unit.asset.name if unit.asset else "",
+                "inventory_number": unit.asset.inventory_number if unit.asset else "",
+                "quantity": 1,
+                "model": unit.asset.model if unit.asset else "",
+                "serial_number": unit.asset.serial_number if unit.asset else "",
+                "units": [{
+                    "unique_identifier": unit.unique_identifier,
+                    "unit_number": unit.unit_number,
+                    "rfid_tag": unit.rfid_tag,
+                    "status": unit.status,
+                }],
+            }
+            assets_data.append(asset_data)
+
     act_filename = f"акт_передачи_{act_number.replace('/', '_').replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     act_filepath = os.path.join(REPORTS_DIR, act_filename)
     excel_bytes = generator.generate(
@@ -268,6 +345,7 @@ async def create_transfer_act(
         room_id=room.id if room else None,
         room_name=room_name,
         asset_ids=asset_ids,
+        unit_ids=unit_ids,
         file_path=act_filepath,
         attachments=[],
         signed=False,
@@ -320,9 +398,7 @@ async def confirm_transfer_act(
     db: Session = Depends(get_db),
     current_user: Any = Depends(get_current_admin),
 ):
-    """Подписать акт: проставить сотрудника активам и записать историю передач"""
-    from src.infrastructure.db.models.asset_transfer_history import AssetTransferHistory
-
+    """Подписать акт: проставить сотрудника активам/единицам и записать историю передач"""
     act = db.query(TransferAct).filter(TransferAct.id == act_id).first()
     if not act:
         raise HTTPException(status_code=404, detail="Акт не найден")
@@ -337,33 +413,74 @@ async def confirm_transfer_act(
     if not employee:
         raise HTTPException(status_code=400, detail="Сотрудник-получатель не найден")
 
-    assets = db.query(Asset).filter(Asset.id.in_(act.asset_ids or [])).all()
-    updated = 0
-    for asset in assets:
-        prev_emp_id = asset.employee_id
-        prev_emp_name = None
-        if prev_emp_id:
-            prev = db.query(Employee).filter(Employee.id == prev_emp_id).first()
-            prev_emp_name = employee_display_name(prev) if prev else None
+    updated_assets = 0
+    updated_units = 0
 
-        asset.employee_id = employee.id
-        asset.responsible_person = employee_display_name(employee)
-        updated += 1
+    # Обновляем активы
+    if act.asset_ids:
+        assets = db.query(Asset).filter(Asset.id.in_(act.asset_ids)).all()
+        for asset in assets:
+            prev_emp_id = asset.employee_id
+            prev_emp_name = None
+            if prev_emp_id:
+                prev = db.query(Employee).filter(Employee.id == prev_emp_id).first()
+                prev_emp_name = employee_display_name(prev) if prev else None
 
-        history = AssetTransferHistory(
-            asset_id=asset.id,
-            prev_employee_id=prev_emp_id,
-            prev_employee_name=prev_emp_name,
-            new_employee_id=employee.id,
-            new_employee_name=employee_display_name(employee),
-            source="transfer_act",
-            source_id=act.id,
-            source_ref=f"Акт передачи {act.act_number}",
-            transfer_date=datetime.now(),
-            created_by_user_id=current_user.id,
-            created_at=datetime.now(),
-        )
-        db.add(history)
+            asset.employee_id = employee.id
+            asset.responsible_person = employee_display_name(employee)
+            updated_assets += 1
+
+            history = AssetTransferHistory(
+                asset_id=asset.id,
+                asset_unit_id=None,
+                prev_employee_id=prev_emp_id,
+                prev_employee_name=prev_emp_name,
+                new_employee_id=employee.id,
+                new_employee_name=employee_display_name(employee),
+                source="transfer_act",
+                source_id=act.id,
+                source_ref=f"Акт передачи {act.act_number}",
+                transfer_date=datetime.now(),
+                created_by_user_id=current_user.id,
+                created_at=datetime.now(),
+            )
+            db.add(history)
+
+    # Обновляем единицы
+    if act.unit_ids:
+        units = db.query(AssetUnit).filter(AssetUnit.id.in_(act.unit_ids)).all()
+        for unit in units:
+            prev_emp_id = unit.current_employee_id
+            prev_emp_name = None
+            if prev_emp_id:
+                prev = db.query(Employee).filter(Employee.id == prev_emp_id).first()
+                prev_emp_name = employee_display_name(prev) if prev else None
+
+            unit.current_employee_id = employee.id
+            unit.current_department_code = employee.department_code
+            unit.last_transfer_date = datetime.now()
+            updated_units += 1
+
+            # Обновляем родительский актив если нет отдельных единиц
+            if unit.asset and not act.unit_ids:
+                unit.asset.employee_id = employee.id
+                unit.asset.responsible_person = employee_display_name(employee)
+
+            history = AssetTransferHistory(
+                asset_id=unit.asset_id,
+                asset_unit_id=unit.id,
+                prev_employee_id=prev_emp_id,
+                prev_employee_name=prev_emp_name,
+                new_employee_id=employee.id,
+                new_employee_name=employee_display_name(employee),
+                source="transfer_act",
+                source_id=act.id,
+                source_ref=f"Акт передачи {act.act_number}",
+                transfer_date=datetime.now(),
+                created_by_user_id=current_user.id,
+                created_at=datetime.now(),
+            )
+            db.add(history)
 
     act.signed = True
     act.signed_at = datetime.now()
@@ -371,9 +488,10 @@ async def confirm_transfer_act(
     db.commit()
 
     return JSONResponse(content={
-        "message": "Акт подписан, сотрудник проставлен активам",
+        "message": "Акт подписан, сотрудник проставлен активам и единицам",
         "act_id": act.id,
-        "assets_updated": updated,
+        "assets_updated": updated_assets,
+        "units_updated": updated_units,
     })
 
 

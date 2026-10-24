@@ -32,6 +32,7 @@ import AnalyticsPage from './pages/AnalyticsPage';
 import DisposalPage from './pages/DisposalPage';
 import RegulatoryPage from './pages/RegulatoryPage';
 import ReconciliationPage from './pages/ReconciliationPage';
+import Warehouse from './pages/Warehouse';
 import RoomInventoryPrint from './pages/RoomInventoryPrint';
 import { Toaster } from 'react-hot-toast';
 import './index.css';
@@ -284,6 +285,13 @@ function App() {
               <Route path="/room-inventory-print" element={
                 <AdminRoute>
                   <RoomInventoryPrint />
+                </AdminRoute>
+              } />
+              
+              {/* Склады (только админ) */}
+              <Route path="/warehouse" element={
+                <AdminRoute>
+                  <Warehouse />
                 </AdminRoute>
               } />
               

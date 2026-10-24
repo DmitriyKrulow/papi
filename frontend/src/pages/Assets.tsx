@@ -78,6 +78,77 @@ const Assets: React.FC = () => {
   const [deptDropdownOpen, setDeptDropdownOpen] = useState(false);
   const [activeInventory, setActiveInventory] = useState<any>(null);
 
+  // Состояние для раскрытия строк и отображения единиц актива
+  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
+  const [unitsData, setUnitsData] = useState<Record<number, any[]>>({});
+  const [loadingUnits, setLoadingUnits] = useState<Record<number, boolean>>({});
+  
+  // Состояние для назначения сотрудника на единицу
+  const [assignUnitModal, setAssignUnitModal] = useState<{
+    isOpen: boolean;
+    unitId: number | null;
+    unitIdentifier: string;
+  }>({ isOpen: false, unitId: null, unitIdentifier: '' });
+  const [assignEmployeeId, setAssignEmployeeId] = useState<number | null>(null);
+  const [assignLoading, setAssignLoading] = useState(false);
+  
+  // Состояние для модального окна разделения актива
+  const [splitModal, setSplitModal] = useState<{
+    isOpen: boolean;
+    assetId: number | null;
+    assetName: string;
+    inventoryNumber: string;
+    quantity: number;
+  }>({ isOpen: false, assetId: null, assetName: '', inventoryNumber: '', quantity: 1 });
+  const [splitRoomId, setSplitRoomId] = useState<number | null>(null);
+  const [splitEmployeeId, setSplitEmployeeId] = useState<number | null>(null);
+  const [splitLoading, setSplitLoading] = useState(false);
+  const [splitRooms, setSplitRooms] = useState<any[]>([]);
+  const [splitEmployees, setSplitEmployees] = useState<any[]>([]);
+
+  // Токен для split-операций
+  const effectiveToken = useMemo(() => localStorage.getItem('token') || '', []);
+
+  // Загрузка помещений и сотрудников для модального окна разделения
+  const loadSplitData = useCallback(async () => {
+    if (!effectiveToken) {
+      console.warn('No token available for loadSplitData');
+      return;
+    }
+    try {
+      const [roomsRes, empsRes] = await Promise.all([
+        fetch('/api/admin/placement-assignments/rooms', {
+          headers: { 'Authorization': `Bearer ${effectiveToken}` },
+        }),
+        fetch('/api/admin/placement-assignments/employees', {
+          headers: { 'Authorization': `Bearer ${effectiveToken}` },
+        }),
+      ]);
+      
+      if (roomsRes.ok) {
+        const roomsData = await roomsRes.json();
+        console.log('Rooms loaded:', roomsData);
+        setSplitRooms(Array.isArray(roomsData) ? roomsData : []);
+      } else {
+        console.error('Failed to load rooms:', roomsRes.status, roomsRes.statusText);
+        setSplitRooms([]);
+      }
+      
+      if (empsRes.ok) {
+        const empsData = await empsRes.json();
+        console.log('Employees loaded:', empsData);
+        setSplitEmployees(Array.isArray(empsData) ? empsData : []);
+      } else {
+        console.error('Failed to load employees:', empsRes.status, empsRes.statusText);
+        setSplitEmployees([]);
+      }
+    } catch (e) {
+      console.error('Failed to load split data:', e);
+      setSplitRooms([]);
+      setSplitEmployees([]);
+    }
+  }, [effectiveToken]);
+
   // Debounce для поиска внутри dropdown-ов (чтобы input не терял фокус)
   const [debouncedRoomSearch, setDebouncedRoomSearch] = useState('');
   const [debouncedDeptSearch, setDebouncedDeptSearch] = useState('');
@@ -225,6 +296,125 @@ fetch('/api/asset-types/', { headers })
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Управление раскрытием строк для отображения единиц актива
+  const toggleRow = useCallback(async (assetId: number) => {
+    const newExpanded = new Set(expandedRows);
+    if (newExpanded.has(assetId)) {
+      newExpanded.delete(assetId);
+      setExpandedRows(newExpanded);
+    } else {
+      newExpanded.add(assetId);
+      setExpandedRows(newExpanded);
+      
+      // Загружаем единицы актива если ещё не загружены
+      if (!unitsData[assetId] && !loadingUnits[assetId]) {
+        setLoadingUnits(prev => ({ ...prev, [assetId]: true }));
+        try {
+          const token = await getToken();
+          const response = await fetch(`/api/asset-units/?asset_id=${assetId}`, {
+            headers: { 'Authorization': token ? `Bearer ${token}` : '' },
+          });
+          if (response.ok) {
+            const data = await response.json();
+            const units = data.units || [];
+            
+            // Если единиц нет и quantity > 1, создаём автоматически
+            if (units.length === 0) {
+              const asset = getSortedAndFilteredAssets.find(a => a.id === assetId);
+              if (asset && asset.quantity && asset.quantity > 1) {
+                console.log(`Создаю ${asset.quantity} единиц для актива ${asset.inventory_number}`);
+                
+                // Создаём единицы по одной
+                for (let i = 1; i <= asset.quantity; i++) {
+                  const uniqueId = `${asset.inventory_number}-${i}`;
+                  try {
+                    await fetch(`/api/asset-units/?asset_id=${assetId}&unit_number=${i}&unique_identifier=${encodeURIComponent(uniqueId)}`, {
+                      method: 'POST',
+                      headers: { 
+                        'Authorization': token ? `Bearer ${token}` : '',
+                        'Content-Type': 'application/json',
+                      },
+                    });
+                  } catch (err) {
+                    console.error(`Failed to create unit ${i}:`, err);
+                  }
+                }
+                
+                // Перезагружаем единицы
+                const refreshResponse = await fetch(`/api/asset-units/?asset_id=${assetId}`, {
+                  headers: { 'Authorization': token ? `Bearer ${token}` : '' },
+                });
+                if (refreshResponse.ok) {
+                  const refreshData = await refreshResponse.json();
+                  setUnitsData(prev => ({ ...prev, [assetId]: refreshData.units || [] }));
+                }
+              } else {
+                setUnitsData(prev => ({ ...prev, [assetId]: units }));
+              }
+            } else {
+              setUnitsData(prev => ({ ...prev, [assetId]: units }));
+            }
+          }
+        } catch (err) {
+          console.error('Failed to load asset units:', err);
+        } finally {
+          setLoadingUnits(prev => ({ ...prev, [assetId]: false }));
+        }
+      }
+    }
+  }, [expandedRows, unitsData, loadingUnits, getToken, getSortedAndFilteredAssets]);
+
+  // Разделение актива на отдельные объекты
+  const splitAsset = async (assetId: number) => {
+    if (!effectiveToken) return;
+    
+    setSplitLoading(true);
+    try {
+      const params = new URLSearchParams();
+      params.set('asset_id', assetId.toString());
+      if (splitRoomId) params.set('room_id', splitRoomId.toString());
+      if (splitEmployeeId) params.set('employee_id', splitEmployeeId.toString());
+      
+      const res = await fetch(`/api/assets/split/?${params}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${effectiveToken}` },
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        toast.success(`Актив разделён на ${data.new_assets.length} объектов`);
+        setSplitModal({ isOpen: false, assetId: null, assetName: '', inventoryNumber: '', quantity: 1 });
+        setSplitRoomId(null);
+        setSplitEmployeeId(null);
+        // Перезагружаем список активов
+        await loadAssets();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.detail || 'Ошибка разделения актива');
+      }
+    } catch (e: any) {
+      console.error('Split error:', e);
+      toast.error(e.message || 'Ошибка соединения');
+    } finally {
+      setSplitLoading(false);
+    }
+  };
+
+  const openSplitModal = async (assetId: number) => {
+    const asset = getSortedAndFilteredAssets.find(a => a.id === assetId);
+    if (asset) {
+      setSplitModal({
+        isOpen: true,
+        assetId: asset.id,
+        assetName: asset.name || '',
+        inventoryNumber: asset.inventory_number || '',
+        quantity: asset.quantity || 1,
+      });
+      // Загружаем помещения и сотрудников
+      await loadSplitData();
+    }
+  };
 
   const handleExport = async () => {
     try {
@@ -1135,6 +1325,9 @@ const handleEditClick = (asset: Asset) => {
                     <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-r border-gray-100 dark:border-gray-600 w-28">
                       RFID
                     </th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-32">
+                      Единицы
+                    </th>
                     <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-24">
                       Действия
                     </th>
@@ -1144,6 +1337,7 @@ const handleEditClick = (asset: Asset) => {
                   {getSortedAndFilteredAssets.map((asset) => {
                     const typeInfo = getAssetTypeLabel(asset.asset_type);
                     return (
+                      <>
                       <tr key={asset.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
                         <td className="px-4 py-3 text-sm font-mono text-gray-900 dark:text-gray-100 border-r border-gray-50 dark:border-gray-700">
                           {asset.inventory_number}
@@ -1213,6 +1407,32 @@ const handleEditClick = (asset: Asset) => {
                           )}
                         </td>
                         <td className="px-4 py-3 text-center">
+                          {asset.quantity && asset.quantity > 1 ? (
+                            <div className="flex flex-col items-center gap-1">
+                              <button
+                                onClick={() => toggleRow(asset.id)}
+                                className="flex items-center justify-center gap-1 px-2 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-700 rounded transition"
+                              >
+                                {expandedRows.has(asset.id) ? (
+                                  <ChevronUp className="w-3 h-3" />
+                                ) : (
+                                  <ChevronDown className="w-3 h-3" />
+                                )}
+                                <span>{asset.quantity}</span>
+                              </button>
+                              <button
+                                onClick={() => openSplitModal(asset.id)}
+                                className="text-[10px] px-2 py-0.5 bg-yellow-100 hover:bg-yellow-200 dark:bg-yellow-900 dark:hover:bg-yellow-800 text-yellow-700 dark:text-yellow-300 rounded transition"
+                                title="Разделить на отдельные объекты"
+                              >
+                                ✂️ Разделить
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-gray-400">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-center">
                           <div className="flex items-center justify-center gap-1">
                             <button
                               onClick={() => { setCurrentAsset(asset); setIsDetailsModalOpen(true); }}
@@ -1241,6 +1461,79 @@ const handleEditClick = (asset: Asset) => {
                           </div>
                         </td>
                       </tr>
+                      {/* Раскрывающаяся строка с деталями единиц актива */}
+                      {expandedRows.has(asset.id) && (
+                        <tr className="bg-blue-50 dark:bg-gray-750">
+                          <td colSpan={12} className="px-4 py-3">
+                            <div className="ml-8 space-y-2">
+                              {loadingUnits[asset.id] ? (
+                                <div className="text-sm text-gray-500 dark:text-gray-400">Загрузка единиц...</div>
+                              ) : unitsData[asset.id] && unitsData[asset.id].length > 0 ? (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                                  {unitsData[asset.id].map((unit: any) => (
+                                    <div
+                                      key={unit.id}
+                                      className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-600"
+                                    >
+                                      <div className="flex items-center justify-between mb-1">
+                                        <span className="text-xs font-mono font-semibold text-gray-700 dark:text-gray-300">
+                                          {unit.unique_identifier}
+                                        </span>
+                                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                                          unit.status === 'active'
+                                            ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
+                                            : unit.status === 'in_repair'
+                                            ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300'
+                                            : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+                                        }`}>
+                                          {unit.status === 'active' ? 'В работе' : unit.status === 'in_repair' ? 'В ремонте' : unit.status}
+                                        </span>
+                                      </div>
+                                      <div className="text-xs text-gray-600 dark:text-gray-400 space-y-0.5 mb-2">
+                                        {unit.current_employee_name ? (
+                                          <div className="flex items-center gap-1">
+                                            <span>👤</span>
+                                            <span className="font-medium">{unit.current_employee_name}</span>
+                                          </div>
+                                        ) : (
+                                          <div className="text-gray-400 italic">Не выдан</div>
+                                        )}
+                                        {unit.current_department_code && (
+                                          <div className="flex items-center gap-1">
+                                            <span>🏢</span>
+                                            <span>{unit.current_department_code}</span>
+                                          </div>
+                                        )}
+                                        {unit.rfid_tag && (
+                                          <div className="flex items-center gap-1">
+                                            <span>📡</span>
+                                            <span>{unit.rfid_tag}</span>
+                                          </div>
+                                        )}
+                                      </div>
+                                      <button
+                                        onClick={() => setAssignUnitModal({
+                                          isOpen: true,
+                                          unitId: unit.id,
+                                          unitIdentifier: unit.unique_identifier,
+                                        })}
+                                        className="w-full text-xs px-2 py-1 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900 dark:hover:bg-blue-800 text-blue-700 dark:text-blue-300 rounded transition"
+                                      >
+                                        {unit.current_employee_name ? '🔄 Переназначить' : '👤 Назначить'}
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="text-sm text-gray-500 dark:text-gray-400">
+                                  Нет зарегистрированных единиц. Создайте единицы через API.
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      </>
                     );
                   })}
                 </tbody>
@@ -1430,6 +1723,106 @@ const handleEditClick = (asset: Asset) => {
             />
           </AssetModal>
         </>
+      )}
+      
+      {/* Модальное окно разделения актива */}
+      {splitModal.isOpen && (
+        <AssetModal
+          isOpen={splitModal.isOpen}
+          onClose={() => {
+            setSplitModal({ isOpen: false, assetId: null, assetName: '', inventoryNumber: '', quantity: 1 });
+            setSplitRoomId(null);
+            setSplitEmployeeId(null);
+          }}
+          title={`Разделить: ${splitModal.inventoryNumber}`}
+          className="max-w-2xl"
+        >
+          <div className="space-y-4">
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">
+                ⚠️ Внимание!
+              </h3>
+              <p className="text-xs text-blue-800 dark:text-blue-200">
+                Актив "{splitModal.assetName}" (инв. {splitModal.inventoryNumber}) с количеством {splitModal.quantity} будет разделён на {splitModal.quantity} отдельных объекта:
+              </p>
+              <div className="mt-2 space-y-1">
+                {Array.from({ length: splitModal.quantity }, (_, i) => i + 1).map((num) => (
+                  <div key={num} className="text-xs font-mono text-blue-700 dark:text-blue-300">
+                    • {splitModal.inventoryNumber}-{num}
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Помещение для хранения (опционально)
+              </label>
+              <select
+                value={splitRoomId ?? ''}
+                onChange={(e) => setSplitRoomId(e.target.value ? Number(e.target.value) : null)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+              >
+                <option value="">— Не выбрано —</option>
+                {splitRooms.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.full_name || r.name || `Помещение ${r.id}`}
+                  </option>
+                ))}
+                {splitRooms.length === 0 && (
+                  <option value="" disabled>
+                    Нет доступных помещений
+                  </option>
+                )}
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Сотрудник (опционально)
+              </label>
+              <select
+                value={splitEmployeeId ?? ''}
+                onChange={(e) => setSplitEmployeeId(e.target.value ? Number(e.target.value) : null)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+              >
+                <option value="">— Не выбрано —</option>
+                {splitEmployees.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.full_name} — {e.position || '—'} ({e.department_name || '—'})
+                  </option>
+                ))}
+                {splitEmployees.length === 0 && (
+                  <option value="" disabled>
+                    Нет доступных сотрудников
+                  </option>
+                )}
+              </select>
+            </div>
+            
+            <button
+              onClick={() => splitModal.assetId && splitAsset(splitModal.assetId)}
+              disabled={splitLoading}
+              className={`w-full py-3 px-4 rounded-lg text-white font-medium transition flex items-center justify-center gap-2 ${
+                splitLoading
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : 'bg-yellow-600 hover:bg-yellow-700'
+              }`}
+            >
+              {splitLoading ? (
+                <span className="flex items-center gap-2">
+                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Разделение...
+                </span>
+              ) : (
+                <>✂️ Разделить на {splitModal.quantity} объектов</>
+              )}
+            </button>
+          </div>
+        </AssetModal>
       )}
     </div>
   );

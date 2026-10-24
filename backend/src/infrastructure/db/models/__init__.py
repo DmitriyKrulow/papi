@@ -36,11 +36,13 @@ from .system_settings import SystemSettings
 from .asset_handover import AssetHandover
 from .rfid_api_key import RfidApiKey
 from .storage_address import StorageAddress
+from .warehouse_location import WarehouseLocation
 from .inventory_schedule import InventorySchedule, ReconciliationRecord
 from .regulatory_document import RegulatoryDocument, EquipmentStandard, ResponsibilityRecord
 from .room_inventory_print import RoomInventoryPrint
 from .transfer_act import TransferAct
 from .asset_transfer_history import AssetTransferHistory
+from .asset_unit import AssetUnit
 
 __all__ = [
     "Base",
@@ -75,4 +77,6 @@ __all__ = [
     "RoomInventoryPrint",
     "TransferAct",
     "AssetTransferHistory",
+    "WarehouseLocation",
+    "AssetUnit",
 ]

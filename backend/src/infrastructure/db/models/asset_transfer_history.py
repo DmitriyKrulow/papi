@@ -25,6 +25,11 @@ class AssetTransferHistory(Base):
 
     id = Column(Integer, primary_key=True)
     asset_id = Column(Integer, ForeignKey("assets.id"), nullable=False, index=True)
+    
+    # Если актив имеет несколько единиц (quantity > 1), указываем конкретную единицу
+    asset_unit_id = Column(
+        Integer, ForeignKey("asset_units.id"), nullable=True, index=True
+    )
 
     # Кому было передано
     new_employee_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
@@ -48,9 +53,11 @@ class AssetTransferHistory(Base):
         Index("idx_asset_transfer_history_new_employee_id", "new_employee_id"),
         Index("idx_asset_transfer_history_source", "source"),
         Index("idx_asset_transfer_history_transfer_date", "transfer_date"),
+        Index("idx_asset_transfer_history_asset_unit_id", "asset_unit_id"),
     )
 
     asset = relationship("Asset", foreign_keys=[asset_id])
+    asset_unit = relationship("AssetUnit", foreign_keys=[asset_unit_id])
     new_employee = relationship("Employee", foreign_keys=[new_employee_id])
     prev_employee = relationship("Employee", foreign_keys=[prev_employee_id])
     created_by_user = relationship("User", foreign_keys=[created_by_user_id])

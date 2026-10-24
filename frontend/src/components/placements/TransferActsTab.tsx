@@ -35,6 +35,14 @@ interface RoomAsset {
   asset_type: string;
   employee_name?: string | null;
   responsible_person?: string;
+  units?: Array<{
+    id: number;
+    unique_identifier: string;
+    unit_number: number;
+    current_employee_name?: string | null;
+    status: string;
+    rfid_tag?: string | null;
+  }>;
 }
 
 interface TransferActItem {
@@ -44,6 +52,14 @@ interface TransferActItem {
   quantity: number;
   model: string;
   serial_number: string;
+  units?: Array<{
+    id: number;
+    unique_identifier: string;
+    unit_number: number;
+    current_employee_name?: string | null;
+    status: string;
+    rfid_tag?: string | null;
+  }>;
 }
 
 interface TransferActAttachment {
@@ -112,6 +128,7 @@ export const TransferActsTab: React.FC<Props> = ({
   const [foundAssets, setFoundAssets] = useState<RoomAsset[]>([]);
   const [searching, setSearching] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [selectedUnitIds, setSelectedUnitIds] = useState<Set<number>>(new Set());
   const [selectedEmployee, setSelectedEmployee] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
 
@@ -189,12 +206,33 @@ export const TransferActsTab: React.FC<Props> = ({
     });
   };
 
-  const clearSelection = () => setSelectedIds(new Set());
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+    setSelectedUnitIds(new Set());
+  };
+
+  const toggleUnit = (unitId: number) => {
+    setSelectedUnitIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(unitId)) next.delete(unitId);
+      else next.add(unitId);
+      return next;
+    });
+  };
+
+  const selectAllUnitsForAsset = (assetId: number, units: RoomAsset['units']) => {
+    if (!units) return;
+    setSelectedUnitIds((prev) => {
+      const next = new Set(prev);
+      units.forEach((u) => next.add(u.id));
+      return next;
+    });
+  };
 
   const createAct = async () => {
     if (!effectiveToken) return;
-    if (selectedIds.size === 0) {
-      toast.error('Выберите хотя бы один актив');
+    if (selectedIds.size === 0 && selectedUnitIds.size === 0) {
+      toast.error('Выберите хотя бы один актив или единицу');
       return;
     }
     if (!selectedEmployee) {
@@ -210,6 +248,7 @@ export const TransferActsTab: React.FC<Props> = ({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             asset_ids: Array.from(selectedIds),
+            unit_ids: Array.from(selectedUnitIds),
             employee_id: selectedEmployee,
             room_id: selectedRoom || null,
           }),
@@ -220,6 +259,7 @@ export const TransferActsTab: React.FC<Props> = ({
         const data = await res.json();
         toast.success(`Акт ${data.act?.act_number || ''} сформирован`);
         setSelectedIds(new Set());
+        setSelectedUnitIds(new Set());
         setSearch('');
         setFoundAssets([]);
         await loadActs();
@@ -240,12 +280,12 @@ export const TransferActsTab: React.FC<Props> = ({
 
   const confirmAct = async (act: TransferAct) => {
     if (!effectiveToken) return;
-    if (!window.confirm(`Подписать акт ${act.act_number}? Сотрудник будет проставлен в данных активов.`)) return;
+    if (!window.confirm(`Подписать акт ${act.act_number}? Сотрудник будет проставлен в данных активов и единиц.`)) return;
     try {
       const res = await api(`/api/admin/transfer-acts/${act.id}/confirm`, { method: 'POST' }, effectiveToken);
       if (res.ok) {
         const data = await res.json();
-        toast.success(`Акт подписан (активов обновлено: ${data.assets_updated})`);
+        toast.success(`Акт подписан (активов: ${data.assets_updated}, единиц: ${data.units_updated})`);
         loadActs();
       } else {
         const err = await res.json().catch(() => ({}));
@@ -381,7 +421,7 @@ export const TransferActsTab: React.FC<Props> = ({
           <div className="mb-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Найдено: {foundAssets.length} · выбрано: {selectedIds.size}
+                Найдено: {foundAssets.length} · выбрано активов: {selectedIds.size} · единиц: {selectedUnitIds.size}
               </span>
               <div className="flex gap-2">
                 <button onClick={selectVisible} className="text-xs text-blue-600 hover:underline">
@@ -420,12 +460,43 @@ export const TransferActsTab: React.FC<Props> = ({
                       <td className="px-2 py-1.5 text-gray-700 dark:text-gray-300">{a.inventory_number}</td>
                       <td className="px-2 py-1.5 text-gray-700 dark:text-gray-300">{a.model || '—'}</td>
                       <td className="px-2 py-1.5 text-gray-700 dark:text-gray-300">{a.serial_number || '—'}</td>
-                      <td className="px-2 py-1.5 text-gray-700 dark:text-gray-300">{a.quantity || 1}</td>
+                      <td className="px-2 py-1.5 text-gray-700 dark:text-gray-300">
+                        {a.quantity || 1}
+                        {a.units && a.units.length > 0 && (
+                          <button
+                            onClick={() => selectAllUnitsForAsset(a.id, a.units)}
+                            className="ml-2 text-xs text-blue-600 hover:underline"
+                            title="Выбрать все единицы"
+                          >
+                            [+единицы]
+                          </button>
+                        )}
+                      </td>
                       <td className="px-2 py-1.5 text-gray-700 dark:text-gray-300">{a.employee_name || a.responsible_person || '—'}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              
+              {/* Отображение выбранных единиц */}
+              {selectedUnitIds.size > 0 && (
+                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border-t border-blue-200 dark:border-blue-700">
+                  <div className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-2">Выбранные единицы:</div>
+                  <div className="flex flex-wrap gap-2">
+                    {foundAssets.flatMap(a => a.units || []).filter(u => selectedUnitIds.has(u.id)).map(u => (
+                      <div key={u.id} className="flex items-center gap-1 text-xs bg-white dark:bg-gray-800 px-2 py-1 rounded border">
+                        <span className="font-mono">{u.unique_identifier}</span>
+                        <button
+                          onClick={() => toggleUnit(u.id)}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -450,9 +521,9 @@ export const TransferActsTab: React.FC<Props> = ({
 
         <button
           onClick={createAct}
-          disabled={creating || selectedIds.size === 0 || !selectedEmployee}
+          disabled={creating || (selectedIds.size === 0 && selectedUnitIds.size === 0) || !selectedEmployee}
           className={`w-full py-3 px-4 rounded-lg text-white font-medium transition flex items-center justify-center gap-2 ${
-            creating || selectedIds.size === 0 || !selectedEmployee
+            creating || (selectedIds.size === 0 && selectedUnitIds.size === 0) || !selectedEmployee
               ? 'bg-gray-400 cursor-not-allowed'
               : 'bg-blue-600 hover:bg-blue-700'
           }`}

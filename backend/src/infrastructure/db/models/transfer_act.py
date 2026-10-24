@@ -43,6 +43,9 @@ class TransferAct(Base):
 
     # Список id активов, включённых в акт (JSON)
     asset_ids = Column(JSON, nullable=False, default=list)
+    
+    # Список id единиц актива, включённых в акт (JSON) — для активов с quantity > 1
+    unit_ids = Column(JSON, nullable=False, default=list)
 
     # Сгенерированный файл акта
     file_path = Column(String(500), nullable=True)

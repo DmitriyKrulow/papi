@@ -17,6 +17,7 @@ from src.infrastructure.db.models.inventory_check_item import InventoryCheckItem
 from src.infrastructure.db.models.asset import Asset
 from src.infrastructure.db.models.user import User
 from src.infrastructure.db.models.department import Department, Room
+from src.infrastructure.db.models.storage_address import StorageAddress
 from src.infrastructure.db.models.employee import Employee
 from src.presentation.http.dependencies.auth import get_current_user, get_current_admin
 from src.shared.utils import get_frontend_url
@@ -91,6 +92,28 @@ def _get_assets_for_check(db: Session, check_type: str, scope_id: Optional[int] 
                 query = query.filter(Asset.responsible_person == str(scope_id))
         else:
             query = query.filter(Asset.responsible_person.isnot(None))
+    elif check_type == "by_warehouse":
+        # По складу — ищем все активы, привязанные к локациям этого склада
+        warehouse = db.query(Room).filter(
+            Room.id == scope_id,
+            Room.room_type == "warehouse",
+        ).first()
+        if not warehouse:
+            raise HTTPException(status_code=404, detail="Склад не найден")
+        
+        # Получаем все storage_addresses этого склада
+        warehouse_address_ids = [
+            sa.id for sa in db.query(StorageAddress.id).filter(
+                StorageAddress.room_id == scope_id,
+                StorageAddress.is_active == True,
+            ).all()
+        ]
+        
+        if warehouse_address_ids:
+            query = query.filter(Asset.storage_address_id.in_(warehouse_address_ids))
+        else:
+            # Если нет локаций — возвращаем пустой список
+            query = query.filter(Asset.id == -1)  # Невозможное условие
     # "full" — все активы
 
     return query.order_by(Asset.inventory_number).all()
@@ -319,6 +342,22 @@ async def get_scope_options(
                     "type": "user",
                 }
                 for u in users
+            ]
+        elif check_type == "by_warehouse":
+            warehouses = db.query(Room).filter(
+                Room.room_type == "warehouse",
+                Room.is_active == True,
+            ).order_by(Room.name).all()
+            return [
+                {
+                    "id": r.id,
+                    "name": r.name,
+                    "department_id": r.department_id,
+                    "department_name": r.department.name if r.department else "",
+                    "building": r.building,
+                    "floor": r.floor,
+                }
+                for r in warehouses
             ]
         return []
     except Exception as e:

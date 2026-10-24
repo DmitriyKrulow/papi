@@ -67,6 +67,9 @@ class Room(Base):
     floor = Column(String(20), nullable=True)
     building = Column(String(255), nullable=True)
 
+    # Тип помещения: "room" (обычное), "warehouse" (склад)
+    room_type = Column(String(20), nullable=False, default="room", index=True)
+
     is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime, nullable=False, default=datetime.now)
     updated_at = Column(
@@ -75,8 +78,15 @@ class Room(Base):
 
     department = relationship("Department", back_populates="rooms")
     inventory_prints = relationship("RoomInventoryPrint", back_populates="room")
+    storage_addresses = relationship("StorageAddress", back_populates="room", foreign_keys="StorageAddress.room_id")
+    warehouse_locations = relationship(
+        "WarehouseLocation",
+        back_populates="room",
+        foreign_keys="WarehouseLocation.room_id",
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self) -> str:
-        return f"<Room(id={self.id}, name='{self.name}', department_id={self.department_id})>"
+        return f"<Room(id={self.id}, name='{self.name}', type='{self.room_type}', department_id={self.department_id})>"
 
 
