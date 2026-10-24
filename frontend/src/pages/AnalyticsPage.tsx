@@ -1,6 +1,6 @@
 // frontend/src/pages/AnalyticsPage.tsx
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, Wrench, Loader2 } from 'lucide-react';
+import { TrendingUp, Wrench, Loader2, AlertTriangle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface BreakdownTrend {
@@ -31,21 +31,36 @@ const AnalyticsPage: React.FC = () => {
   const navigate = useNavigate();
   const [data, setData] = useState<BreakdownData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [months, setMonths] = useState(12);
 
   const fetchData = async () => {
     setLoading(true);
+    setError(null);
     try {
       const token = localStorage.getItem('token');
       const res = await fetch(`/api/analytics/breakdown-trends?months=${months}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (res.ok) {
-        const json = await res.json();
-        setData(json);
+      if (!res.ok) {
+        setData(null);
+        setError(
+          res.status === 403
+            ? 'Недостаточно прав: аналитика поломок доступна только администраторам.'
+            : `Не удалось загрузить данные (HTTP ${res.status}).`,
+        );
+        return;
       }
+      const json = await res.json();
+      setData({
+        top_types: json.top_types ?? [],
+        monthly_trend: json.monthly_trend ?? [],
+        status_distribution: json.status_distribution ?? [],
+      });
     } catch (e) {
       console.error(e);
+      setData(null);
+      setError('Сервер недоступен. Проверьте, что backend запущен.');
     } finally {
       setLoading(false);
     }
@@ -65,6 +80,10 @@ const AnalyticsPage: React.FC = () => {
 
   const maxTypeCount = data?.top_types[0]?.repair_count || 1;
   const barColors = ['#EF4444', '#F97316', '#F59E0B', '#84CC16', '#22C55E', '#14B8A6', '#3B82F6', '#6366F1', '#8B5CF6', '#EC4899'];
+
+  const hasData = !!data && (
+    data.top_types.length > 0 || data.monthly_trend.length > 0 || data.status_distribution.length > 0
+  );
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -102,7 +121,28 @@ const AnalyticsPage: React.FC = () => {
           <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
           <span className="ml-3 text-gray-500">Загрузка...</span>
         </div>
-      ) : data ? (
+      ) : error ? (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-6 flex flex-col items-start gap-3">
+          <div className="flex items-center gap-2 text-red-700 dark:text-red-300">
+            <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+            <span className="text-sm font-medium">{error}</span>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={fetchData}
+              className="px-3 py-1.5 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700 transition"
+            >
+              Повторить
+            </button>
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="px-3 py-1.5 text-sm rounded-lg border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/40 transition"
+            >
+              На дашборд
+            </button>
+          </div>
+        </div>
+      ) : hasData ? (
         <>
           {/* Топ-10 типов активов по ремонтам */}
           {data.top_types.length > 0 && (
@@ -249,8 +289,29 @@ const AnalyticsPage: React.FC = () => {
           </div>
         </>
       ) : (
-        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-6 text-center">
-          <p className="text-blue-700 dark:text-blue-300">Нет данных для отображения</p>
+        <div className="bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-12 text-center">
+          <div className="text-5xl mb-4">📊</div>
+          <h3 className="text-lg font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Нет данных для отображения
+          </h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 max-w-md mx-auto">
+            За выбранный период заявок на ремонт не зафиксировано.
+            Попробуйте расширить период или перейдите к списку ремонтов.
+          </p>
+          <div className="flex items-center justify-center gap-3">
+            <button
+              onClick={() => setMonths(24)}
+              className="px-4 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition"
+            >
+              Показать за 24 мес
+            </button>
+            <button
+              onClick={() => navigate('/repairs')}
+              className="px-4 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+            >
+              Список ремонтов
+            </button>
+          </div>
         </div>
       )}
     </div>

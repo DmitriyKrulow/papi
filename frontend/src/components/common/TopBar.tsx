@@ -3,14 +3,17 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useTheme } from '../../hooks/useTheme';
+import { useNavSections } from '../navigation/navItems';
 import { Sun, Moon, UserCog, LogOut, Menu, X, Bell, Search } from 'lucide-react';
 import NotificationDropdown from '../notifications/NotificationDropdown';
 
 const TopBar = () => {
   const navigate = useNavigate();
-  const { user, logout, isAuthenticated } = useAuth();
+  const { user, logout, isAuthenticated, isAdmin } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const navSections = useNavSections(isAdmin);
 
   const handleLogout = () => {
     logout();
@@ -91,55 +94,62 @@ const TopBar = () => {
 
       {/* Mobile menu */}
       {mobileMenuOpen && (
-        <div className="lg:hidden border-t border-gray-100 dark:border-graphite-800 bg-white dark:bg-graphite-900 py-2 px-3 space-y-0.5">
-          <div className="md:hidden mb-2">
+        <div className="lg:hidden border-t border-gray-100 dark:border-graphite-800 bg-white dark:bg-graphite-900 py-2 px-3 space-y-4 max-h-[80vh] overflow-y-auto">
+          {/* Search (mobile) */}
+          <div className="md:hidden">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
                 placeholder="Поиск..."
-                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 dark:border-graphite-700 rounded-lg bg-gray-50 dark:bg-graphite-800 text-gray-900 dark:text-graphite-100 focus:outline-none focus:ring-1 focus:ring-accent-400/50 placeholder:text-gray-400"
+                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-accent-400/50 placeholder:text-gray-400"
               />
             </div>
           </div>
           
+          {/* User info */}
           {isAuthenticated && user && (
-            <div className="px-2 py-1.5 text-sm text-gray-500 dark:text-graphite-400 flex items-center gap-2">
+            <div className="px-2 py-1.5 text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2">
               <UserCog className="w-4 h-4" />
               {user.username}
             </div>
           )}
           
+          {/* Navigation sections */}
           {isAuthenticated && (
             <>
-              <Link
-                to="/dashboard"
-                onClick={() => setMobileMenuOpen(false)}
-                className="block px-3 py-2 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-graphite-800 transition-colors text-gray-700 dark:text-graphite-300"
-              >
-                📊 Дашборд
-              </Link>
-              <Link
-                to="/assets"
-                onClick={() => setMobileMenuOpen(false)}
-                className="block px-3 py-2 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-graphite-800 transition-colors text-gray-700 dark:text-graphite-300"
-              >
-                📦 Активы
-              </Link>
-              <Link
-                to="/inventory"
-                onClick={() => setMobileMenuOpen(false)}
-                className="block px-3 py-2 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-graphite-800 transition-colors text-gray-700 dark:text-graphite-300"
-              >
-                📋 Инвентаризация
-              </Link>
-              <button
-                onClick={handleLogout}
-                className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-red-500"
-              >
-                🚪 Выйти
-              </button>
+              {navSections.map(section => (
+                <div key={section.title}>
+                  <div className="px-2 py-1 text-xs font-semibold text-gray-400 dark:text-gray-600 uppercase tracking-wider">
+                    {section.title}
+                  </div>
+                  <div className="space-y-0.5">
+                    {section.items.map(item => (
+                      <Link
+                        key={item.path}
+                        to={item.path}
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="block px-3 py-2 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-gray-700 dark:text-gray-300 flex items-center gap-2"
+                      >
+                        <span className="flex-shrink-0">{item.icon}</span>
+                        <span>{item.label}</span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </>
+          )}
+
+          {/* Logout */}
+          {isAuthenticated && (
+            <button
+              onClick={handleLogout}
+              className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-red-500 flex items-center gap-2"
+            >
+              <LogOut className="w-4 h-4" />
+              Выйти
+            </button>
           )}
         </div>
       )}

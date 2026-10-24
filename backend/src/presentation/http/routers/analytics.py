@@ -6,11 +6,11 @@ from typing import Optional, List
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func, case
+from sqlalchemy import func, case, desc
 
 from src.infrastructure.db.init_db import get_db
 from src.infrastructure.db.models.asset import Asset
-from src.infrastructure.db.models.repair_request import RepairRequest
+from src.infrastructure.db.models.repair_request import RepairRequest, RepairStatus
 from src.infrastructure.db.models.inventory_check import InventoryCheck
 from src.infrastructure.db.models.inventory_check_item import InventoryCheckItem
 from src.infrastructure.db.models.asset_type_config import AssetTypeConfig
@@ -19,6 +19,14 @@ from src.presentation.http.dependencies.auth import get_current_admin
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/analytics", tags=["analytics"])
+
+
+def _type_name(configs: dict, code: Optional[str]) -> str:
+    """Название типа актива из конфига с безопасным фолбэком."""
+    if not code:
+        return "Без типа"
+    cfg = configs.get(code)
+    return cfg.name if cfg else code
 
 
 @router.get("/breakdown-trends")
@@ -55,7 +63,7 @@ async def get_breakdown_trends(
             Asset.is_active == True,
         )
         .group_by(RepairRequest.asset_id, Asset.name, Asset.inventory_number, Asset.asset_type)
-        .order_by(func.desc("repair_count"))
+        .order_by(desc("repair_count"))
         .limit(limit)
         .all()
     )
@@ -76,7 +84,7 @@ async def get_breakdown_trends(
             Asset.is_active == True,
         )
         .group_by(Asset.asset_type)
-        .order_by(func.desc("repair_count"))
+        .order_by(desc("repair_count"))
         .limit(10)
         .all()
     )
@@ -84,11 +92,11 @@ async def get_breakdown_trends(
     # Динамика по месяцам
     monthly_repairs = (
         db.query(
-            func.strftime('%Y-%m', RepairRequest.created_at).label("month"),
+            func.to_char(RepairRequest.created_at, 'YYYY-MM').label("month"),
             func.count(RepairRequest.id).label("count"),
         )
         .filter(RepairRequest.created_at >= cutoff_date)
-        .group_by(func.strftime('%Y-%m', RepairRequest.created_at))
+        .group_by(func.to_char(RepairRequest.created_at, 'YYYY-MM'))
         .order_by("month")
         .all()
     )
@@ -122,7 +130,7 @@ async def get_breakdown_trends(
         "top_types": [
             {
                 "type_code": t.asset_type or "unknown",
-                "type_name": type_configs.get(t.asset_type or "").name if t.asset_type else "unknown",
+                "type_name": _type_name(type_configs, t.asset_type),
                 "repair_count": t.repair_count or 0,
                 "completed_count": t.completed_count or 0,
                 "avg_cost": float(t.avg_cost or 0),
@@ -171,7 +179,7 @@ async def get_discrepancy_analysis(
             Asset.is_active == True,
         )
         .group_by(Asset.department_code)
-        .order_by(func.desc("missing_count"))
+        .order_by(desc("missing_count"))
         .all()
     )
     
@@ -190,14 +198,14 @@ async def get_discrepancy_analysis(
             Asset.is_active == True,
         )
         .group_by(Asset.asset_type)
-        .order_by(func.desc("missing_count"))
+        .order_by(desc("missing_count"))
         .all()
     )
     
     # Динамика расхождений по месяцам
     monthly_discrepancies = (
         db.query(
-            func.strftime('%Y-%m', InventoryCheck.created_at).label("month"),
+            func.to_char(InventoryCheck.created_at, 'YYYY-MM').label("month"),
             func.sum(case((InventoryCheckItem.result == "missing", 1), else_=0)).label("missing"),
             func.sum(case((InventoryCheckItem.result == "surplus", 1), else_=0)).label("surplus"),
         )
@@ -206,7 +214,7 @@ async def get_discrepancy_analysis(
             InventoryCheck.created_at >= cutoff_date,
             InventoryCheck.status == "completed",
         )
-        .group_by(func.strftime('%Y-%m', InventoryCheck.created_at))
+        .group_by(func.to_char(InventoryCheck.created_at, 'YYYY-MM'))
         .order_by("month")
         .all()
     )
@@ -266,7 +274,7 @@ async def get_purchase_recommendations(
         .filter(Asset.is_active == True)
         .group_by(Asset.asset_type)
         .having(func.count(RepairRequest.id) > 0)
-        .order_by(func.desc("repair_count"))
+        .order_by(desc("repair_count"))
         .limit(5)
         .all()
     )
@@ -288,7 +296,7 @@ async def get_purchase_recommendations(
             Asset.purchase_price > 0,
             (Asset.purchase_price - Asset.current_value) / Asset.purchase_price >= 0.8,
         )
-        .order_by(func.desc("wear_percent"))
+        .order_by(desc("wear_percent"))
         .limit(20)
         .all()
     )
@@ -306,7 +314,7 @@ async def get_purchase_recommendations(
             Asset.is_active == True,
         )
         .group_by(Asset.asset_type)
-        .order_by(func.desc("missing_count"))
+        .order_by(desc("missing_count"))
         .limit(10)
         .all()
     )
@@ -317,7 +325,7 @@ async def get_purchase_recommendations(
         "replacement_candidates": [
             {
                 "type_code": r.asset_type or "unknown",
-                "type_name": type_configs.get(r.asset_type or "").name if r.asset_type else "unknown",
+                "type_name": _type_name(type_configs, r.asset_type),
                 "repair_count": r.repair_count or 0,
                 "avg_repair_cost": float(r.avg_repair_cost or 0),
                 "total_assets": r.total_assets or 0,
@@ -366,10 +374,14 @@ async def get_analytics_overview(
         .all()
     )
     
-    # Активы требующие ремонта
+    # Активы требующие ремонта (заявки в работе: отправлены/одобрены/в процессе)
     pending_repairs = (
         db.query(func.count(RepairRequest.id))
-        .filter(RepairRequest.status.in_(["open", "in_progress"]))
+        .filter(RepairRequest.status.in_([
+            RepairStatus.SUBMITTED,
+            RepairStatus.APPROVED,
+            RepairStatus.IN_PROGRESS,
+        ]))
         .scalar() or 0
     )
     

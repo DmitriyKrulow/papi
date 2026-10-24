@@ -336,7 +336,7 @@ const LayoutWithSidebar: React.FC<{ children: React.ReactNode }> = ({ children }
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <TopBar />
-        <main className="flex-grow">
+        <main className="flex-grow px-4 py-6 lg:px-6 lg:py-8">
           {children}
         </main>
       </div>
