@@ -20,6 +20,72 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
   const [responsibleOptions, setResponsibleOptions] = useState<any[]>([]);
   const [storageAddresses, setStorageAddresses] = useState<any[]>([]);
   const [selectedStorageAddressId, setSelectedStorageAddressId] = useState<number | ''>('');
+  const [storageSearchQuery, setStorageSearchQuery] = useState('');
+  const [storageDropdownOpen, setStorageDropdownOpen] = useState(false);
+
+  // Закрытие dropdown при клике вне
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.storage-search-container')) {
+        setStorageDropdownOpen(false);
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
+
+  // Загрузка складских полок
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    fetch('/api/storage-addresses/rooms/all?room_type=warehouse', {
+      headers: { 'Authorization': `Bearer ${token}` },
+    })
+      .then(r => r.ok ? r.json() : [])
+      .catch(() => [])
+      .then(rooms => {
+        if (!Array.isArray(rooms) || rooms.length === 0) return;
+        
+        const loadTrees = Promise.all(
+          rooms.map((room: any) =>
+            fetch(`/api/storage-addresses/rooms/${room.id}/tree`, {
+              headers: { 'Authorization': `Bearer ${token}` },
+            })
+              .then(r => r.ok ? r.json() : { zones: [], storage_tree: [] })
+              .catch(() => ({ zones: [], storage_tree: [] }))
+          )
+        );
+        
+        loadTrees.then(trees => {
+          const shelves: any[] = [];
+          trees.forEach(tree => {
+            const collectShelves = (nodes: any[], path: string = '') => {
+              for (const node of nodes) {
+                const currentPath = path ? `${path} → ${node.name}` : node.name;
+                if (node.level === 'shelf') {
+                  shelves.push({
+                    id: node.id,
+                    name: node.name,
+                    full_address: currentPath,
+                  });
+                }
+                if (node.children) {
+                  collectShelves(node.children, currentPath);
+                }
+              }
+            };
+            collectShelves(tree.zones || []);
+            collectShelves(tree.storage_tree || []);
+          });
+          setStorageAddresses(shelves);
+        });
+      });
+  }, []);
+
+  const filteredShelves = storageAddresses.filter(sa =>
+    sa.full_address.toLowerCase().includes(storageSearchQuery.toLowerCase()) ||
+    sa.name.toLowerCase().includes(storageSearchQuery.toLowerCase())
+  );
 
   const {
     register,
@@ -902,38 +968,49 @@ const AddAssetForm: React.FC<AddAssetFormProps> = ({ onSubmit, onClose }) => {
           </p>
         </div>
 
-        <div>
+        <div className="storage-search-container">
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
-            📍 Склад/Ячейка
+            📍 Адрес хранения (склад → стеллаж → полка)
           </label>
-          <select
-            value={selectedStorageAddressId}
-            onChange={(e) => {
-              const addrId = e.target.value ? Number(e.target.value) : null;
-              setSelectedStorageAddressId(addrId || '');
-              if (addrId) {
-                const addr = storageAddresses.find((a: any) => a.id === addrId);
-                if (addr) {
-                  setValue('storage_address_id', addrId);
-                  setValue('storage_address_name', addr.name || addr.full_address || addr.code);
-                }
-              } else {
-                setValue('storage_address_id', undefined);
-                setValue('storage_address_name', '');
-              }
-            }}
-            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            disabled={loadingOptions || storageAddresses.length === 0}
-          >
-            <option value="">Не выбрано</option>
-            {storageAddresses.map((addr: any) => (
-              <option key={addr.id} value={addr.id}>
-                {addr.name} {addr.code ? `(${addr.code})` : ''} {addr.full_address ? `- ${addr.full_address}` : ''}
-              </option>
-            ))}
-          </select>
+          <div className="relative">
+            <input
+              type="text"
+              value={storageSearchQuery}
+              onChange={(e) => {
+                setStorageSearchQuery(e.target.value);
+                setStorageDropdownOpen(true);
+              }}
+              onFocus={() => setStorageDropdownOpen(true)}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Поиск склада, стеллажа, полки..."
+            />
+            {storageDropdownOpen && filteredShelves.length > 0 && (
+              <div className="absolute z-50 mt-1 w-full max-h-60 overflow-y-auto bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg">
+                {filteredShelves.map((sa: any) => (
+                  <div
+                    key={sa.id}
+                    onClick={() => {
+                      setSelectedStorageAddressId(sa.id);
+                      setValue('storage_address_id', sa.id);
+                      setValue('storage_address_name', sa.full_address);
+                      setStorageSearchQuery(sa.full_address);
+                      setStorageDropdownOpen(false);
+                    }}
+                    className="px-4 py-2.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer text-sm text-gray-900 dark:text-gray-100 border-b border-gray-100 dark:border-gray-700 last:border-b-0"
+                  >
+                    <div className="font-medium">{sa.full_address}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {storageDropdownOpen && filteredShelves.length === 0 && storageSearchQuery && (
+              <div className="absolute z-50 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                Ничего не найдено
+              </div>
+            )}
+          </div>
           {storageAddresses.length === 0 && !loadingOptions && (
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Нет доступных ячеек</p>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Нет доступных ячеек склада</p>
           )}
         </div>
 

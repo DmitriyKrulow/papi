@@ -21,6 +21,79 @@ const EditAssetForm: React.FC<EditAssetFormProps> = ({ existingAsset, onSubmit, 
   const [responsibleOptions, setResponsibleOptions] = useState<any[]>([]);
   const [storageAddresses, setStorageAddresses] = useState<any[]>([]);
   const [selectedStorageAddressId, setSelectedStorageAddressId] = useState<number | ''>('');
+  const [storageSearchQuery, setStorageSearchQuery] = useState('');
+  const [storageDropdownOpen, setStorageDropdownOpen] = useState(false);
+
+  // Загрузка складских полок
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    console.log('[EditAssetForm] Loading storage addresses, token exists:', !!token);
+    fetch('/api/storage-addresses/rooms/all?room_type=warehouse', {
+      headers: { 'Authorization': `Bearer ${token}` },
+    })
+      .then(r => {
+        console.log('[EditAssetForm] rooms/all response:', r.status);
+        return r.ok ? r.json() : [];
+      })
+      .catch(e => {
+        console.error('[EditAssetForm] rooms/all error:', e);
+        return [];
+      })
+      .then(rooms => {
+        console.log('[EditAssetForm] rooms:', rooms);
+        if (!Array.isArray(rooms) || rooms.length === 0) return;
+        
+        // Загружаем дерево для каждого склада
+        const loadTrees = Promise.all(
+          rooms.map((room: any) =>
+            fetch(`/api/storage-addresses/rooms/${room.id}/tree`, {
+              headers: { 'Authorization': `Bearer ${token}` },
+            })
+              .then(r => {
+                console.log(`[EditAssetForm] tree for room ${room.id}:`, r.status);
+                return r.ok ? r.json() : { zones: [], storage_tree: [] };
+              })
+              .catch(e => {
+                console.error(`[EditAssetForm] tree error for room ${room.id}:`, e);
+                return { zones: [], storage_tree: [] };
+              })
+          )
+        );
+        
+        loadTrees.then(trees => {
+          console.log('[EditAssetForm] trees:', trees);
+          const shelves: any[] = [];
+          trees.forEach(tree => {
+            // Собираем все полки из зон
+            const collectShelves = (nodes: any[], path: string = '') => {
+              for (const node of nodes) {
+                const currentPath = path ? `${path} → ${node.name}` : node.name;
+                if (node.level === 'shelf') {
+                  shelves.push({
+                    id: node.id,
+                    name: node.name,
+                    full_address: currentPath,
+                  });
+                }
+                if (node.children) {
+                  collectShelves(node.children, currentPath);
+                }
+              }
+            };
+            collectShelves(tree.zones || []);
+            collectShelves(tree.storage_tree || []);
+          });
+          console.log('[EditAssetForm] shelves collected:', shelves);
+          setStorageAddresses(shelves);
+        });
+      });
+  }, []);
+
+  // Фильтрация полок по поиску
+  const filteredShelves = storageAddresses.filter(sa =>
+    sa.full_address.toLowerCase().includes(storageSearchQuery.toLowerCase()) ||
+    sa.name.toLowerCase().includes(storageSearchQuery.toLowerCase())
+  );
 
   const {
     register,
@@ -227,7 +300,27 @@ const EditAssetForm: React.FC<EditAssetFormProps> = ({ existingAsset, onSubmit, 
   const allRooms = flattenRooms(deptTree);
   const allEmployees = flattenEmployees();
 
-const handleSubmitForm = async (data: any) => {
+  // Фильтрация кабинетов по номеру
+  const [roomFilter, setRoomFilter] = useState('');
+  const filteredRooms = allRooms.filter(r =>
+    r.roomName.toLowerCase().includes(roomFilter.toLowerCase()) ||
+    r.fullName.toLowerCase().includes(roomFilter.toLowerCase()) ||
+    r.roomName.replace(/\D/g, '').includes(roomFilter)
+  );
+
+  // Закрытие dropdown при клике вне
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.storage-search-container')) {
+        setStorageDropdownOpen(false);
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
+
+  const handleSubmitForm = async (data: any) => {
     try {
       const payload: Asset = {
         id: existingAsset.id,
@@ -897,6 +990,13 @@ const handleSubmitForm = async (data: any) => {
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
             Подразделение / Кабинет
           </label>
+          <input
+            type="text"
+            value={roomFilter}
+            onChange={(e) => setRoomFilter(e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-2"
+            placeholder="Фильтр по номеру/названию кабинета..."
+          />
           <select
             value={selectedRoomId}
             onChange={(e) => {
@@ -913,11 +1013,11 @@ const handleSubmitForm = async (data: any) => {
                 setValue('location_address', '');
               }
             }}
-                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             disabled={loadingOptions || allRooms.length === 0}
           >
             <option value="">Не выбрано</option>
-            {allRooms.map(room => (
+            {filteredRooms.map(room => (
               <option key={room.roomId} value={room.roomId}>
                 {room.fullName}
               </option>
@@ -1026,39 +1126,51 @@ const handleSubmitForm = async (data: any) => {
         </p>
       </div>
 
-      <div>
+      <div className="storage-search-container">
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
-          📍 Адрес хранения (ячейка склада)
+          📍 Адрес хранения (склад → стеллаж → полка)
         </label>
-        <select
-          value={selectedStorageAddressId}
-          onChange={(e) => {
-            const saId = e.target.value ? Number(e.target.value) : null;
-            setSelectedStorageAddressId(saId || '');
-            if (saId) {
-              const sa = storageAddresses.find((s: any) => s.id === saId);
-              if (sa) {
-                setValue('storage_address_name', sa.full_address);
-              }
-            } else {
-              setValue('storage_address_name', '');
-            }
-          }}
-          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          disabled={loadingOptions || storageAddresses.length === 0}
-        >
-          <option value="">Не выбрано</option>
-          {storageAddresses.map((sa: any) => (
-            <option key={sa.id} value={sa.id}>
-              {sa.full_address || sa.name}
-            </option>
-          ))}
-        </select>
+        <div className="relative">
+          <input
+            type="text"
+            value={storageSearchQuery}
+            onChange={(e) => {
+              setStorageSearchQuery(e.target.value);
+              setStorageDropdownOpen(true);
+            }}
+            onFocus={() => setStorageDropdownOpen(true)}
+            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="Поиск склада, стеллажа, полки..."
+          />
+          {storageDropdownOpen && filteredShelves.length > 0 && (
+            <div className="absolute z-50 mt-1 w-full max-h-60 overflow-y-auto bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg">
+              {filteredShelves.map((sa: any) => (
+                <div
+                  key={sa.id}
+                  onClick={() => {
+                    setSelectedStorageAddressId(sa.id);
+                    setValue('storage_address_name', sa.full_address);
+                    setStorageSearchQuery(sa.full_address);
+                    setStorageDropdownOpen(false);
+                  }}
+                  className="px-4 py-2.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer text-sm text-gray-900 dark:text-gray-100 border-b border-gray-100 dark:border-gray-700 last:border-b-0"
+                >
+                  <div className="font-medium">{sa.full_address}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          {storageDropdownOpen && filteredShelves.length === 0 && storageSearchQuery && (
+            <div className="absolute z-50 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+              Ничего не найдено
+            </div>
+          )}
+        </div>
         {storageAddresses.length === 0 && !loadingOptions && (
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Нет доступных ячеек склада</p>
         )}
         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-          Выберите ячейку склада для размещения актива
+          Выберите полку склада для размещения актива
         </p>
       </div>
 
