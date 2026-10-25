@@ -19,6 +19,8 @@ const EditAssetForm: React.FC<EditAssetFormProps> = ({ existingAsset, onSubmit, 
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | ''>('');
   const [loadingOptions, setLoadingOptions] = useState(true);
   const [responsibleOptions, setResponsibleOptions] = useState<any[]>([]);
+  const [storageAddresses, setStorageAddresses] = useState<any[]>([]);
+  const [selectedStorageAddressId, setSelectedStorageAddressId] = useState<number | ''>('');
 
   const {
     register,
@@ -121,13 +123,19 @@ const EditAssetForm: React.FC<EditAssetFormProps> = ({ existingAsset, onSubmit, 
         if (!r.ok) return [];
         return r.json();
       }).catch(() => []),
-    ]).then(([tree, emps, responsibleUsers]) => {
+      fetch('/api/storage-addresses/available-addresses', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => {
+        if (!r.ok) return [];
+        return r.json();
+      }).catch(() => []),
+    ]).then(([tree, emps, responsibleUsers, saList]) => {
       const safeTree = Array.isArray(tree) ? tree : [];
       const safeEmps = Array.isArray(emps) ? emps : [];
       const safeResponsibleUsers = Array.isArray(responsibleUsers) ? responsibleUsers : [];
+      const safeSaList = Array.isArray(saList) ? saList : [];
       setDeptTree(safeTree);
       setEmployees(safeEmps);
       setLoadingOptions(false);
+      setStorageAddresses(safeSaList);
       
       if (existingAsset.department_code || existingAsset.location_address) {
         const rooms = flattenRooms(safeTree);
@@ -159,11 +167,15 @@ const EditAssetForm: React.FC<EditAssetFormProps> = ({ existingAsset, onSubmit, 
           setSelectedEmployeeId(matchedAssetEmp.id);
         }
       }
+      if (existingAsset.storage_address_id) {
+        setSelectedStorageAddressId(existingAsset.storage_address_id);
+      }
     }).catch(() => {
       console.error('Ошибка загрузки опций');
       setDeptTree([]);
       setEmployees([]);
       setResponsibleOptions([]);
+      setStorageAddresses([]);
       setLoadingOptions(false);
     });
   }, []);
@@ -246,7 +258,8 @@ const handleSubmitForm = async (data: any) => {
         depreciation_years: data.depreciation_years ? Number(data.depreciation_years) : undefined,
         next_maintenance_date: data.next_maintenance_date || undefined,
         rfid_tag: data.rfid_tag || '',
-        storage_address_id: data.storage_address_id || undefined,
+        storage_address_id: selectedStorageAddressId ? Number(selectedStorageAddressId) : undefined,
+        storage_address_name: data.storage_address_name || '',
         employee_id: selectedEmployeeId ? Number(selectedEmployeeId) : undefined,
         is_active: existingAsset.is_active,
         created_at: existingAsset.created_at,
@@ -1015,16 +1028,37 @@ const handleSubmitForm = async (data: any) => {
 
       <div>
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
-          📍 Адрес хранения
+          📍 Адрес хранения (ячейка склада)
         </label>
-        <input
-          type="text"
-          {...register('storage_address_name')}
+        <select
+          value={selectedStorageAddressId}
+          onChange={(e) => {
+            const saId = e.target.value ? Number(e.target.value) : null;
+            setSelectedStorageAddressId(saId || '');
+            if (saId) {
+              const sa = storageAddresses.find((s: any) => s.id === saId);
+              if (sa) {
+                setValue('storage_address_name', sa.full_address);
+              }
+            } else {
+              setValue('storage_address_name', '');
+            }
+          }}
           className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          placeholder="Стеллаж A-3-5 (код адреса)"
-        />
+          disabled={loadingOptions || storageAddresses.length === 0}
+        >
+          <option value="">Не выбрано</option>
+          {storageAddresses.map((sa: any) => (
+            <option key={sa.id} value={sa.id}>
+              {sa.full_address || sa.name}
+            </option>
+          ))}
+        </select>
+        {storageAddresses.length === 0 && !loadingOptions && (
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Нет доступных ячеек склада</p>
+        )}
         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-          Адрес хранения: корпус → этаж → зона → ряд → стеллаж → ячейка
+          Выберите ячейку склада для размещения актива
         </p>
       </div>
 

@@ -1,6 +1,6 @@
 // frontend/src/pages/Warehouse.tsx
 import { useState, useEffect, useCallback } from 'react';
-import { Boxes, Loader2, Building2, Grid3X3, Package, ChevronRight, ChevronDown, Archive, Layers, MapPin } from 'lucide-react';
+import { Boxes, Loader2, Building2, Package, ChevronRight, ChevronDown, Archive, Layers, MapPin, Plus, Trash2, X, Pencil, Copy, FolderPlus, MoveRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface WarehouseRoom {
@@ -11,17 +11,23 @@ interface WarehouseRoom {
   department_id: number;
   department_name: string;
   full_name: string;
-  cell_count?: number;
+  asset_count: number;
+  storage_addresses_count: number;
 }
 
-interface StorageAddressNode {
+interface WarehouseTreeNode {
   id: number;
   name: string;
-  type: 'rack' | 'shelf' | 'cell';
-  parent_id: number | null;
+  code?: string;
+  level: 'zone' | 'rack' | 'shelf' | 'asset';
+  parent_id?: number | null;
   current_count?: number;
   capacity?: number;
-  children?: StorageAddressNode[];
+  children?: WarehouseTreeNode[];
+  is_zone?: boolean;
+  location_type?: string;
+  inventory_number?: string;
+  room_id?: number;
 }
 
 interface Asset {
@@ -30,24 +36,46 @@ interface Asset {
   inventory_number?: string;
   storage_address_id?: number | null;
   storage_address_name?: string;
+  warehouse_location_id?: number | null;
+  room_id?: number | null;
   [key: string]: any;
 }
 
 interface MoveModalState {
   isOpen: boolean;
   asset: Asset | null;
-  destinationCells: StorageAddressNode[];
+  destinationCells: WarehouseTreeNode[];
   loading: boolean;
   selectedCellId: number | null;
+}
+
+interface AddAddressModal {
+  isOpen: boolean;
+  mode: 'zone' | 'rack' | 'shelf';
+  parentId: number | null;
+  parentName: string;
+  loading: boolean;
+}
+
+interface RenameModal {
+  isOpen: boolean;
+  nodeId: number | null;
+  nodeName: string;
+  nodeLevel: string;
+  loading: boolean;
 }
 
 const Warehouse: React.FC = () => {
   const [rooms, setRooms] = useState<WarehouseRoom[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null);
+  const [selectedRoom, setSelectedRoom] = useState<WarehouseRoom | null>(null);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
-  const [storageTree, setStorageTree] = useState<StorageAddressNode[]>([]);
+  const [treeData, setTreeData] = useState<{
+    zones: WarehouseTreeNode[];
+    storage_tree: WarehouseTreeNode[];
+    unassigned_assets: WarehouseTreeNode[];
+  } | null>(null);
   const [treeLoading, setTreeLoading] = useState<boolean>(false);
 
   // Search state
@@ -64,6 +92,27 @@ const Warehouse: React.FC = () => {
     loading: false,
     selectedCellId: null,
   });
+
+  // Add address modal state
+  const [addAddressModal, setAddAddressModal] = useState<AddAddressModal>({
+    isOpen: false,
+    mode: 'rack',
+    parentId: null,
+    parentName: '',
+    loading: false,
+  });
+  const [newAddressName, setNewAddressName] = useState('');
+  const [newAddressCapacity, setNewAddressCapacity] = useState<number | ''>('');
+
+  // Rename modal state
+  const [renameModal, setRenameModal] = useState<RenameModal>({
+    isOpen: false,
+    nodeId: null,
+    nodeName: '',
+    nodeLevel: '',
+    loading: false,
+  });
+  const [renameValue, setRenameValue] = useState('');
 
   const fetchWarehouseData = useCallback(async () => {
     try {
@@ -99,7 +148,7 @@ const Warehouse: React.FC = () => {
     fetchWarehouseData();
   }, [fetchWarehouseData]);
 
-  const fetchStorageTree = useCallback(async (roomId: number) => {
+  const fetchTreeData = useCallback(async (roomId: number) => {
     try {
       setTreeLoading(true);
       const token = localStorage.getItem('token') || '';
@@ -112,13 +161,17 @@ const Warehouse: React.FC = () => {
 
       if (response.ok) {
         const data = await response.json();
-        const treeData = Array.isArray(data) ? data : (data.tree || []);
-        setStorageTree(treeData);
-        // Auto-expand first level (racks)
-        const initialExpanded = new Set<string>(
-          treeData.map((node: StorageAddressNode) => String(node.id))
-        );
-        setExpandedNodes(initialExpanded);
+        setTreeData({
+          zones: data.zones || [],
+          storage_tree: data.storage_tree || [],
+          unassigned_assets: data.unassigned_assets || [],
+        });
+        // Auto-expand zones and root items
+        const allIds = [
+          ...(data.zones || []).map((n: any) => String(n.id)),
+          ...(data.storage_tree || []).map((n: any) => String(n.id)),
+        ];
+        setExpandedNodes(new Set(allIds));
       } else {
         toast.error(`Ошибка загрузки дерева склада (${response.status})`);
       }
@@ -129,14 +182,14 @@ const Warehouse: React.FC = () => {
     }
   }, []);
 
-  const handleRoomClick = (roomId: number) => {
-    if (selectedRoomId === roomId) {
-      setSelectedRoomId(null);
-      setStorageTree([]);
+  const handleRoomClick = (room: WarehouseRoom) => {
+    if (selectedRoom?.id === room.id) {
+      setSelectedRoom(null);
+      setTreeData(null);
       setExpandedNodes(new Set());
     } else {
-      setSelectedRoomId(roomId);
-      fetchStorageTree(roomId);
+      setSelectedRoom(room);
+      fetchTreeData(room.id);
     }
   };
 
@@ -151,6 +204,104 @@ const Warehouse: React.FC = () => {
       return next;
     });
   };
+
+  // Flatten all cells from tree for move modal
+  const flattenCells = (nodes: WarehouseTreeNode[]): WarehouseTreeNode[] => {
+    let result: WarehouseTreeNode[] = [];
+    for (const node of nodes) {
+      if (node.level === 'shelf') {
+        result.push(node);
+      }
+      if (node.children) {
+        result = result.concat(flattenCells(node.children));
+      }
+    }
+    return result;
+  };
+
+  // Collect all assignable nodes (zones + cells)
+  const getAllAssignableNodes = (data: typeof treeData): WarehouseTreeNode[] => {
+    if (!data) return [];
+    const all: WarehouseTreeNode[] = [];
+    // Zones are assignable
+    data.zones?.forEach(z => all.push(z));
+    // Cells from storage_tree
+    const cells = flattenCells(data.storage_tree || []);
+    all.push(...cells);
+    // Cells from zones (nested storage addresses)
+    data.zones?.forEach(z => {
+      if (z.children) {
+        all.push(...flattenCells(z.children));
+      }
+    });
+    return all;
+  };
+
+  // Rename functions
+  const openRenameModal = useCallback((node: WarehouseTreeNode) => {
+    setRenameModal({
+      isOpen: true,
+      nodeId: node.id,
+      nodeName: node.name,
+      nodeLevel: node.level,
+      loading: false,
+    });
+    setRenameValue(node.name);
+  }, []);
+
+  const closeRenameModal = useCallback(() => {
+    setRenameModal({ isOpen: false, nodeId: null, nodeName: '', nodeLevel: '', loading: false });
+    setRenameValue('');
+  }, []);
+
+  const handleRename = useCallback(async () => {
+    if (!renameValue.trim() || !renameModal.nodeId) {
+      toast.error('Введите название');
+      return;
+    }
+    try {
+      setRenameModal(prev => ({ ...prev, loading: true }));
+      const token = localStorage.getItem('token') || '';
+      
+      // Determine if it's a zone (warehouse_location) or storage_address
+      const isZone = renameModal.nodeLevel === 'zone' && treeData?.zones?.some(z => z.id === renameModal.nodeId);
+      const endpoint = isZone
+        ? `/api/storage-addresses/warehouse-locations/${renameModal.nodeId}`
+        : `/api/storage-addresses/${renameModal.nodeId}`;
+      const method = isZone ? 'PUT' : 'PATCH';
+      
+      let response;
+      if (isZone) {
+        response = await fetch(`${endpoint}?name=${encodeURIComponent(renameValue.trim())}`, {
+          headers: { 'Authorization': token ? `Bearer ${token}` : '' },
+        });
+      } else {
+        response = await fetch(endpoint, {
+          method: 'PATCH',
+          headers: {
+            'Authorization': token ? `Bearer ${token}` : '',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ name: renameValue.trim() }),
+        });
+      }
+
+      if (response.ok) {
+        toast.success('Переименовано');
+        closeRenameModal();
+        if (selectedRoom) {
+          await fetchTreeData(selectedRoom.id);
+        }
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        toast.error(errData.detail || `Ошибка (${response.status})`);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Ошибка соединения');
+    } finally {
+      setRenameModal(prev => ({ ...prev, loading: false }));
+    }
+  }, [renameValue, renameModal, treeData, selectedRoom, closeRenameModal, fetchTreeData, selectedRoom]);
 
   // Search assets
   const searchAssets = useCallback(async (query: string) => {
@@ -188,47 +339,23 @@ const Warehouse: React.FC = () => {
   const loadDestinationCells = useCallback(async (addressId: number | null) => {
     try {
       setMoveModal((prev) => ({ ...prev, loading: true }));
-      const token = localStorage.getItem('token') || '';
-      let cells: StorageAddressNode[] = [];
+      const t = localStorage.getItem('token') || '';
+      let cells: WarehouseTreeNode[] = [];
 
-      if (addressId) {
-        // Fetch cells from the same storage address tree
-        const response = await fetch(`/api/storage-addresses/${addressId}/assets`, {
+      if (selectedRoom) {
+        const response = await fetch(`/api/storage-addresses/rooms/${selectedRoom.id}/tree`, {
           headers: {
-            'Authorization': token ? `Bearer ${token}` : '',
+            'Authorization': t ? `Bearer ${t}` : '',
             'Content-Type': 'application/json',
           },
         });
         if (response.ok) {
-          // We'll load cells from the room's tree instead
-        }
-      }
-
-      // Load all cells from all rooms in the tree
-      if (selectedRoomId) {
-        const response = await fetch(`/api/storage-addresses/rooms/${selectedRoomId}/tree`, {
-          headers: {
-            'Authorization': token ? `Bearer ${token}` : '',
-            'Content-Type': 'application/json',
-          },
-        });
-        if (response.ok) {
-          const treeData = await response.json();
-          const tree = Array.isArray(treeData) ? treeData : (treeData.tree || []);
-          // Flatten all cells from tree
-          const flattenCells = (nodes: StorageAddressNode[]): StorageAddressNode[] => {
-            let result: StorageAddressNode[] = [];
-            for (const node of nodes) {
-              if (node.type === 'cell') {
-                result.push(node);
-              }
-              if (node.children) {
-                result = result.concat(flattenCells(node.children));
-              }
-            }
-            return result;
-          };
-          cells = flattenCells(tree);
+          const data = await response.json();
+          cells = getAllAssignableNodes({
+            zones: data.zones || [],
+            storage_tree: data.storage_tree || [],
+            unassigned_assets: data.unassigned_assets || [],
+          });
         }
       }
 
@@ -242,7 +369,7 @@ const Warehouse: React.FC = () => {
       toast.error(err.message || 'Ошибка загрузки ячеек');
       setMoveModal((prev) => ({ ...prev, loading: false }));
     }
-  }, [selectedRoomId]);
+  }, [selectedRoom]);
 
   // Handle move asset
   const handleMoveAsset = useCallback(async () => {
@@ -251,11 +378,11 @@ const Warehouse: React.FC = () => {
       return;
     }
     try {
-      const token = localStorage.getItem('token') || '';
+      const t = localStorage.getItem('token') || '';
       const response = await fetch(`/api/assets/${moveModal.asset.id}`, {
         method: 'PATCH',
         headers: {
-          'Authorization': token ? `Bearer ${token}` : '',
+          'Authorization': t ? `Bearer ${t}` : '',
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -264,13 +391,14 @@ const Warehouse: React.FC = () => {
       });
 
       if (response.ok) {
-        toast.success(`Актив перемещён в ячейку`);
+        toast.success('Актив перемещён');
         setMoveModal({ isOpen: false, asset: null, destinationCells: [], loading: false, selectedCellId: null });
-        // Refresh search results if search is active
         if (searchQuery.trim()) {
           await searchAssets(searchQuery);
         }
-        // Refresh room data
+        if (selectedRoom) {
+          await fetchTreeData(selectedRoom.id);
+        }
         fetchWarehouseData();
       } else {
         const errData = await response.json().catch(() => ({}));
@@ -279,7 +407,7 @@ const Warehouse: React.FC = () => {
     } catch (err: any) {
       toast.error(err.message || 'Ошибка соединения с сервером');
     }
-  }, [moveModal.asset, moveModal.selectedCellId, searchQuery, searchAssets, fetchWarehouseData]);
+  }, [moveModal.asset, moveModal.selectedCellId, searchQuery, searchAssets, fetchWarehouseData, fetchTreeData, selectedRoom]);
 
   const openMoveModal = useCallback((asset: Asset) => {
     loadDestinationCells(asset.storage_address_id || null);
@@ -290,14 +418,145 @@ const Warehouse: React.FC = () => {
     setMoveModal({ isOpen: false, asset: null, destinationCells: [], loading: false, selectedCellId: null });
   }, []);
 
+  // Add address functions
+  const openAddAddressModal = useCallback((mode: 'zone' | 'rack' | 'shelf', parentId: number | null = null, parentName: string = '') => {
+    setAddAddressModal({ isOpen: true, mode, parentId, parentName, loading: false });
+    setNewAddressName('');
+    setNewAddressCapacity('');
+  }, []);
+
+  const closeAddAddressModal = useCallback(() => {
+    setAddAddressModal({ isOpen: false, mode: 'rack', parentId: null, parentName: '', loading: false });
+    setNewAddressName('');
+    setNewAddressCapacity('');
+  }, []);
+
+  const handleAddAddress = useCallback(async () => {
+    try {
+      setAddAddressModal(prev => ({ ...prev, loading: true }));
+      const t = localStorage.getItem('token') || '';
+      
+      const levelMap = { zone: 'zone', rack: 'rack', shelf: 'shelf' };
+      const level = levelMap[addAddressModal.mode];
+      
+      if (!level) {
+        toast.error('Не указан уровень хранения');
+        setAddAddressModal(prev => ({ ...prev, loading: false }));
+        return;
+      }
+      
+      // If adding a zone, use warehouse_locations endpoint
+      if (addAddressModal.mode === 'zone') {
+        const response = await fetch(`/api/storage-addresses/warehouse-locations?name=${encodeURIComponent(newAddressName.trim())}&room_id=${selectedRoom?.id}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': t ? `Bearer ${t}` : '',
+          },
+        });
+        
+        if (response.ok) {
+          toast.success('Зона добавлена');
+          closeAddAddressModal();
+          // Refresh tree data
+          if (selectedRoom) {
+            await fetchTreeData(selectedRoom.id);
+          }
+          fetchWarehouseData();
+        } else {
+          const errData = await response.json().catch(() => ({}));
+          toast.error(errData.detail || `Ошибка (${response.status})`);
+        }
+      } else {
+        // Add storage address
+        const body: any = {
+          name: newAddressName.trim() || "",
+          level: level,
+          room_id: selectedRoom?.id,
+          capacity: newAddressCapacity || undefined,
+        };
+        
+        // Определяем, как связывать узел
+        if (addAddressModal.mode === 'rack') {
+          // Стеллаж привязывается к зоне через warehouse_location_id
+          if (addAddressModal.parentId) {
+            body.warehouse_location_id = addAddressModal.parentId;
+          }
+        } else if (addAddressModal.mode === 'shelf') {
+          // Полка привязывается к стеллажу через parent_id
+          if (addAddressModal.parentId) {
+            body.parent_id = addAddressModal.parentId;
+          }
+        }
+        
+        console.log('Creating storage address:', body);
+        console.log('Mode:', addAddressModal.mode, 'ParentId:', addAddressModal.parentId);
+        
+        const response = await fetch('/api/storage-addresses', {
+          method: 'POST',
+          headers: {
+            'Authorization': t ? `Bearer ${t}` : '',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body),
+        });
+
+        if (response.ok) {
+          toast.success('Элемент добавлен');
+          closeAddAddressModal();
+          if (selectedRoom) {
+            await fetchTreeData(selectedRoom.id);
+          }
+          fetchWarehouseData();
+        } else {
+          const errData = await response.json().catch(() => ({}));
+          toast.error(errData.detail || `Ошибка (${response.status})`);
+        }
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Ошибка соединения');
+    } finally {
+      setAddAddressModal(prev => ({ ...prev, loading: false }));
+    }
+  }, [newAddressName, newAddressCapacity, addAddressModal.mode, addAddressModal.parentId, selectedRoom, closeAddAddressModal, fetchTreeData, fetchWarehouseData]);
+
+  const handleDeleteAddress = useCallback(async (nodeId: number, nodeLevel: string, parentNodeId: number | null = null) => {
+    if (!confirm('Удалить элемент и все вложенные?')) return;
+
+    try {
+      const t = localStorage.getItem('token') || '';
+      
+      // Determine if it's a zone or storage_address
+      const isZone = nodeLevel === 'zone' && treeData?.zones?.some(z => z.id === nodeId);
+      const endpoint = isZone
+        ? `/api/storage-addresses/warehouse-locations/${nodeId}`
+        : `/api/storage-addresses/${nodeId}`;
+      const method = isZone ? 'DELETE' : 'DELETE';
+      
+      const response = await fetch(endpoint, {
+        method,
+        headers: {
+          'Authorization': t ? `Bearer ${t}` : '',
+        },
+      });
+
+      if (response.ok) {
+        toast.success('Элемент удалён');
+        if (selectedRoom) {
+          await fetchTreeData(selectedRoom.id);
+        }
+        fetchWarehouseData();
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        toast.error(errData.detail || `Ошибка (${response.status})`);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Ошибка соединения');
+    }
+  }, [selectedRoom, fetchTreeData, fetchWarehouseData, treeData]);
+
   // Статистика
   const totalRooms = rooms.length;
-  const totalCells = rooms.reduce((sum, room) => sum + (room.cell_count || 0), 0);
-  const totalAssets = rooms.reduce((sum, room) => {
-    // Если в ответе есть поле с количеством активов — используем его
-    // Иначе оцениваем по количеству помещений (заглушка)
-    return sum + (room as any).asset_count || 0;
-  }, 0);
+  const totalAssets = rooms.reduce((sum, room) => sum + (room.asset_count || 0), 0);
 
   if (loading) {
     return (
@@ -318,7 +577,7 @@ const Warehouse: React.FC = () => {
           <Boxes className="w-7 h-7 text-blue-600 dark:text-blue-400" />
           Склад
         </h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Управление помещениями и ячейками склада</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Управление помещениями и структурой хранения</p>
       </div>
 
       {/* Error */}
@@ -332,8 +591,7 @@ const Warehouse: React.FC = () => {
       )}
 
       {/* Stat cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {/* Total rooms */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-5">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-lg bg-blue-50 dark:bg-blue-900/20">
@@ -346,20 +604,6 @@ const Warehouse: React.FC = () => {
           </div>
         </div>
 
-        {/* Total cells */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-5">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-lg bg-green-50 dark:bg-green-900/20">
-              <Grid3X3 className="w-5 h-5 text-green-600 dark:text-green-400" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{totalCells}</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Всего ячеек</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Assets on warehouse */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-5">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-lg bg-purple-50 dark:bg-purple-900/20">
@@ -388,14 +632,14 @@ const Warehouse: React.FC = () => {
             {rooms.map((room) => (
               <div
                 key={room.id}
-                onClick={() => handleRoomClick(room.id)}
+                onClick={() => handleRoomClick(room)}
                 className={`px-5 py-3.5 hover:bg-gray-50 dark:hover:bg-gray-750 transition cursor-pointer ${
-                  selectedRoomId === room.id ? 'bg-blue-50 dark:bg-blue-900/10 border-l-4 border-l-blue-500' : 'border-l-4 border-l-transparent'
+                  selectedRoom?.id === room.id ? 'bg-blue-50 dark:bg-blue-900/10 border-l-4 border-l-blue-500' : 'border-l-4 border-l-transparent'
                 }`}
               >
                 <div className="flex items-center justify-between">
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{room.full_name}</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{room.full_name || room.name}</p>
                     <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-500 dark:text-gray-400">
                       {room.floor && <span>Этаж: {room.floor}</span>}
                       {room.building && <span>Здание: {room.building}</span>}
@@ -404,10 +648,10 @@ const Warehouse: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-3 ml-4">
                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-                      <Grid3X3 className="w-3 h-3" />
-                      {room.cell_count || 0} ячеек
+                      <Package className="w-3 h-3" />
+                      {room.asset_count || 0} активов
                     </span>
-                    <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform ${selectedRoomId === room.id ? 'rotate-90' : ''}`} />
+                    <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform ${selectedRoom?.id === room.id ? 'rotate-90' : ''}`} />
                   </div>
                 </div>
               </div>
@@ -526,46 +770,186 @@ const Warehouse: React.FC = () => {
         )}
       </div>
 
-      {/* Storage Address Tree */}
-      {selectedRoomId && (
+      {/* Add Address Modal */}
+      {addAddressModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={closeAddAddressModal} />
+          <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-md overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                Добавить {addAddressModal.mode === 'rack' ? 'стеллаж' : 'полка'}
+              </h3>
+              <button onClick={closeAddAddressModal} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="px-6 py-4">
+              {addAddressModal.parentName && (
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+                  Родитель: <span className="font-medium text-gray-700 dark:text-gray-300">{addAddressModal.parentName}</span>
+                </p>
+              )}
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Название *</label>
+                  <input
+                    type="text"
+                    value={newAddressName}
+                    onChange={(e) => setNewAddressName(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddAddress()}
+                    placeholder="Введите название (например: Полка 1)"
+                    className="w-full px-3 py-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    autoFocus
+                  />
+                </div>
+                {(addAddressModal.mode === 'shelf') && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Вместимость</label>
+                    <input
+                      type="number"
+                      value={newAddressCapacity}
+                      onChange={(e) => setNewAddressCapacity(e.target.value ? Number(e.target.value) : '')}
+                      placeholder="Не ограничено"
+                      min="0"
+                      className="w-full px-3 py-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
+              <button
+                onClick={closeAddAddressModal}
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={handleAddAddress}
+                disabled={addAddressModal.loading || !newAddressName.trim()}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed rounded-lg transition flex items-center gap-2"
+              >
+                <Loader2 className={`w-4 h-4 ${addAddressModal.loading ? 'animate-spin' : 'hidden'}`} />
+                Добавить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Warehouse Structure Tree */}
+      {selectedRoom && (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
               <Archive className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-              Структура склада
+              Структура: {selectedRoom.name}
             </h2>
-            <button
-              onClick={() => {
-                setSelectedRoomId(null);
-                setStorageTree([]);
-                setExpandedNodes(new Set());
-              }}
-              className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition"
-            >
-              Закрыть
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => openAddAddressModal('zone')}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Зона
+              </button>
+              <button
+                onClick={() => {
+                  setSelectedRoom(null);
+                  setTreeData(null);
+                  setExpandedNodes(new Set());
+                }}
+                className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition"
+              >
+                Закрыть
+              </button>
+            </div>
           </div>
           {treeLoading ? (
             <div className="px-5 py-12 text-center">
               <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2 text-blue-600 dark:text-blue-400" />
               <p className="text-gray-500 dark:text-gray-400 text-sm">Загрузка структуры...</p>
             </div>
-          ) : storageTree.length === 0 ? (
+          ) : !treeData || (treeData.zones.length === 0 && treeData.storage_tree.length === 0 && treeData.unassigned_assets.length === 0) ? (
             <div className="px-5 py-12 text-center">
               <Layers className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
               <p className="text-gray-500 dark:text-gray-400 text-sm">Структура склада пуста</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Добавьте зону для начала</p>
             </div>
           ) : (
-            <div className="px-5 py-3">
-              {storageTree.map((rack) => (
-                <StorageTreeNode
-                  key={rack.id}
-                  node={rack}
-                  depth={0}
-                  expandedNodes={expandedNodes}
-                  onToggle={toggleNode}
-                />
-              ))}
+            <div className="px-5 py-3 space-y-4">
+              {/* Zones */}
+              {treeData.zones.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-400 mb-2 px-2">Зоны</h3>
+                  {treeData.zones.map((zone) => (
+                    <WarehouseTreeNode
+                      key={zone.id}
+                      node={zone}
+                      depth={0}
+                      expandedNodes={expandedNodes}
+                      onToggle={toggleNode}
+                      onDelete={handleDeleteAddress}
+                      onRename={openRenameModal}
+                      onAddChild={openAddAddressModal}
+                      onMoveAsset={(asset: Asset) => openMoveModal(asset)}
+                      treeData={treeData}
+                      fetchTreeData={fetchTreeData}
+                      selectedRoom={selectedRoom}
+                      fetchWarehouseData={fetchWarehouseData}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* Unassigned storage addresses (not in zones) */}
+              {treeData.storage_tree.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-400 mb-2 px-2">Стеллажи без зоны</h3>
+                  {treeData.storage_tree.map((node) => (
+                    <WarehouseTreeNode
+                      key={node.id}
+                      node={node}
+                      depth={0}
+                      expandedNodes={expandedNodes}
+                      onToggle={toggleNode}
+                      onDelete={handleDeleteAddress}
+                      onAddChild={openAddAddressModal}
+                      onMoveAsset={(asset: Asset) => openMoveModal(asset)}
+                      treeData={treeData}
+                      fetchTreeData={fetchTreeData}
+                      selectedRoom={selectedRoom}
+                      fetchWarehouseData={fetchWarehouseData}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* Unassigned Assets */}
+              {treeData.unassigned_assets.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-400 mb-2 px-2 flex items-center gap-2">
+                    <Package className="w-4 h-4" />
+                    Нераспределённые активы ({treeData.unassigned_assets.length})
+                  </h3>
+                  {treeData.unassigned_assets.map((assetNode) => (
+                    <WarehouseTreeNode
+                      key={assetNode.id}
+                      node={assetNode}
+                      depth={0}
+                      expandedNodes={expandedNodes}
+                      onToggle={toggleNode}
+                      onDelete={() => {}}
+                      onAddChild={openAddAddressModal}
+                      onMoveAsset={(a: Asset) => openMoveModal(a as Asset)}
+                      treeData={treeData}
+                      fetchTreeData={fetchTreeData}
+                      selectedRoom={selectedRoom}
+                      fetchWarehouseData={fetchWarehouseData}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -682,113 +1066,136 @@ const Warehouse: React.FC = () => {
   );
 };
 
-// Recursive tree node component
-interface StorageTreeNodeProps {
-  node: StorageAddressNode;
+// Helper functions for tree rendering
+const getLevelLabel = (level: string): string => {
+  const labels: Record<string, string> = {
+    zone: 'Зона', rack: 'Стеллаж', shelf: 'Полка', asset: 'Актив',
+  };
+  return labels[level] || level;
+};
+
+const getLevelColor = (level: string): string => {
+  const colors: Record<string, string> = {
+    zone: 'text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20',
+    rack: 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20',
+    shelf: 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20',
+    asset: 'text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/20',
+  };
+  return colors[level] || 'text-gray-600 dark:text-gray-400';
+};
+
+// Recursive warehouse tree node component
+interface WarehouseTreeNodeProps {
+  node: WarehouseTreeNode;
   depth: number;
   expandedNodes: Set<string>;
   onToggle: (nodeId: string) => void;
+  onDelete: (nodeId: number, nodeLevel: string, parentId?: number | null) => void;
+  onRename: (node: WarehouseTreeNode) => void;
+  onAddChild: (mode: 'zone' | 'rack' | 'shelf', parentId: number, parentName: string) => void;
+  onMoveAsset: (asset: Asset) => void;
+  treeData: { zones: WarehouseTreeNode[]; storage_tree: WarehouseTreeNode[]; unassigned_assets: WarehouseTreeNode[] } | null;
+  fetchTreeData: (roomId: number) => Promise<void>;
+  selectedRoom: WarehouseRoom | null;
+  fetchWarehouseData: () => Promise<void>;
 }
 
-const StorageTreeNode: React.FC<StorageTreeNodeProps> = ({ node, depth, expandedNodes, onToggle }) => {
+const WarehouseTreeNode: React.FC<WarehouseTreeNodeProps> = ({
+  node, depth, expandedNodes, onToggle, onDelete, onRename, onAddChild, onMoveAsset,
+  treeData, fetchTreeData, selectedRoom, fetchWarehouseData,
+}) => {
   const hasChildren = node.children && node.children.length > 0;
   const isExpanded = expandedNodes.has(String(node.id));
-  const isCell = node.type === 'cell';
+  const isAsset = node.level === 'asset';
 
-  const iconMap = {
-    rack: <Archive className="w-4 h-4 text-amber-600 dark:text-amber-400" />,
-    shelf: <Layers className="w-4 h-4 text-blue-600 dark:text-blue-400" />,
-    cell: <MapPin className="w-4 h-4 text-green-600 dark:text-green-400" />,
+  const handleRowClick = () => {
+    if (hasChildren && !isAsset) {
+      onToggle(String(node.id));
+    } else if (isAsset) {
+      const mockAsset: Asset = {
+        id: node.id, name: node.name, inventory_number: node.inventory_number,
+        room_id: selectedRoom?.id,
+      };
+      onMoveAsset(mockAsset);
+    }
   };
 
-  const labelMap = {
-    rack: 'Стеллаж',
-    shelf: 'Полка',
-    cell: 'Ячейка',
+  const handleMoveAssetFromNode = () => {
+    const mockAsset: Asset = {
+      id: node.id, name: node.name, inventory_number: node.inventory_number,
+      room_id: selectedRoom?.id,
+    };
+    onMoveAsset(mockAsset);
   };
 
   return (
     <div className="select-none">
       <div
-        className={`flex items-center gap-2 py-1.5 px-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-750 transition cursor-pointer ${
-          isCell ? 'pl-6' : ''
-        }`}
+        className={`flex items-center gap-2 py-1.5 px-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-750 transition ${isAsset ? 'cursor-pointer' : hasChildren ? 'cursor-pointer' : ''}`}
         style={{ paddingLeft: `${depth * 24 + 8}px` }}
-        onClick={() => {
-          if (hasChildren) {
-            onToggle(String(node.id));
-          }
-        }}
+        onClick={handleRowClick}
       >
-        {/* Expand / Collapse toggle */}
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            if (hasChildren) {
-              onToggle(String(node.id));
-            }
-          }}
-          className={`w-5 h-5 flex items-center justify-center rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition ${
-            hasChildren ? 'cursor-pointer' : 'cursor-default opacity-0'
-          }`}
+          onClick={(e) => { e.stopPropagation(); if (hasChildren && !isAsset) onToggle(String(node.id)); }}
+          className={`w-5 h-5 flex items-center justify-center rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition flex-shrink-0 ${hasChildren && !isAsset ? 'cursor-pointer' : 'cursor-default opacity-0'}`}
         >
-          {isExpanded ? (
-            <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
-          ) : (
-            <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
-          )}
+          {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-gray-500" /> : <ChevronRight className="w-3.5 h-3.5 text-gray-500" />}
         </button>
 
-        {/* Icon */}
-        <span className="flex-shrink-0">{iconMap[node.type]}</span>
+        <span className={`text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${getLevelColor(node.level)}`}>
+          {getLevelLabel(node.level)}
+        </span>
 
-        {/* Label */}
-        <span className={`text-sm truncate flex-1 ${isCell ? 'text-gray-700 dark:text-gray-300' : 'text-gray-900 dark:text-gray-100 font-medium'}`}>
+        {node.level === 'zone' && <Building2 className="w-4 h-4 text-purple-600 dark:text-purple-400 flex-shrink-0" />}
+        {node.level === 'rack' && <Archive className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />}
+        {node.level === 'shelf' && <Layers className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />}
+        {node.level === 'asset' && <Package className="w-4 h-4 text-gray-600 dark:text-gray-400 flex-shrink-0" />}
+
+        <span className={`text-sm truncate flex-1 ${isAsset ? 'text-gray-600 dark:text-gray-400 italic' : 'text-gray-900 dark:text-gray-100 font-medium'}`}>
           {node.name}
         </span>
 
-        {/* Cell stats */}
-        {isCell && (
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              {node.current_count ?? 0}/{node.capacity ?? 0}
-            </span>
-            {node.capacity && node.current_count !== undefined && (
-              <span className="text-xs px-1.5 py-0.5 rounded-full font-medium"
-                style={{
-                  backgroundColor: node.capacity > 0
-                    ? `${Math.min(100, Math.round(((node.current_count || 0) / node.capacity) * 100))}%` === '100'
-                      ? 'rgba(239, 68, 68, 0.15)'
-                      : Math.round(((node.current_count || 0) / node.capacity) * 100) > 70
-                        ? 'rgba(245, 158, 11, 0.15)'
-                        : 'rgba(34, 197, 94, 0.15)'
-                    : 'rgba(34, 197, 94, 0.15)',
-                  color: node.capacity > 0
-                    ? `${Math.min(100, Math.round(((node.current_count || 0) / node.capacity) * 100))}%` === '100'
-                      ? '#ef4444'
-                      : Math.round(((node.current_count || 0) / node.capacity) * 100) > 70
-                        ? '#f59e0b'
-                        : '#22c55e'
-                    : '#22c55e',
-                }}
-              >
-                {node.capacity > 0 ? Math.round(((node.current_count || 0) / node.capacity) * 100) : 0}%
-              </span>
-            )}
-          </div>
+        {(node.level === 'zone' || node.level === 'rack') && node.current_count !== undefined && node.current_count > 0 && (
+          <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">{node.current_count} ак.</span>
         )}
+
+        <div className="flex items-center gap-0.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+          {!isAsset && (
+            <button onClick={() => onRename(node)} className="p-1 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition" title="Переименовать">
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {!isAsset && node.level === 'zone' && (
+            <button onClick={() => onAddChild('rack', node.id, node.name)} className="p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition" title="Добавить стеллаж">
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {!isAsset && node.level === 'rack' && (
+            <button onClick={() => onAddChild('shelf', node.id, node.name)} className="p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition" title="Добавить полку">
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {isAsset && (
+            <button onClick={handleMoveAssetFromNode} className="p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition" title="Переместить">
+              <MoveRight className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {!isAsset && (
+            <button onClick={() => onDelete(node.id, node.level, node.parent_id ?? null)} className="p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition" title="Удалить">
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Children */}
       {hasChildren && isExpanded && (
         <div className="border-l border-gray-200 dark:border-gray-700 ml-4">
           {node.children!.map((child) => (
-            <StorageTreeNode
-              key={child.id}
-              node={child}
-              depth={depth + 1}
-              expandedNodes={expandedNodes}
-              onToggle={onToggle}
+            <WarehouseTreeNode
+              key={child.id} node={child} depth={depth + 1} expandedNodes={expandedNodes}
+              onToggle={onToggle} onDelete={onDelete} onRename={onRename} onAddChild={onAddChild}
+              onMoveAsset={onMoveAsset} treeData={treeData} fetchTreeData={fetchTreeData}
+              selectedRoom={selectedRoom} fetchWarehouseData={fetchWarehouseData}
             />
           ))}
         </div>

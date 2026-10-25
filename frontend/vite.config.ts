@@ -10,7 +10,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:8888',
+        target: 'http://localhost:8080',
         changeOrigin: true,
         secure: false,
         configure: (proxy) => {
@@ -22,22 +22,22 @@ export default defineConfig({
         },
       },
       '/docs': {
-        target: 'http://localhost:8888',
+        target: 'http://localhost:8080',
         changeOrigin: true,
         secure: false,
       },
       '/openapi.json': {
-        target: 'http://localhost:8888',
+        target: 'http://localhost:8080',
         changeOrigin: true,
         secure: false,
       },
       '/oauth2-redirect': {
-        target: 'http://localhost:8888',
+        target: 'http://localhost:8080',
         changeOrigin: true,
         secure: false,
       },
       '/static': {
-        target: 'http://localhost:8888',
+        target: 'http://localhost:8080',
         changeOrigin: true,
         secure: false,
       },

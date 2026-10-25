@@ -315,7 +315,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost", "http://localhost:5173", "https://localhost"],
+    allow_origins=["http://localhost", "http://localhost:80", "http://localhost:5173", "https://localhost", "https://localhost:443"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

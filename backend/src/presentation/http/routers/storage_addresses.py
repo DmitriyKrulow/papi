@@ -1,4 +1,4 @@
-﻿# backend/src/presentation/http/routers/storage_addresses.py
+# backend/src/presentation/http/routers/storage_addresses.py
 """Адресное хранение — управление стеллажами, полками, ячейками и складскими локациями"""
 import logging
 from typing import Optional, List
@@ -16,6 +16,85 @@ from src.presentation.http.dependencies.auth import get_current_user, get_curren
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/storage-addresses", tags=["storage-addresses"])
+
+
+def _build_storage_tree(addresses, parent_wl_id, db):
+    """Построить дерево storage_addresses из списка"""
+    logger.info(f"Building storage tree for wl_id={parent_wl_id}, addresses count={len(addresses)}")
+    
+    # Группируем по уровням
+    by_level = {}
+    for addr in addresses:
+        if addr.level not in by_level:
+            by_level[addr.level] = []
+        by_level[addr.level].append({
+            "id": addr.id,
+            "name": addr.name,
+            "code": addr.code or "",
+            "level": addr.level,
+            "parent_id": addr.parent_id,
+            "warehouse_location_id": addr.warehouse_location_id,
+            "capacity": addr.capacity,
+            "current_count": addr.current_count,
+        })
+    
+    logger.info(f"By level: { {k: len(v) for k, v in by_level.items()} }")
+    
+    def build_tree(p_id=None, lvl=None):
+        children = []
+        # Определяем, какой уровень искать для детей
+        level_map = {
+            None: "rack",    # Корень -> ищем rack'и
+            "rack": "shelf", # Rack -> ищем shelf'и
+            "shelf": "cell", # Shelf -> ищем cell'ы
+            "cell": None,    # Cell -> нет детей
+        }
+        search_level = level_map.get(lvl)
+        
+        if search_level is None:
+            return children
+        
+        logger.info(f"build_tree: p_id={p_id}, lvl={lvl}, search_level={search_level}, items_count={len(by_level.get(search_level, []))}")
+        logger.info(f"build_tree: by_level keys={list(by_level.keys())}")
+        
+        for item in by_level.get(search_level, []):
+            node = None
+            # Для rack: проверяем warehouse_location_id (привязка к зоне)
+            if item.get("level") == "rack":
+                logger.debug(f"Checking rack: id={item['id']}, wl_id={item['warehouse_location_id']}, p_id={p_id}")
+                if item.get("warehouse_location_id") == p_id:
+                    logger.info(f"Found rack: {item['name']} for wl_id={p_id}")
+                    node = {
+                        "id": item["id"],
+                        "name": item["name"],
+                        "code": item["code"],
+                        "level": item["level"],
+                        "capacity": item["capacity"],
+                        "current_count": item["current_count"],
+                        "children": build_tree(item["id"], item["level"]),
+                    }
+            # Для shelf и cell: проверяем warehouse_location_id И parent_id
+            elif item.get("level") in ("shelf", "cell"):
+                # warehouse_location_id == p_id — привязка к зоне (p_id = zone ID)
+                # parent_id == p_id — привязка к родителю (rack или shelf)
+                logger.debug(f"Checking {item['level']}: id={item['id']}, wl_id={item['warehouse_location_id']}, parent_id={item['parent_id']}, p_id={p_id}")
+                if item.get("warehouse_location_id") == p_id or item.get("parent_id") == p_id:
+                    logger.info(f"Found {item['level']}: {item['name']} for wl_id={p_id} / parent_id={p_id}")
+                    node = {
+                        "id": item["id"],
+                        "name": item["name"],
+                        "code": item["code"],
+                        "level": item["level"],
+                        "capacity": item["capacity"],
+                        "current_count": item["current_count"],
+                        "children": build_tree(item["id"], item["level"]),
+                    }
+            if node:
+                children.append(node)
+        logger.info(f"build_tree: p_id={p_id}, lvl={lvl}, children_count={len(children)}")
+        return children
+    
+    return build_tree(parent_wl_id, None)
 
 
 @router.get("/tree")
@@ -58,22 +137,56 @@ async def get_address_tree(
 
 @router.post("")
 async def create_address(
-    name: str = Query(...),
-    level: str = Query(...),
-    parent_id: Optional[int] = None,
-    code: Optional[str] = None,
-    capacity: Optional[int] = None,
-    description: str = "",
-    room_id: Optional[int] = None,
+    payload: dict,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin),
 ):
     """Создать адрес хранения"""
+    name = payload.get("name", "")
+    level = payload.get("level", "")
+    parent_id = payload.get("parent_id")
+    warehouse_location_id = payload.get("warehouse_location_id")
+    code = payload.get("code")
+    capacity = payload.get("capacity")
+    description = payload.get("description", "")
+    room_id = payload.get("room_id")
+    
+    logger.info(f"Creating StorageAddress: name={name}, level={level}, parent_id={parent_id}, warehouse_location_id={warehouse_location_id}, room_id={room_id}")
+    
+    if not name:
+        raise HTTPException(status_code=400, detail="Название обязательно")
+    if not level:
+        raise HTTPException(status_code=400, detail="Уровень обязателен")
+    
+    # Проверка уникальности имени в рамках родителя/зоны
+    if parent_id:
+        existing = db.query(StorageAddress).filter(
+            StorageAddress.parent_id == parent_id,
+            StorageAddress.name == name,
+            StorageAddress.level == level,
+            StorageAddress.is_active == True,
+        ).first()
+        if existing:
+            raise HTTPException(status_code=400, detail=f"Элемент '{name}' уже существует у родителя")
+    elif warehouse_location_id:
+        existing = db.query(StorageAddress).filter(
+            StorageAddress.warehouse_location_id == warehouse_location_id,
+            StorageAddress.name == name,
+            StorageAddress.level == level,
+            StorageAddress.is_active == True,
+        ).first()
+        if existing:
+            raise HTTPException(status_code=400, detail=f"Элемент '{name}' уже существует в этой зоне")
+    
     parent = None
     if parent_id:
         parent = db.query(StorageAddress).filter(StorageAddress.id == parent_id).first()
         if not parent:
             raise HTTPException(status_code=404, detail="Родитель не найден")
+        # Наследуем warehouse_location_id от родителя (rack) для shelf/cell
+        if level in ("shelf", "cell") and not warehouse_location_id and parent.warehouse_location_id:
+            warehouse_location_id = parent.warehouse_location_id
+            logger.info(f"Inherited warehouse_location_id={warehouse_location_id} from parent {parent.level} (id={parent.id}) for {level}")
     if code:
         existing = db.query(StorageAddress).filter(StorageAddress.code == code).first()
         if existing:
@@ -81,10 +194,14 @@ async def create_address(
     new_address = StorageAddress(
         parent_id=parent_id, level=level, name=name,
         code=code, capacity=capacity, description=description, room_id=room_id,
+        warehouse_location_id=warehouse_location_id,
     )
+    logger.info(f"Created StorageAddress: id={new_address.id}, name={name}, level={level}, warehouse_location_id={new_address.warehouse_location_id}, parent_id={new_address.parent_id}")
     db.add(new_address)
-    db.commit()
+    db.flush()
     db.refresh(new_address)
+    logger.info(f"StorageAddress refreshed: id={new_address.id}, parent_id={new_address.parent_id}, warehouse_location_id={new_address.warehouse_location_id}")
+    db.commit()
     return {
         "success": True, "id": new_address.id,
         "name": new_address.name, "level": new_address.level,
@@ -93,223 +210,57 @@ async def create_address(
     }
 
 
-@router.get("/{address_id}")
-async def get_address_details(
+@router.delete("/{address_id}")
+async def delete_address(
     address_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Детали адреса и активы в нём"""
-    address = db.query(StorageAddress).filter(StorageAddress.id == address_id).first()
-    if not address:
-        raise HTTPException(status_code=404, detail="Адрес не найден")
-    assets = db.query(Asset).filter(
-        Asset.storage_address_id == address_id, Asset.is_active == True
-    ).all()
-    children = db.query(StorageAddress).filter(
-        StorageAddress.parent_id == address_id, StorageAddress.is_active == True
-    ).all()
-    return {
-        "id": address.id, "name": address.name,
-        "code": address.code or "", "level": address.level,
-        "full_address": address.get_full_address(),
-        "description": address.description or "",
-        "capacity": address.capacity,
-        "current_count": address.current_count,
-        "children": [
-            {"id": c.id, "name": c.name, "code": c.code or "",
-             "level": c.level, "current_count": c.current_count}
-            for c in children
-        ],
-        "assets": [
-            {"id": a.id, "inventory_number": a.inventory_number or "",
-             "name": a.name or "", "model": a.model or "",
-             "rfid_tag": a.rfid_tag or "",
-             "responsible_person": a.responsible_person or ""}
-            for a in assets
-        ],
-    }
-
-
-@router.get("/{address_id}/assets")
-async def get_address_assets(
-    address_id: int,
-    include_children: bool = False,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Активы в адресе (опционально рекурсивно)"""
-    address = db.query(StorageAddress).filter(StorageAddress.id == address_id).first()
-    if not address:
-        raise HTTPException(status_code=404, detail="Адрес не найден")
-    assets = []
-    if not include_children:
-        assets = db.query(Asset).filter(
-            Asset.storage_address_id == address_id, Asset.is_active == True
-        ).all()
-    else:
-        all_ids = [address_id]
-        queue = [address_id]
-        while queue:
-            current = queue.pop(0)
-            children = db.query(StorageAddress).filter(
-                StorageAddress.parent_id == current, StorageAddress.is_active == True
-            ).all()
-            for child in children:
-                all_ids.append(child.id)
-                queue.append(child.id)
-        assets = db.query(Asset).filter(
-            Asset.storage_address_id.in_(all_ids), Asset.is_active == True
-        ).all()
-    return {
-        "address_id": address.id, "address_name": address.name,
-        "full_address": address.get_full_address(),
-        "include_children": include_children,
-        "total_assets": len(assets),
-        "assets": [
-            {"id": a.id, "inventory_number": a.inventory_number or "",
-             "name": a.name or "", "model": a.model or "",
-             "rfid_tag": a.rfid_tag or "",
-             "responsible_person": a.responsible_person or ""}
-            for a in assets
-        ],
-    }
-
-
-@router.post("/{address_id}/move")
-async def move_asset_to_address(
-    address_id: int,
-    asset_ids: List[int] = Query(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin),
 ):
-    """Переместить активы в адрес хранения"""
+    """Удалить адрес хранения (soft delete)"""
     address = db.query(StorageAddress).filter(StorageAddress.id == address_id).first()
     if not address:
         raise HTTPException(status_code=404, detail="Адрес не найден")
-    results = {"moved": [], "not_found": [], "already_here": []}
-    for asset_id in asset_ids:
-        asset = db.query(Asset).filter(
-            Asset.id == asset_id, Asset.is_active == True
-        ).first()
-        if not asset:
-            results["not_found"].append({"asset_id": asset_id})
-            continue
-        if asset.storage_address_id == address_id:
-            results["already_here"].append({
-                "asset_id": asset_id,
-                "inventory_number": asset.inventory_number,
-            })
-            continue
-        asset.storage_address_id = address_id
-        results["moved"].append({
-            "asset_id": asset_id,
-            "inventory_number": asset.inventory_number,
-            "name": asset.name,
-            "new_address": address.get_full_address(),
-        })
+    
+    # Проверяем, есть ли активы в этом адресе или его детях
+    asset_count = db.query(Asset).filter(
+        Asset.storage_address_id == address_id, Asset.is_active == True,
+    ).count()
+    
+    if asset_count > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Нельзя удалить: {asset_count} активных активов. Сначала переместите активы.",
+        )
+    
+    address.is_active = False
     db.commit()
-    return {
-        "success": True, "address": address.get_full_address(),
-        "total": len(asset_ids),
-        "moved": len(results["moved"]),
-        "not_found": len(results["not_found"]),
-        "already_here": len(results["already_here"]),
-        "details": results,
-    }
+    return {"success": True, "message": f"Адрес '{address.name}' удалён"}
 
 
-@router.get("/search/by-code/{code}")
-async def search_by_code(
-    code: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Поиск адреса по коду (для сканирования QR-кода адреса)"""
-    address = db.query(StorageAddress).filter(StorageAddress.code == code).first()
-    if not address:
-        return {"found": False, "message": f"Адрес с кодом '{code}' не найден"}
-    assets = db.query(Asset).filter(
-        Asset.storage_address_id == address.id, Asset.is_active == True
-    ).all()
-    return {
-        "found": True,
-        "address": {
-            "id": address.id, "name": address.name,
-            "code": address.code or "", "level": address.level,
-            "full_address": address.get_full_address(),
-            "current_count": address.current_count,
-            "capacity": address.capacity,
-        },
-        "assets_count": len(assets),
-        "assets": [
-            {"id": a.id, "inventory_number": a.inventory_number or "",
-             "name": a.name or "", "rfid_tag": a.rfid_tag or ""}
-            for a in assets
-        ],
-    }
-
-
-@router.get("/stats")
-async def get_storage_stats(
+@router.patch("/{address_id}")
+async def update_address(
+    address_id: int,
+    payload: dict,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin),
 ):
-    """Статистика адресного хранения"""
-    total_addresses = db.query(StorageAddress).filter(
-        StorageAddress.is_active == True
-    ).count()
-    by_level = {}
-    for level in ["building", "floor", "zone", "aisle", "shelf", "cell"]:
-        by_level[level] = db.query(StorageAddress).filter(
-            StorageAddress.level == level, StorageAddress.is_active == True
-        ).count()
-    total_with = db.query(Asset).filter(
-        Asset.is_active == True, Asset.storage_address_id.isnot(None)
-    ).count()
-    total_without = db.query(Asset).filter(
-        Asset.is_active == True, Asset.storage_address_id.is_(None)
-    ).count()
+    """Обновить адрес хранения (переименование)"""
+    address = db.query(StorageAddress).filter(StorageAddress.id == address_id).first()
+    if not address:
+        raise HTTPException(status_code=404, detail="Адрес не найден")
+    
+    name = payload.get("name")
+    if name is not None:
+        address.name = name
+    
+    db.commit()
+    db.refresh(address)
     return {
-        "total_addresses": total_addresses,
-        "by_level": by_level,
-        "total_assets_with_address": total_with,
-        "total_assets_without_address": total_without,
-        "address_coverage_percent": round(
-            total_with / (total_with + total_without) * 100, 1
-        ) if (total_with + total_without) > 0 else 0,
+        "success": True,
+        "id": address.id,
+        "name": address.name,
+        "level": address.level,
     }
-
-
-# ======================================================================
-# Складские помещения
-# ======================================================================
-
-@router.get("/rooms")
-async def get_warehouse_rooms(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Список всех складских помещений (room_type='warehouse')"""
-    from src.infrastructure.db.models.department import Room as RoomModel
-    
-    rooms = db.query(RoomModel).filter(
-        RoomModel.room_type == "warehouse",
-        RoomModel.is_active == True,
-    ).order_by(RoomModel.name).all()
-    
-    return [
-        {
-            "id": r.id,
-            "name": r.name,
-            "department_id": r.department_id,
-            "department_name": r.department.name if r.department else "",
-            "floor": r.floor,
-            "building": r.building,
-            "room_type": r.room_type,
-        }
-        for r in rooms
-    ]
 
 
 @router.get("/rooms/{room_id}/tree")
@@ -318,7 +269,7 @@ async def get_room_location_tree(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Дерево локаций (storage_addresses) для конкретного склада"""
+    """Дерево склада: зоны (warehouse_locations) + storage_addresses + нераспределённые активы"""
     from src.infrastructure.db.models.department import Room as RoomModel
     
     room = db.query(RoomModel).filter(
@@ -328,49 +279,103 @@ async def get_room_location_tree(
     if not room:
         raise HTTPException(status_code=404, detail="Складское помещение не найдено")
     
-    # Получаем все адреса хранения для этого склада
-    addresses = db.query(StorageAddress).filter(
+    # ---- ZONES (WarehouseLocation) ----
+    zones = db.query(WarehouseLocation).filter(
+        WarehouseLocation.room_id == room_id,
+        WarehouseLocation.is_active == True,
+    ).order_by(WarehouseLocation.name).all()
+    
+    zone_list = []
+    for z in zones:
+        # Загружаем ВСЕ storage_addresses для зоны (rack, shelf, cell)
+        # Rack привязан по warehouse_location_id, shelf/cell привязаны по parent_id (рекурсивно)
+        all_sas = db.query(StorageAddress).filter(
+            StorageAddress.room_id == z.room_id,
+            StorageAddress.is_active == True,
+        ).all()
+        
+        # Фильтруем только те, что принадлежат этой зоне
+        zone_sas = []
+        for sa in all_sas:
+            if sa.warehouse_location_id == z.id:
+                zone_sas.append(sa)
+            elif sa.parent_id:
+                # Проверяем, является ли родитель частью зоны
+                parent = db.query(StorageAddress).filter(StorageAddress.id == sa.parent_id).first()
+                if parent and parent.warehouse_location_id == z.id:
+                    zone_sas.append(sa)
+        
+        logger.info(f"Zone {z.id} ({z.name}): found {len(zone_sas)} storage_addresses")
+        for sa in zone_sas:
+            logger.info(f"  SA: id={sa.id}, name={sa.name}, level={sa.level}, parent_id={sa.parent_id}, wl_id={sa.warehouse_location_id}")
+        
+        # Детальное логирование для отладки дерева
+        logger.info(f"Calling _build_storage_tree with {len(zone_sas)} addresses, zone_id={z.id}")
+        if zone_sas:
+            levels = set(sa.level for sa in zone_sas)
+            logger.info(f"  Levels in zone_sas: {levels}")
+        
+        sa_ids = [sa.id for sa in zone_sas]
+        direct_count = db.query(Asset).filter(
+            Asset.warehouse_location_id == z.id, Asset.is_active == True,
+        ).count()
+        child_count = 0
+        if sa_ids:
+            child_count = db.query(Asset).filter(
+                Asset.storage_address_id.in_(sa_ids), Asset.is_active == True,
+            ).count()
+        
+        zone_node = {
+            "id": z.id,
+            "name": z.name,
+            "code": z.code or "",
+            "level": "zone",
+            "location_type": z.location_type,
+            "capacity": z.capacity,
+            "current_count": direct_count + child_count,
+            "children": [],
+            "is_zone": True,
+        }
+        
+        if zone_sas:
+            zone_node["children"] = _build_storage_tree(zone_sas, z.id, db)
+        
+        zone_list.append(zone_node)
+    
+    # ---- STORAGE ADDRESSES (не привязанные к warehouse_location) ----
+    storage_addrs = db.query(StorageAddress).filter(
         StorageAddress.room_id == room_id,
         StorageAddress.is_active == True,
+        StorageAddress.warehouse_location_id.is_(None),
     ).order_by(StorageAddress.level, StorageAddress.name).all()
     
-    # Группируем по уровням
-    by_level = {}
-    for addr in addresses:
-        if addr.level not in by_level:
-            by_level[addr.level] = []
-        by_level[addr.level].append({
-            "id": addr.id,
-            "name": addr.name,
-            "code": addr.code or "",
-            "level": addr.level,
-            "parent_id": addr.parent_id,
-            "capacity": addr.capacity,
-            "current_count": addr.current_count,
-        })
+    storage_tree = _build_storage_tree(storage_addrs, None, db)
     
-    # Строим дерево
-    def build_tree(parent_id=None, lvl=None):
-        children = []
-        for item in by_level.get(lvl, []):
-            if item.get("parent_id") == parent_id:
-                node = {
-                    "id": item["id"],
-                    "name": item["name"],
-                    "code": item["code"],
-                    "level": item["level"],
-                    "capacity": item["capacity"],
-                    "current_count": item["current_count"],
-                    "children": build_tree(item["id"], item["level"]),
-                }
-                children.append(node)
-        return children
+    # ---- UNASSIGNED ASSETS ----
+    unassigned = db.query(Asset).filter(
+        Asset.is_active == True,
+        Asset.room_id == room_id,
+        Asset.storage_address_id.is_(None),
+        Asset.warehouse_location_id.is_(None),
+    ).order_by(Asset.inventory_number).all()
+    
+    unassigned_list = [
+        {
+            "id": a.id,
+            "name": a.name or "",
+            "inventory_number": a.inventory_number or "",
+            "level": "asset",
+        }
+        for a in unassigned
+    ]
     
     return {
         "room_id": room.id,
         "room_name": room.name,
-        "tree": build_tree(None, "building"),
-        "by_level": by_level,
+        "zones": zone_list,
+        "storage_tree": storage_tree,
+        "unassigned_assets": unassigned_list,
+        "unassigned_count": len(unassigned_list),
     }
 
 
@@ -400,6 +405,45 @@ async def get_room_assets(
         ).all()
     ]
     
+    # Получаем активы, привязанные к storage_address этого склада
+    storage_address_asset_ids = []
+    if room_address_ids:
+        storage_address_asset_ids = [
+            a.id for a in db.query(Asset.id).filter(
+                Asset.is_active == True,
+                Asset.storage_address_id.in_(room_address_ids),
+            ).all()
+        ]
+    
+    # Получаем все warehouse_location этого склада
+    wl_ids = [
+        wl.id for wl in db.query(WarehouseLocation.id).filter(
+            WarehouseLocation.room_id == room_id,
+            WarehouseLocation.is_active == True,
+        ).all()
+    ]
+    
+    # Получаем активы, привязанные напрямую к warehouse_location этого склада
+    warehouse_location_asset_ids = []
+    if wl_ids:
+        warehouse_location_asset_ids = [
+            a.id for a in db.query(Asset.id).filter(
+                Asset.is_active == True,
+                Asset.warehouse_location_id.in_(wl_ids),
+            ).all()
+        ]
+    
+    # Получаем активы, привязанные напрямую к помещению (room_id)
+    room_asset_ids = [
+        a.id for a in db.query(Asset.id).filter(
+            Asset.is_active == True,
+            Asset.room_id == room_id,
+        ).all()
+    ]
+    
+    # Объединяем уникальные ID активов
+    all_asset_ids = list(set(storage_address_asset_ids + warehouse_location_asset_ids + room_asset_ids))
+    
     if storage_address_id:
         # Получаем все дочерние локации от указанной
         all_ids = [storage_address_id]
@@ -417,15 +461,17 @@ async def get_room_assets(
         # Фильтруем: только локации, принадлежащие этому складу
         all_ids = [aid for aid in all_ids if aid in room_address_ids]
         
+        # Фильтруем по ID активов
         query = db.query(Asset).filter(
+            Asset.id.in_(all_asset_ids),
             Asset.is_active == True,
             Asset.storage_address_id.in_(all_ids),
         )
     else:
-        # Все активы со склада (привязанные к любым локациям этого склада)
+        # Все активы со склада
         query = db.query(Asset).filter(
+            Asset.id.in_(all_asset_ids),
             Asset.is_active == True,
-            Asset.storage_address_id.in_(room_address_ids) if room_address_ids else False,
         )
     
     if search:
@@ -653,6 +699,43 @@ async def search_by_location(
         ],
     }
 
+
+# ======================================================================
+# Доступные адреса хранения для выбора
+# ======================================================================
+
+@router.get("/available-addresses")
+async def get_available_storage_addresses(
+    room_id: Optional[int] = Query(None, description="ID помещения для фильтрации"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Список всех активных storage_addresses уровня 'cell' для выбора в качестве места размещения актива.
+    Можно отфильтровать по room_id.
+    """
+    query = db.query(StorageAddress).filter(
+        StorageAddress.level == "cell",
+        StorageAddress.is_active == True,
+    )
+    if room_id:
+        query = query.filter(StorageAddress.room_id == room_id)
+    
+    addresses = query.order_by(StorageAddress.room_id, StorageAddress.name).all()
+    
+    return [
+        {
+            "id": sa.id,
+            "name": sa.name,
+            "room_id": sa.room_id,
+            "room_name": sa.room.name if sa.room else "",
+            "full_address": sa.get_full_address(),
+            "parent_id": sa.parent_id,
+        }
+        for sa in addresses
+    ]
+
+
 # ======================================================================
 # Складские локации (WarehouseLocation) — CRUD
 # ======================================================================
@@ -781,6 +864,7 @@ async def create_warehouse_location(
     new_location = WarehouseLocation(
         room_id=room_id, name=name, code=code,
         location_type=location_type, description=description, capacity=capacity,
+        is_active=True,
     )
     db.add(new_location)
     db.commit()
@@ -1006,7 +1090,7 @@ async def toggle_room_type(
         # Конвертируем в склад
         room.room_type = "warehouse"
         
-        # Создаём WarehouseLocation по умолчанию
+        # Создаём WarehouseLocation по умолчанию (зона склада)
         wl = WarehouseLocation(
             room_id=room_id,
             name="Основная зона",
@@ -1016,46 +1100,27 @@ async def toggle_room_type(
         db.add(wl)
         db.flush()
         
-        # Создаём дерево storage_addresses
-        # Уровень 1: Стеллажи (racks)
-        rack_names = ["A", "B", "C", "D", "E"]
-        wl_id = wl.id
-        for rack_letter in rack_names:
-            rack = StorageAddress(
-                warehouse_location_id=wl_id,
-                room_id=room_id,
-                level="rack",
-                name=f"Стеллаж {rack_letter}",
-                code=f"{room_id}-{rack_letter}",
-            )
-            db.add(rack)
-            db.flush()
-            
-            # Уровень 2: Полки (shelves)
-            for shelf_num in range(1, 6):
-                shelf = StorageAddress(
-                    parent_id=rack.id,
-                    warehouse_location_id=wl_id,
-                    room_id=room_id,
-                    level="shelf",
-                    name=f"Полка {shelf_num}",
-                    code=f"{room_id}-{rack_letter}-{shelf_num}",
-                )
-                db.add(shelf)
-                db.flush()
-                
-                # Уровень 3: Ячейки (cells)
-                for cell_num in range(1, 11):
-                    cell = StorageAddress(
-                        parent_id=shelf.id,
-                        warehouse_location_id=wl_id,
-                        room_id=room_id,
-                        level="cell",
-                        name=f"Ячейка {cell_num}",
-                        code=f"{room_id}-{rack_letter}-{shelf_num}-{cell_num}",
-                        capacity=1,
-                    )
-                    db.add(cell)
+        # НЕ создаём ячейки автоматически — они создаются при добавлении стеллажей/полок вручную
+        
+        # Переназначаем активы из помещения на склад
+        from src.infrastructure.db.models.asset import Asset as AssetModel
+        
+        # Ищем активы:
+        # 1. С room_id = room_id (уже привязаны к помещению)
+        # 2. С location_address, содержащим название помещения
+        existing_assets = db.query(AssetModel).filter(
+            AssetModel.is_active == True,
+            (AssetModel.room_id == room_id) | 
+            (AssetModel.location_address.like(f'%{room.name}%')),
+        ).all()
+        
+        assets_assigned = 0
+        if existing_assets:
+            for asset in existing_assets:
+                # Привязываем актив к складу через room_id и warehouse_location_id
+                asset.room_id = room_id
+                asset.warehouse_location_id = wl.id
+                assets_assigned += 1
         
         db.commit()
         db.refresh(room)
@@ -1064,27 +1129,68 @@ async def toggle_room_type(
             "success": True,
             "message": f"Помещение '{room.name}' преобразовано в склад",
             "room_type": "warehouse",
-            "storage_tree_created": True,
+            "storage_tree_created": False,
+            "cells_created": 0,
+            "assets_assigned": assets_assigned,
+            "debug": {
+                "room_id": room_id,
+                "room_name": room.name,
+                "existing_assets_found": len(existing_assets),
+                "assets_assigned": assets_assigned,
+            }
         }
     
     else:
         # Конвертируем в обычное помещение
         room.room_type = "room"
         
-        # Деактивируем warehouse_locations
+        # Собираем все warehouse_location этого склада
+        from src.infrastructure.db.models.asset import Asset as AssetModel
         wls = db.query(WarehouseLocation).filter(
             WarehouseLocation.room_id == room_id,
             WarehouseLocation.is_active == True,
         ).all()
+        wl_ids = [wl.id for wl in wls]
+        
+        # Собираем все storage_addresses этого помещения
+        sa_ids = []
+        sas = db.query(StorageAddress).filter(
+            StorageAddress.room_id == room_id,
+            StorageAddress.is_active == True,
+        ).all()
+        for sa in sas:
+            sa_ids.append(sa.id)
+            # Рекурсивно собираем дочерние
+            queue = [sa.id]
+            while queue:
+                current = queue.pop(0)
+                children = db.query(StorageAddress).filter(
+                    StorageAddress.parent_id == current,
+                    StorageAddress.is_active == True,
+                ).all()
+                for child in children:
+                    sa_ids.append(child.id)
+                    queue.append(child.id)
+        
+        # Проставляем room_id всем активам, привязанным к storage_addresses или warehouse_location этого склада
+        assets_to_assign = db.query(AssetModel).filter(
+            AssetModel.is_active == True,
+            (AssetModel.storage_address_id.in_(sa_ids)) | (AssetModel.warehouse_location_id.in_(wl_ids)),
+        ).all()
+        rooms_assigned = 0
+        for asset in assets_to_assign:
+            asset.room_id = room_id
+            asset.storage_address_id = None
+            asset.warehouse_location_id = None
+            rooms_assigned += 1
+        
+        # Удаляем storage_addresses (cascade через warehouse_locations)
         for wl in wls:
-            wl.is_active = False
-            # Деактивируем связанные storage_addresses
-            sas = db.query(StorageAddress).filter(
+            # Удаляем все storage_addresses этой warehouse_location
+            db.query(StorageAddress).filter(
                 StorageAddress.warehouse_location_id == wl.id,
-                StorageAddress.is_active == True,
-            ).all()
-            for sa in sas:
-                sa.is_active = False
+            ).delete(synchronize_session=False)
+            wl.is_active = False
         
         db.commit()
         db.refresh(room)
@@ -1093,7 +1199,8 @@ async def toggle_room_type(
             "success": True,
             "message": f"Помещение '{room.name}' преобразовано в обычное помещение",
             "room_type": "room",
-            "storage_tree_deactivated": True,
+            "storage_tree_removed": True,
+            "rooms_assigned": rooms_assigned,
         }
 
 
@@ -1104,47 +1211,30 @@ async def preview_room_conversion(
     current_user: User = Depends(get_current_user),
 ):
     """
-    Предпросмотр дерева storage_addresses при конвертации помещения в склад.
-    Возвращает структуру без сохранения в БД.
+    Предпросмотр конвертации помещения в склад.
+    Возвращает информацию без создания структуры.
     """
     from src.infrastructure.db.models.department import Room as RoomModel
+    from src.infrastructure.db.models.asset import Asset as AssetModel
+    from sqlalchemy import func
     
     room = db.query(RoomModel).filter(RoomModel.id == room_id).first()
     if not room:
         raise HTTPException(status_code=404, detail="Помещение не найдено")
     
-    rack_names = ["A", "B", "C", "D", "E"]
-    tree = []
-    for rack_letter in rack_names:
-        rack_node = {
-            "id": None, "name": f"Стеллаж {rack_letter}",
-            "level": "rack", "code": f"{room_id}-{rack_letter}",
-            "children": [],
-        }
-        for shelf_num in range(1, 6):
-            shelf_node = {
-                "id": None, "name": f"Полка {shelf_num}",
-                "level": "shelf", "code": f"{room_id}-{rack_letter}-{shelf_num}",
-                "children": [],
-            }
-            for cell_num in range(1, 11):
-                shelf_node["children"].append({
-                    "id": None, "name": f"Ячейка {cell_num}",
-                    "level": "cell", "code": f"{room_id}-{rack_letter}-{shelf_num}-{cell_num}",
-                    "children": [],
-                })
-            rack_node["children"].append(shelf_node)
-        tree.append(rack_node)
+    # Считаем активы, которые будут перенесены на склад
+    asset_count = db.query(func.count(AssetModel.id)).filter(
+        AssetModel.is_active == True,
+        (AssetModel.room_id == room_id) | (AssetModel.location_address == room.name),
+    ).scalar() or 0
     
     return {
         "room_id": room.id,
         "room_name": room.name,
         "current_type": room.room_type,
         "would_be_type": "warehouse" if room.room_type == "room" else "room",
-        "preview_tree": tree,
-        "total_racks": len(rack_names),
-        "total_shelves": len(rack_names) * 5,
-        "total_cells": len(rack_names) * 5 * 10,
+        "assets_count": asset_count,
+        "message": "При конвертации активы из помещения будут привязаны к складу. Ячейки создаются вручную при добавлении стеллажей.",
     }
 
 
@@ -1171,6 +1261,68 @@ async def get_all_rooms(
         )
     rooms = query.order_by(RoomModel.department_id, RoomModel.name).all()
     
+    # Получаем count активов для всех помещений одним запросом
+    from src.infrastructure.db.models.asset import Asset as AssetModel
+    from sqlalchemy import func
+    room_id_to_asset_count = dict(
+        db.query(
+            AssetModel.room_id, func.count(AssetModel.id)
+        ).filter(
+            AssetModel.room_id.isnot(None),
+            AssetModel.is_active == True,
+        ).group_by(AssetModel.room_id).all()
+    )
+    
+    # cell_count убран — активы разного размера, ячейки не имеют смысла
+    # Считаем активы по storage_addresses ИЛИ warehouse_location
+    
+    # Получаем count активов для всех складов по storage_address_id ИЛИ warehouse_location_id
+    room_id_to_storage_asset_count = {}
+    for room in rooms:
+        if room.room_type == "warehouse":
+            # Считаем активы по storage_addresses этого склада
+            sa_ids = [
+                sa.id for sa in db.query(StorageAddress.id).filter(
+                    StorageAddress.room_id == room.id,
+                    StorageAddress.is_active == True,
+                ).all()
+            ]
+            # Считаем активы по warehouse_location этого склада
+            wl_ids = [
+                wl.id for wl in db.query(WarehouseLocation.id).filter(
+                    WarehouseLocation.room_id == room.id,
+                    WarehouseLocation.is_active == True,
+                ).all()
+            ]
+            # Объединяем: активы с storage_address_id ИЛИ warehouse_location_id
+            from sqlalchemy import or_
+            
+            or_conditions = []
+            if sa_ids:
+                or_conditions.append(AssetModel.storage_address_id.in_(sa_ids))
+            if wl_ids:
+                or_conditions.append(AssetModel.warehouse_location_id.in_(wl_ids))
+            
+            if or_conditions:
+                count = db.query(func.count(AssetModel.id)).filter(
+                    AssetModel.is_active == True,
+                    or_(*or_conditions),
+                ).scalar() or 0
+                room_id_to_storage_asset_count[room.id] = count
+    
+    # Считаем storage_addresses и warehouse_locations для всех помещений
+    room_id_to_sa_count = {}
+    room_id_to_wl_count = {}
+    for room in rooms:
+        room_id_to_sa_count[room.id] = db.query(func.count(StorageAddress.id)).filter(
+            StorageAddress.room_id == room.id,
+            StorageAddress.is_active == True,
+        ).scalar() or 0
+        room_id_to_wl_count[room.id] = db.query(func.count(WarehouseLocation.id)).filter(
+            WarehouseLocation.room_id == room.id,
+            WarehouseLocation.is_active == True,
+        ).scalar() or 0
+    
     return [
         {
             "id": r.id,
@@ -1180,8 +1332,98 @@ async def get_all_rooms(
             "floor": r.floor,
             "building": r.building,
             "room_type": r.room_type,
-            "storage_addresses_count": len(r.storage_addresses) if r.storage_addresses else 0,
-            "warehouse_locations_count": len(r.warehouse_locations) if hasattr(r, 'warehouse_locations') and r.warehouse_locations else 0,
+            "storage_addresses_count": room_id_to_sa_count.get(r.id, 0),
+            "warehouse_locations_count": room_id_to_wl_count.get(r.id, 0),
+            "full_name": f"{r.name} ({r.department.name})" if r.department else r.name,
+            # asset_count: для складов — активы по storage_address_id, для обычных — по room_id
+            "asset_count": room_id_to_storage_asset_count.get(r.id, 0) if r.room_type == "warehouse" else room_id_to_asset_count.get(r.id, 0),
         }
         for r in rooms
     ]
+
+
+@router.get("/tree/{room_id}")
+async def get_warehouse_tree(
+    room_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Получить дерево склада с активами"""
+    from src.infrastructure.db.models.department import Room as RoomModel
+    
+    room = db.query(RoomModel).filter(
+        RoomModel.id == room_id,
+        RoomModel.is_active == True,
+    ).first()
+    if not room:
+        raise HTTPException(status_code=404, detail="Помещение не найдено")
+    
+    # Получаем все storage_addresses для этого помещения
+    all_addresses = db.query(StorageAddress).filter(
+        StorageAddress.room_id == room_id,
+        StorageAddress.is_active == True,
+    ).all()
+    
+    # Получаем все активы для этого помещения
+    assets = db.query(Asset).filter(
+        Asset.is_active == True,
+        (Asset.room_id == room_id) | (Asset.warehouse_location_id.isnot(None)),
+    ).all()
+    
+    # Группируем адреса по parent_id
+    by_parent = {}
+    for addr in all_addresses:
+        if addr.parent_id not in by_parent:
+            by_parent[addr.parent_id] = []
+        by_parent[addr.parent_id].append(addr)
+    
+    # Считаем активы по storage_address_id
+    assets_by_address = {}
+    for asset in assets:
+        if asset.storage_address_id:
+            if asset.storage_address_id not in assets_by_address:
+                assets_by_address[asset.storage_address_id] = []
+            assets_by_address[asset.storage_address_id].append(asset)
+    
+    # Считаем активы без storage_address_id (нераспределённые)
+    unassigned_assets = [a for a in assets if not a.storage_address_id]
+    
+    def build_node(addr):
+        children = by_parent.get(addr.id, [])
+        node = {
+            "id": addr.id,
+            "name": addr.name,
+            "level": addr.level,
+            "code": addr.code or "",
+            "children": [],
+            "asset_count": len(assets_by_address.get(addr.id, [])),
+            "has_children": len(children) > 0,
+        }
+        # Рекурсивно добавляем детей
+        for child in children:
+            node["children"].append(build_node(child))
+        return node
+    
+    # Корень — помещение
+    root_nodes = by_parent.get(None, [])
+    
+    # Собираем дерево
+    tree = []
+    for node in root_nodes:
+        tree.append(build_node(node))
+    
+    return {
+        "room_id": room.id,
+        "room_name": room.name,
+        "full_name": f"{room.name} ({room.department.name})" if room.department else room.name,
+        "tree": tree,
+        "unassigned_assets": [
+            {
+                "id": a.id,
+                "name": a.name or "",
+                "inventory_number": a.inventory_number or "",
+            }
+            for a in unassigned_assets
+        ],
+        "unassigned_count": len(unassigned_assets),
+    }

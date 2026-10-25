@@ -30,6 +30,7 @@ interface TreeRoom {
   name: string;
   floor?: string;
   building?: string;
+  room_type?: string;
 }
 
 interface User {
@@ -906,6 +907,45 @@ const AdminPanel: React.FC = () => {
     setShowRoomForm(true);
   };
 
+  const handleToggleRoomType = async (dept: TreeDepartment, room: TreeRoom) => {
+    let message = '';
+    if (room.room_type === 'warehouse') {
+      message = `Вы уверены, что хотите вернуть '${room.name}' как помещение?\n\n⚠️ Все активы, размещённые в ячейках склада, будут привязаны к этому помещению (поле «Размещение» станет пустым). Структура склада будет удалена.`;
+    } else {
+      message = `Вы уверены, что хотите конвертировать '${room.name}' в склад?\n\nБудет автоматически создана структура: 5 стеллажей × 5 полок × 10 ячеек (250 ячеек). Активы из помещения будут перемещены в ячейки.`;
+    }
+    if (!confirm(message)) return;
+    
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/storage-addresses/rooms/${room.id}/toggle-type`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        let successMsg = data.message || 'Успешно';
+        if (data.cells_created) successMsg += `\nСоздано ячеек: ${data.cells_created}`;
+        if (data.assets_assigned) successMsg += `\nАктивов назначено: ${data.assets_assigned}`;
+        if (data.rooms_assigned) successMsg += `\nАктивов привязано к помещению: ${data.rooms_assigned}`;
+        if (data.debug) {
+          successMsg += `\n\nDebug: ${JSON.stringify(data.debug, null, 2)}`;
+        }
+        toast.success(successMsg);
+        fetchDepartments();
+      } else {
+        const err = await response.json().catch(() => ({}));
+        toast.error(err.detail || 'Ошибка');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Ошибка соединения');
+    }
+  };
+
   // Employee handlers
   const handleCreateEmployee = async () => {
     if (!empFormData.first_name || !empFormData.last_name || !empFormData.department_id || empFormData.department_id === 0) {
@@ -1390,19 +1430,33 @@ const AdminPanel: React.FC = () => {
                                 <div className="text-center py-4 text-gray-400 text-sm">Нет кабинетов</div>
                               ) : (
                                 <div className="flex flex-wrap gap-2">
-                                  {sortedRooms.map((room) => (
-                                    <div key={room.id} className="inline-flex items-center gap-1.5 bg-purple-50 dark:bg-purple-900/40 border border-purple-200 dark:border-purple-700 rounded-full pl-3 pr-1 py-1">
-                                      <div className="flex items-center gap-1.5">
-                                        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{room.name}</span>
-                                        {room.floor && <span className="text-xs text-purple-600 dark:text-purple-300 bg-purple-100 dark:bg-purple-900/60 px-1.5 py-0.5 rounded-full">Эт. {room.floor}</span>}
-                                        {room.building && <span className="text-xs text-purple-600 dark:text-purple-300 bg-purple-100 dark:bg-purple-900/60 px-1.5 py-0.5 rounded-full">Корп. {room.building}</span>}
-                                      </div>
+                                  {sortedRooms.map((room) => {
+                                    const isWarehouse = room.room_type === 'warehouse';
+                                    return (
+                                      <div key={room.id} className={`inline-flex items-center gap-1.5 rounded-full pl-3 pr-1 py-1 border ${
+                                        isWarehouse
+                                          ? 'bg-amber-50 dark:bg-amber-900/40 border-amber-200 dark:border-amber-700'
+                                          : 'bg-purple-50 dark:bg-purple-900/40 border-purple-200 dark:border-purple-700'
+                                      }`}>
+                                        <div className="flex items-center gap-1.5">
+                                          <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{room.name}</span>
+                                          {isWarehouse && <span className="text-xs text-amber-600 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/60 px-1.5 py-0.5 rounded-full">📦 Склад</span>}
+                                          {room.floor && <span className={`text-xs px-1.5 py-0.5 rounded-full ${isWarehouse ? 'text-amber-600 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/60' : 'text-purple-600 dark:text-purple-300 bg-purple-100 dark:bg-purple-900/60'}`}>Эт. {room.floor}</span>}
+                                          {room.building && <span className={`text-xs px-1.5 py-0.5 rounded-full ${isWarehouse ? 'text-amber-600 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/60' : 'text-purple-600 dark:text-purple-300 bg-purple-100 dark:bg-purple-900/60'}`}>Корп. {room.building}</span>}
+                                        </div>
                                       <button
                                         onClick={() => handleEditRoom(dept, room)}
                                         className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-full transition flex-shrink-0"
                                         title="Редактировать"
                                       >
                                         ✏️
+                                      </button>
+                                      <button
+                                        onClick={() => handleToggleRoomType(dept, room)}
+                                        className="p-1 text-amber-600 hover:text-amber-900 hover:bg-amber-100 dark:hover:bg-amber-900/40 rounded-full transition flex-shrink-0"
+                                        title={room.room_type === 'warehouse' ? 'Вернуть как помещение' : 'Конвертировать в склад'}
+                                      >
+                                        {room.room_type === 'warehouse' ? '🏢' : '📦'}
                                       </button>
                                       <button
                                         onClick={() => { setMoveRoomModal({open: true, room, deptId: dept.id}); setMoveTargetDept(null); }}
@@ -1419,7 +1473,8 @@ const AdminPanel: React.FC = () => {
                                         🗑️
                                       </button>
                                     </div>
-                                  ))}
+                                    );
+                                  })}
                                 </div>
                               )}
                             </div>

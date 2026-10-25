@@ -178,6 +178,7 @@ async def get_placement_tree(
                     "name": r.name,
                     "floor": r.floor or "",
                     "building": r.building or "",
+                    "room_type": r.room_type or "room",
                 }
                 for r in rooms
             ],
