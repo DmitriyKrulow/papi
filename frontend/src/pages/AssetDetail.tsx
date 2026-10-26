@@ -182,7 +182,7 @@ const AssetDetail: React.FC = () => {
             <div className="sm:col-span-1">
               <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Адрес</dt>
               <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
-                {asset.location_address || 'Не указано'}
+                {asset.location_address || asset.storage_address_name || 'Не указано'}
               </dd>
             </div>
             <div className="sm:col-span-1">

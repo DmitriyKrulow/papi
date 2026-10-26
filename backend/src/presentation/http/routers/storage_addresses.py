@@ -35,10 +35,25 @@ def _build_storage_tree(addresses, parent_wl_id, db):
             "parent_id": addr.parent_id,
             "warehouse_location_id": addr.warehouse_location_id,
             "capacity": addr.capacity,
-            "current_count": addr.current_count,
         })
     
     logger.info(f"By level: { {k: len(v) for k, v in by_level.items()} }")
+    
+    def count_assets_for_address(addr_id):
+        """Посчитать активы для адреса (включая детей)"""
+        # Прямые активы
+        direct = db.query(Asset).filter(
+            Asset.storage_address_id == addr_id,
+            Asset.is_active == True,
+        ).count()
+        
+        # Активы у детей
+        child_ids = [a.id for a in addresses if a.parent_id == addr_id]
+        child_count = 0
+        for cid in child_ids:
+            child_count += count_assets_for_address(cid)
+        
+        return direct + child_count
     
     def build_tree(p_id=None, lvl=None):
         children = []
@@ -64,13 +79,15 @@ def _build_storage_tree(addresses, parent_wl_id, db):
                 logger.debug(f"Checking rack: id={item['id']}, wl_id={item['warehouse_location_id']}, p_id={p_id}")
                 if item.get("warehouse_location_id") == p_id:
                     logger.info(f"Found rack: {item['name']} for wl_id={p_id}")
+                    # Считаем активы рекурсивно
+                    asset_count = count_assets_for_address(item["id"])
                     node = {
                         "id": item["id"],
                         "name": item["name"],
                         "code": item["code"],
                         "level": item["level"],
                         "capacity": item["capacity"],
-                        "current_count": item["current_count"],
+                        "current_count": asset_count,
                         "children": build_tree(item["id"], item["level"]),
                     }
             # Для shelf и cell: проверяем warehouse_location_id И parent_id
@@ -80,13 +97,15 @@ def _build_storage_tree(addresses, parent_wl_id, db):
                 logger.debug(f"Checking {item['level']}: id={item['id']}, wl_id={item['warehouse_location_id']}, parent_id={item['parent_id']}, p_id={p_id}")
                 if item.get("warehouse_location_id") == p_id or item.get("parent_id") == p_id:
                     logger.info(f"Found {item['level']}: {item['name']} for wl_id={p_id} / parent_id={p_id}")
+                    # Считаем активы рекурсивно
+                    asset_count = count_assets_for_address(item["id"])
                     node = {
                         "id": item["id"],
                         "name": item["name"],
                         "code": item["code"],
                         "level": item["level"],
                         "capacity": item["capacity"],
-                        "current_count": item["current_count"],
+                        "current_count": asset_count,
                         "children": build_tree(item["id"], item["level"]),
                     }
             if node:

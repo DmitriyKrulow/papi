@@ -92,6 +92,10 @@ def asset_to_dict(asset, db: Optional[Session] = None):
             # Логин проверяющего — показываем в UI вместо числового ID
             assigned_inventory_checker_name = checker.username or checker.full_name
 
+    # Складская локация: полный адрес вида "Склад → Зона → Стеллаж"
+    storage_addr = getattr(asset, 'storage_address', None)
+    storage_address_name = storage_addr.get_full_address() if storage_addr else None
+
     return {
         "id": getattr(asset, 'id', None),
         "inventory_number": safe_str(getattr(asset, 'inventory_number', None)),
@@ -133,6 +137,8 @@ def asset_to_dict(asset, db: Optional[Session] = None):
         "last_inventory_confirmed": getattr(asset, 'last_inventory_confirmed', False),
         "last_inventory_source": getattr(asset, 'last_inventory_source', None),
         "rfid_tag": safe_str(getattr(asset, 'rfid_tag', None)),
+        "storage_address_id": getattr(asset, 'storage_address_id', None),
+        "storage_address_name": safe_str(storage_address_name),
     }
 
 
@@ -539,6 +545,13 @@ async def update_asset(
                 raw_tag = str(raw_tag).strip().upper() or None
             logger.info(f"[Asset Update] Setting rfid_tag for asset {asset_id}: {raw_tag!r}")
             asset.rfid_tag = raw_tag  # type: ignore[assignment]
+        if "storage_address_id" in asset_data:
+            new_storage_id = asset_data["storage_address_id"] or None
+            # Смена складской локации отвязывает актив от кабинета
+            if new_storage_id:
+                asset.room_id = None
+            asset.storage_address_id = new_storage_id  # type: ignore[assignment]
+            logger.info(f"[Asset Update] Setting storage_address_id for asset {asset_id}: {new_storage_id!r}")
         
         asset.updated_at = datetime.now()  # type: ignore[assignment]
         

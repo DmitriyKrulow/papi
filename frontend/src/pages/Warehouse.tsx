@@ -1155,8 +1155,14 @@ const WarehouseTreeNode: React.FC<WarehouseTreeNodeProps> = ({
           {node.name}
         </span>
 
-        {(node.level === 'zone' || node.level === 'rack') && node.current_count !== undefined && node.current_count > 0 && (
-          <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">{node.current_count} ак.</span>
+        {(node.level === 'zone' || node.level === 'rack' || node.level === 'shelf') && node.current_count !== undefined && node.current_count > 0 && (
+          <span className={`text-xs flex-shrink-0 ${
+            node.level === 'zone' ? 'text-purple-600 dark:text-purple-400' :
+            node.level === 'rack' ? 'text-amber-600 dark:text-amber-400' :
+            'text-blue-600 dark:text-blue-400'
+          }`}>
+            {node.current_count} ак.
+          </span>
         )}
 
         <div className="flex items-center gap-0.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>

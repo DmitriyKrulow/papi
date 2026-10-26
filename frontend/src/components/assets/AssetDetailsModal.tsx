@@ -361,7 +361,7 @@ const getStatusColor = (status: string): string => {
     
     // Местоположение
     const locationRows: React.ReactNode[] = [
-      printRow('Адрес', asset.location_address),
+      printRow('Адрес', asset.location_address || asset.storage_address_name),
       printRow('Подразделение', asset.department_name || asset.department_code),
       printRow('Ответственное лицо', asset.responsible_person || asset.employee_name),
     ];
@@ -710,8 +710,11 @@ return (
           <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide flex items-center gap-2">
             <MapPin className="w-4 h-4" /> Местоположение
           </h4>
-          <DetailRow label="Адрес" value={asset.location_address} />
+          <DetailRow label="Адрес" value={asset.location_address || asset.storage_address_name} />
           <DetailRow label="Подразделение" value={asset.department_code} />
+          {asset.storage_address_name && (
+            <DetailRow label="Складская локация" value={asset.storage_address_name} />
+          )}
         </div>
 
         <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-6 space-y-4">

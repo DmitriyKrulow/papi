@@ -15,6 +15,7 @@ interface Asset {
   responsible_person?: string;
   purchase_date?: string;
   location_address?: string;
+  storage_address_name?: string;
   last_inventory_date?: string;
   last_inventory_confirmed?: boolean;
   asset_photos?: Array<{
@@ -395,10 +396,10 @@ const InventoryAssetMobile: React.FC = () => {
               </div>
             )}
             
-            {asset.location_address && (
+            {(asset.location_address || asset.storage_address_name) && (
               <div className="flex items-center gap-2">
                 <span className="text-gray-500 dark:text-gray-400 w-28 shrink-0">Местоположение:</span>
-                <span className="text-gray-900 dark:text-gray-100">{asset.location_address}</span>
+                <span className="text-gray-900 dark:text-gray-100">{asset.location_address || asset.storage_address_name}</span>
               </div>
             )}
             
