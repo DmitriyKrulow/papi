@@ -39,8 +39,10 @@ public class AppSettings
 
 public enum ScannerMode
 {
-    Hid,      // Эмуляция клавиатуры
-    Tcp       // TCP/IP сокет
+    Hid,      // Эмуляция клавиатуры (RFID)
+    Nfc,      // Эмуляция клавиатуры (NFC)
+    Tcp,      // TCP/IP сокет
+    Serial    // RS232
 }
 
 /// <summary>

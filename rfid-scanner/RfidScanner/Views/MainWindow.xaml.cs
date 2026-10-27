@@ -36,6 +36,11 @@ public partial class MainWindow : Window
     private readonly System.Text.StringBuilder _hidBuffer = new();
     private DateTime _lastHidKeyTime = DateTime.MinValue;
     private const int HidCharTimeoutMs = 200;
+    
+    // Буфер для NFC-сканера (посимвольный ввод)
+    private readonly System.Text.StringBuilder _nfcBuffer = new();
+    private DateTime _lastNfcKeyTime = DateTime.MinValue;
+    private const int NfcCharTimeoutMs = 200;
 
     public MainWindow(ConfigService config, RoleService roleService, AppUser currentUser)
     {
@@ -132,6 +137,9 @@ public partial class MainWindow : Window
         
         // HID-сканер
         PreviewKeyDown += MainWindow_PreviewKeyDown;
+        
+        // Обновляем индикатор режима
+        UpdateModeIndicator();
         
         // Подписка на создание сессии
         _sessionManager.SessionChanged += OnSessionCreated;
@@ -254,8 +262,13 @@ public partial class MainWindow : Window
 
     private void OnFinished()
     {
+        System.Diagnostics.Debug.WriteLine("[MainWindow] OnFinished called");
         if (_finishTask != null && !_finishTask.IsCompleted)
+        {
+            System.Diagnostics.Debug.WriteLine("[MainWindow] OnFinished - task already running, skipping");
             return;
+        }
+        System.Diagnostics.Debug.WriteLine("[MainWindow] Starting FinishInventoryAsync");
         _finishTask = FinishInventoryAsync();
     }
 
@@ -263,41 +276,46 @@ public partial class MainWindow : Window
     {
         try
         {
+            System.Diagnostics.Debug.WriteLine("[MainWindow] Calling FinishWithSyncAsync");
             var result = await _scanViewModel.FinishWithSyncAsync();
+            System.Diagnostics.Debug.WriteLine($"[MainWindow] FinishWithSyncAsync completed: Success={result.Success}, Skipped={result.SkippedCount}");
 
-            Dispatcher.Invoke(() =>
+            // Показываем результат и переключаем view
+            System.Diagnostics.Debug.WriteLine("[MainWindow] Showing toast and switching view");
+            
+            // Сбрасываем флаг подавления — он может остаться true от OnSessionCreated
+            _suppressSessionViewSwitch = false;
+            
+            if (result.SkippedCount > 0)
             {
-                if (result.SkippedCount > 0)
-                {
-                    var msg = $"Инвентаризация завершена.\n\n" +
-                              $"✅ Найдено: {_scanViewModel.MatchedCount}\n" +
-                              $"❌ Отсутствует: {_scanViewModel.MissingCount}\n" +
-                              $"⏭ Пропущено: {result.SkippedCount}";
+                var msg = $"Инвентаризация завершена.\n\n" +
+                          $"✅ Найдено: {_scanViewModel.MatchedCount}\n" +
+                          $"❌ Отсутствует: {_scanViewModel.MissingCount}\n" +
+                          $"⏭ Пропущено: {result.SkippedCount}";
 
-                    if (result.ServerError)
-                        ToastService.ShowWarning(this, $"⚠ Ошибка сервера: {result.Message}");
-                    else
-                        ToastService.ShowSuccess(this, "✅ Результаты отправлены на сервер");
-                }
-                else if (result.ServerError)
-                {
-                    ToastService.ShowWarning(this, $"Инвентаризация завершена локально. Ошибка: {result.Message}");
-                }
+                if (result.ServerError)
+                    ToastService.ShowWarning(this, $"⚠ Ошибка сервера: {result.Message}");
                 else
-                {
-                    ToastService.ShowSuccess(this, $"Инвентаризация завершена. Найдено: {_scanViewModel.MatchedCount}, Отсутствует: {_scanViewModel.MissingCount}");
-                }
+                    ToastService.ShowSuccess(this, "✅ Результаты отправлены на сервер");
+            }
+            else if (result.ServerError)
+            {
+                ToastService.ShowWarning(this, $"Инвентаризация завершена локально. Ошибка: {result.Message}");
+            }
+            else
+            {
+                ToastService.ShowSuccess(this, $"Инвентаризация завершена. Найдено: {_scanViewModel.MatchedCount}, Отсутствует: {_scanViewModel.MissingCount}");
+            }
 
-                SwitchToRoomSelector();
-            });
+            System.Diagnostics.Debug.WriteLine("[MainWindow] Calling SwitchToRoomSelector");
+            SwitchToRoomSelector();
+            System.Diagnostics.Debug.WriteLine("[MainWindow] SwitchToRoomSelector completed");
         }
         catch (Exception ex)
         {
-            Dispatcher.Invoke(() =>
-            {
-                ToastService.ShowError(this, $"Ошибка завершения инвентаризации: {ex.Message}");
-                SwitchToRoomSelector();
-            });
+            System.Diagnostics.Debug.WriteLine($"[MainWindow] Exception in FinishInventoryAsync: {ex}");
+            ToastService.ShowError(this, $"Ошибка завершения инвентаризации: {ex.Message}");
+            SwitchToRoomSelector();
         }
         finally
         {
@@ -348,17 +366,32 @@ public partial class MainWindow : Window
         if (ScanHostView.Visibility != Visibility.Visible) return;
 
         var now = DateTime.Now;
-        if ((now - _lastHidKeyTime).TotalMilliseconds > HidCharTimeoutMs)
-            _hidBuffer.Clear();
-        _lastHidKeyTime = now;
+        var isNfcMode = _config.Settings.ScannerMode == ScannerMode.Nfc;
+        
+        // Определяем какой буфер использовать
+        var buffer = isNfcMode ? _nfcBuffer : _hidBuffer;
+        var lastKeyTime = isNfcMode ? _lastNfcKeyTime : _lastHidKeyTime;
+        var charTimeoutMs = isNfcMode ? NfcCharTimeoutMs : HidCharTimeoutMs;
+
+        if ((now - lastKeyTime).TotalMilliseconds > charTimeoutMs)
+            buffer.Clear();
+        
+        if (isNfcMode)
+            _lastNfcKeyTime = now;
+        else
+            _lastHidKeyTime = now;
 
         if (e.Key == Key.Return || e.Key == Key.Enter)
         {
-            var tag = _hidBuffer.ToString().Trim();
-            _hidBuffer.Clear();
+            var tag = buffer.ToString().Trim();
+            buffer.Clear();
 
             if (tag.Length > 0)
+            {
+                var modeLabel = isNfcMode ? "NFC" : "RFID";
+                System.Diagnostics.Debug.WriteLine($"[{modeLabel}] Tag: {tag}");
                 _scanViewModel.ProcessTagCommand.Execute(tag);
+            }
 
             e.Handled = true;
             return;
@@ -367,7 +400,7 @@ public partial class MainWindow : Window
         var ch = KeyToChar(e.Key);
         if (ch != null)
         {
-            _hidBuffer.Append(ch.Value);
+            buffer.Append(ch.Value);
             e.Handled = true;
         }
     }
@@ -381,6 +414,30 @@ public partial class MainWindow : Window
         if (key >= Key.NumPad0 && key <= Key.NumPad9)
             return (char)('0' + (key - Key.NumPad0));
         return null;
+    }
+
+    private void UpdateModeIndicator()
+    {
+        var mode = _config.Settings.ScannerMode;
+        switch (mode)
+        {
+            case ScannerMode.Nfc:
+                ModeIndicator.Text = "📱 NFC";
+                ModeIndicator.Foreground = (Brush)FindResource("ThemeSuccess");
+                break;
+            case ScannerMode.Serial:
+                ModeIndicator.Text = "🔌 Serial";
+                ModeIndicator.Foreground = (Brush)FindResource("ThemeWarning");
+                break;
+            case ScannerMode.Tcp:
+                ModeIndicator.Text = "🌐 TCP";
+                ModeIndicator.Foreground = (Brush)FindResource("ThemeInfo");
+                break;
+            default:
+                ModeIndicator.Text = "📡 RFID";
+                ModeIndicator.Foreground = (Brush)FindResource("ThemeAccentBright");
+                break;
+        }
     }
 
     // ==================== Кнопки ====================
@@ -426,8 +483,14 @@ public partial class MainWindow : Window
 
     private void SwitchToRoomSelector()
     {
+        System.Diagnostics.Debug.WriteLine("[MainWindow] SwitchToRoomSelector START");
+        
         // Не переключаемся если только что создали сессию (защита от цикла)
-        if (_suppressSessionViewSwitch) return;
+        if (_suppressSessionViewSwitch)
+        {
+            System.Diagnostics.Debug.WriteLine("[MainWindow] SwitchToRoomSelector - suppressed");
+            return;
+        }
         
         // Сохраняем состояние вкладки перед завершением сессии
         _wasInventoriesTab = _roomSelectorViewModel?.ShowInventories ?? false;
@@ -435,12 +498,17 @@ public partial class MainWindow : Window
         _isSwitchingView = true;
         
         if (_sessionManager.HasActiveSession)
+        {
+            System.Diagnostics.Debug.WriteLine("[MainWindow] Finishing session");
             _sessionManager.FinishSession();
+        }
         
         ScanHostView.Visibility = Visibility.Collapsed;
         RoomSelectorHostView.Visibility = Visibility.Visible;
         _isSwitchingView = false;
 
+        System.Diagnostics.Debug.WriteLine("[MainWindow] View switched to RoomSelector");
+        
         // Восстанавливаем вкладку если была инвентаризация
         if (_wasInventoriesTab)
         {
@@ -454,5 +522,6 @@ public partial class MainWindow : Window
         }
         
         UpdateWidgets();
+        System.Diagnostics.Debug.WriteLine("[MainWindow] SwitchToRoomSelector DONE");
     }
 }

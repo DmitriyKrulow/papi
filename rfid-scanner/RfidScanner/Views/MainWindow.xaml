@@ -165,9 +165,14 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Grid.Column="0">
-                        <TextBlock x:Name="ConnectionStatus" Text="Проверка подключения..." 
-                                   Foreground="{DynamicResource ThemeTextOnDark}" FontSize="13" 
-                                   FontWeight="SemiBold"/>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock x:Name="ModeIndicator" Text="📡 RFID" 
+                                       Foreground="{DynamicResource ThemeAccentBright}" FontSize="13" 
+                                       FontWeight="SemiBold" Margin="0,0,10,0"/>
+                            <TextBlock x:Name="ConnectionStatus" Text="Проверка подключения..." 
+                                       Foreground="{DynamicResource ThemeTextOnDark}" FontSize="13" 
+                                       FontWeight="SemiBold"/>
+                        </StackPanel>
                         <TextBlock x:Name="SyncStatus" Text="Загрузка..." 
                                    Foreground="{DynamicResource ThemeTextSecondary}" FontSize="11" 
                                    Margin="0,2,0,0"/>

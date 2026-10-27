@@ -186,7 +186,9 @@ public partial class ScanView : UserControl
 
     private void FinishButton_Click(object sender, RoutedEventArgs e)
     {
+        System.Diagnostics.Debug.WriteLine("[ScanView] FinishButton_Click called");
         Finished?.Invoke();
+        System.Diagnostics.Debug.WriteLine("[ScanView] Finished event fired");
     }
 
     private void ResetButton_Click(object sender, RoutedEventArgs e)

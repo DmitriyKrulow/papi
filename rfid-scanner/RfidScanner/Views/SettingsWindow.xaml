@@ -84,10 +84,26 @@
                                Foreground="{DynamicResource ThemeTextPrimary}"/>
                     <ComboBox Grid.Column="1" x:Name="ScannerModeCombo" 
                               SelectedIndex="0" Margin="0,0,0,5">
-                        <ComboBoxItem Content="HID (клавиатура)"/>
-                        <ComboBoxItem Content="TCP/IP"/>
+                        <ComboBoxItem Content="📡 RFID (клавиатура)"/>
+                        <ComboBoxItem Content="📱 NFC (клавиатура)"/>
+                        <ComboBoxItem Content="🌐 TCP/IP"/>
+                        <ComboBoxItem Content="🔌 Serial (RS232)"/>
                     </ComboBox>
                 </Grid>
+                
+                <!-- Индикатор выбранного режима -->
+                <Border x:Name="ModeIndicatorBorder" Background="{DynamicResource ThemeWidgetInfoBg}" 
+                        CornerRadius="8" Padding="12" Margin="0,0,0,15"
+                        BorderThickness="1" BorderBrush="{DynamicResource ThemeBorderBrush}">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                        <TextBlock x:Name="ModeIndicatorIcon" Text="📡" FontSize="16" Margin="0,0,8,0"
+                                   VerticalAlignment="Center"/>
+                        <TextBlock x:Name="ModeIndicatorText" Text="RFID-сканер (HID)" 
+                                   FontSize="13" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource ThemeTextPrimary}"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
 
                 <Grid Margin="0,0,0,15" x:Name="TcpSettingsPanel" Visibility="Collapsed">
                     <Grid.ColumnDefinitions>

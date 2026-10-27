@@ -1,4 +1,6 @@
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
 using RfidScanner.Services;
 
 namespace RfidScanner.Views;
@@ -25,15 +27,66 @@ public partial class SettingsWindow : Window
         SoundCheck.IsChecked = settings.EnableSound;
         
         // Установка режима сканера
-        ScannerModeCombo.SelectedIndex = 
-            settings.ScannerMode == ScannerMode.Tcp ? 1 : 0;
+        // Индексы: 0=RFID, 1=NFC, 2=TCP, 3=Serial
+        switch (settings.ScannerMode)
+        {
+            case ScannerMode.Nfc:
+                ScannerModeCombo.SelectedIndex = 1;
+                break;
+            case ScannerMode.Tcp:
+                ScannerModeCombo.SelectedIndex = 2;
+                break;
+            case ScannerMode.Serial:
+                ScannerModeCombo.SelectedIndex = 3;
+                break;
+            default:
+                ScannerModeCombo.SelectedIndex = 0;
+                break;
+        }
         
-        // Показ/скрытие TCP-настроек
+        // Обновляем индикатор режима
+        UpdateModeIndicator();
+        
+        // Показ/скрытие TCP/Serial-настроек
         ScannerModeCombo.SelectionChanged += (s, e) =>
         {
             TcpSettingsPanel.Visibility = 
-                ScannerModeCombo.SelectedIndex == 1 ? Visibility.Visible : Visibility.Collapsed;
+                ScannerModeCombo.SelectedIndex >= 2 ? Visibility.Visible : Visibility.Collapsed;
+            UpdateModeIndicator();
         };
+    }
+    
+    private void UpdateModeIndicator()
+    {
+        var selectedIndex = ScannerModeCombo.SelectedIndex;
+        
+        switch (selectedIndex)
+        {
+            case 1: // NFC
+                ModeIndicatorIcon.Text = "📱";
+                ModeIndicatorText.Text = "NFC-сканер (клавиатура)";
+                ModeIndicatorBorder.Background = (Brush)FindResource("ThemeWidgetSuccessBg");
+                ModeIndicatorText.Foreground = (Brush)FindResource("ThemeSuccess");
+                break;
+            case 2: // TCP
+                ModeIndicatorIcon.Text = "🌐";
+                ModeIndicatorText.Text = "TCP/IP сканер";
+                ModeIndicatorBorder.Background = (Brush)FindResource("ThemeWidgetInfoBg");
+                ModeIndicatorText.Foreground = (Brush)FindResource("ThemeInfo");
+                break;
+            case 3: // Serial
+                ModeIndicatorIcon.Text = "🔌";
+                ModeIndicatorText.Text = "Serial (RS232) сканер";
+                ModeIndicatorBorder.Background = (Brush)FindResource("ThemeWidgetWarningBg");
+                ModeIndicatorText.Foreground = (Brush)FindResource("ThemeWarning");
+                break;
+            default: // RFID
+                ModeIndicatorIcon.Text = "📡";
+                ModeIndicatorText.Text = "RFID-сканер (HID)";
+                ModeIndicatorBorder.Background = (Brush)FindResource("ThemeWidgetErrorBg");
+                ModeIndicatorText.Foreground = (Brush)FindResource("ThemeError");
+                break;
+        }
     }
 
     private void SaveButton_Click(object sender, RoutedEventArgs e)
@@ -63,8 +116,14 @@ public partial class SettingsWindow : Window
             settings.EnableSound = (bool)SoundCheck.IsChecked!;
             
             // Установка режима
-            settings.ScannerMode = 
-                ScannerModeCombo.SelectedIndex == 1 ? ScannerMode.Tcp : ScannerMode.Hid;
+            // Индексы: 0=RFID, 1=NFC, 2=TCP, 3=Serial
+            settings.ScannerMode = ScannerModeCombo.SelectedIndex switch
+            {
+                1 => ScannerMode.Nfc,
+                2 => ScannerMode.Tcp,
+                3 => ScannerMode.Serial,
+                _ => ScannerMode.Hid
+            };
             
             _config.Save();
             
