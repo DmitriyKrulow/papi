@@ -162,6 +162,9 @@ const Assets: React.FC = () => {
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
+  // Возвращаем фокус в основной поиск только если он реально был в этой строке.
+  // Иначе он перехватывает ввод у полей поиска внутри фильтров.
+  const searchFocusedRef = useRef(false);
 
   const handleSearchChange = useCallback((value: string) => {
     setSearchTerm(value);
@@ -174,12 +177,24 @@ const Assets: React.FC = () => {
 
   // Сохраняем фокус при ререндере (используем useLayoutEffect для синхронности)
   useLayoutEffect(() => {
-    if (searchInputRef.current && document.activeElement !== searchInputRef.current) {
-      requestAnimationFrame(() => {
+    if (!searchFocusedRef.current || !searchInputRef.current) return;
+    if (document.activeElement === searchInputRef.current) return;
+    requestAnimationFrame(() => {
+      if (
+        searchFocusedRef.current &&
+        searchInputRef.current &&
+        document.activeElement !== searchInputRef.current
+      ) {
         searchInputRef.current?.focus();
-      });
-    }
+      }
+    });
   });
+
+  // При открытии страницы курсор ставим в строку поиска (удобно для сканера)
+  useEffect(() => {
+    searchInputRef.current?.focus();
+    searchFocusedRef.current = true;
+  }, []);
 
   // Debounce для поиска по комнатам внутри dropdown
   useEffect(() => {
@@ -935,6 +950,8 @@ const handleEditClick = (asset: Asset) => {
             placeholder="Поиск по названию, инв. номеру..."
             value={searchTerm}
             onChange={(e) => handleSearchChange(e.target.value)}
+            onFocus={() => { searchFocusedRef.current = true; }}
+            onBlur={() => { searchFocusedRef.current = false; }}
             className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
           />
           {isAdmin && (
@@ -1021,9 +1038,11 @@ const handleEditClick = (asset: Asset) => {
                 <ChevronDown className={`absolute right-2.5 top-2.5 w-3.5 h-3.5 text-gray-400 transition-transform ${deptDropdownOpen ? 'rotate-180' : ''}`} />
               </div>
               {deptDropdownOpen && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setDeptDropdownOpen(false)} />
-                  <div className="absolute z-20 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-hidden" style={{ top: '100%' }}>
+                <div
+                  className="absolute z-20 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-hidden"
+                  style={{ top: '100%' }}
+                  onClick={(e) => e.stopPropagation()}
+                >
                     <div className="p-2 border-b border-gray-100 dark:border-gray-700">
                       <div className="relative">
                         <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
@@ -1032,6 +1051,7 @@ const handleEditClick = (asset: Asset) => {
                           placeholder="Поиск..."
                           value={departmentSearch}
                           onChange={(e) => setDepartmentSearch(e.target.value)}
+                          autoFocus
                           className="w-full pl-7 pr-2 py-1.5 border border-gray-200 dark:border-gray-600 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                         />
                       </div>
@@ -1063,6 +1083,8 @@ const handleEditClick = (asset: Asset) => {
                         <div className="px-3 py-4 text-sm text-gray-400 text-center dark:text-gray-500">Ничего не найдено</div>
                       )}
                     </div>
+                  </div>
+              )}
             </div>
             <div className="relative">
               <div className="relative">
@@ -1093,9 +1115,11 @@ const handleEditClick = (asset: Asset) => {
                 <ChevronDown className={`absolute right-2.5 top-2.5 w-3.5 h-3.5 text-gray-400 transition-transform ${roomDropdownOpen ? 'rotate-180' : ''}`} />
               </div>
               {roomDropdownOpen && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setRoomDropdownOpen(false)} />
-                  <div className="absolute z-20 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-80 overflow-hidden" style={{ top: '100%' }}>
+                <div
+                  className="absolute z-20 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-80 overflow-hidden"
+                  style={{ top: '100%' }}
+                  onClick={(e) => e.stopPropagation()}
+                >
                     <div className="p-2 border-b border-gray-100 dark:border-gray-700">
                       <div className="relative">
                         <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
@@ -1104,6 +1128,7 @@ const handleEditClick = (asset: Asset) => {
                           placeholder="Поиск..."
                           value={roomSearch}
                           onChange={(e) => setRoomSearch(e.target.value)}
+                          autoFocus
                           className="w-full pl-7 pr-2 py-1.5 border border-gray-200 dark:border-gray-600 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                         />
                       </div>
@@ -1193,10 +1218,6 @@ const handleEditClick = (asset: Asset) => {
                       )}
                     </div>
                   </div>
-                </>
-              )}
-            </div>
-                </>
               )}
             </div>
             <div className="relative">
@@ -1222,9 +1243,11 @@ const handleEditClick = (asset: Asset) => {
                 <ChevronDown className={`absolute right-2.5 top-2.5 w-3.5 h-3.5 text-gray-400 transition-transform ${employeeDropdownOpen ? 'rotate-180' : ''}`} />
               </div>
               {employeeDropdownOpen && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setEmployeeDropdownOpen(false)} />
-                  <div className="absolute z-20 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-hidden" style={{ top: '100%' }}>
+                <div
+                  className="absolute z-20 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-hidden"
+                  style={{ top: '100%' }}
+                  onClick={(e) => e.stopPropagation()}
+                >
                     <div className="p-2 border-b border-gray-100 dark:border-gray-700">
                       <div className="relative">
                         <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
@@ -1233,6 +1256,7 @@ const handleEditClick = (asset: Asset) => {
                           placeholder="Поиск..."
                           value={employeeSearch}
                           onChange={(e) => setEmployeeSearch(e.target.value)}
+                          autoFocus
                           className="w-full pl-7 pr-2 py-1.5 border border-gray-200 dark:border-gray-600 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                         />
                       </div>
@@ -1267,7 +1291,6 @@ const handleEditClick = (asset: Asset) => {
                       )}
                     </div>
                   </div>
-                </>
               )}
             </div>
             {/* Empty fields filters */}
@@ -1402,7 +1425,7 @@ const handleEditClick = (asset: Asset) => {
                     <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-32">
                       Единицы
                     </th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-24">
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-24 sticky right-0 z-10 bg-gray-50 dark:bg-gray-700 shadow-[inset_1px_0_0_0_rgba(0,0,0,0.06)]">
                       Действия
                     </th>
                   </tr>
@@ -1412,7 +1435,7 @@ const handleEditClick = (asset: Asset) => {
                     const typeInfo = getAssetTypeLabel(asset.asset_type);
                     return (
                       <>
-                      <tr key={asset.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+                      <tr key={asset.id} className="group hover:bg-gray-50 dark:hover:bg-gray-700 transition">
                         <td className="px-4 py-3 text-sm font-mono text-gray-900 dark:text-gray-100 border-r border-gray-50 dark:border-gray-700">
                           {asset.inventory_number}
                         </td>
@@ -1506,7 +1529,7 @@ const handleEditClick = (asset: Asset) => {
                             <span className="text-xs text-gray-400">—</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-center">
+                        <td className="px-4 py-3 text-center sticky right-0 bg-white dark:bg-gray-800 group-hover:bg-gray-50 dark:group-hover:bg-gray-700 shadow-[inset_1px_0_0_0_rgba(0,0,0,0.06)]">
                           <div className="flex items-center justify-center gap-1">
                             <button
                               onClick={() => { setCurrentAsset(asset); setIsDetailsModalOpen(true); }}

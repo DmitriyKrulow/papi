@@ -154,6 +154,29 @@ async def get_address_tree(
     return {"tree": build_tree(None, "building"), "by_level": by_level}
 
 
+@router.get("")
+async def list_storage_addresses(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Простой список всех активных storage_addresses для выбора в фильтре"""
+    addresses = db.query(StorageAddress).filter(
+        StorageAddress.is_active == True,
+    ).order_by(StorageAddress.level, StorageAddress.name).all()
+    
+    result = []
+    for sa in addresses:
+        full = sa.get_full_address()
+        result.append({
+            "id": sa.id,
+            "name": sa.name,
+            "code": sa.code or "",
+            "level": sa.level,
+            "full_address": full,
+        })
+    return result
+
+
 @router.post("")
 async def create_address(
     payload: dict,
